@@ -1,0 +1,95 @@
+<aside class="utility" aria-label="Acciones y configuración">
+  <section class="utility__section" aria-labelledby="utility-quick-heading">
+    <h2 id="utility-quick-heading" class="utility__label">Quick actions</h2>
+    <ul class="utility__actions" role="list">
+      @for (action of quickActions; track action.id) {
+        <li>
+          <button type="button" class="utility__action" (click)="onQuickAction(action.id)">
+            <span class="utility__action-icon" aria-hidden="true">
+              @switch (action.icon) {
+                @case ('plus') {
+                  <svg lucidePlus [size]="18" strokeWidth="1.75"></svg>
+                }
+                @case ('play') {
+                  <svg lucidePlay [size]="18" strokeWidth="1.75"></svg>
+                }
+                @case ('download') {
+                  <svg lucideDownload [size]="18" strokeWidth="1.75"></svg>
+                }
+                @case ('upload') {
+                  <svg lucideUpload [size]="18" strokeWidth="1.75"></svg>
+                }
+              }
+            </span>
+            <span class="utility__action-text">
+              <span class="utility__action-title">{{ action.title }}</span>
+              <span class="utility__action-sub">{{ action.subtitle }}</span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section class="utility__section utility__section--activity" aria-labelledby="utility-activity-heading">
+    <h2 id="utility-activity-heading" class="utility__label">Recent activity</h2>
+    <div class="utility__activity-card">
+      <ul class="utility__activity-list cp-scrollbar" role="list">
+        @for (item of recentActivities; track item.id) {
+          <li class="utility__activity-row">
+            <span class="utility__activity-icon" aria-hidden="true">
+              @switch (item.icon) {
+                @case ('branch') {
+                  <svg lucideGitBranch [size]="16" strokeWidth="1.75"></svg>
+                }
+                @case ('layers') {
+                  <svg lucideLayers [size]="16" strokeWidth="1.75"></svg>
+                }
+                @case ('settings') {
+                  <svg lucideSettings [size]="16" strokeWidth="1.75"></svg>
+                }
+              }
+            </span>
+            <div class="utility__activity-body">
+              <p class="utility__activity-primary">
+                <span class="utility__activity-verb" [attr.data-tone]="item.verbTone">{{ item.verb }}</span>
+                <strong class="utility__activity-target">{{ item.target }}</strong>
+              </p>
+              <p class="utility__activity-meta">
+                <svg
+                  lucideClock
+                  [size]="12"
+                  strokeWidth="1.75"
+                  class="utility__activity-meta-icon"
+                  aria-hidden="true"
+                ></svg>
+                <span class="utility__activity-time">{{ item.timeAgo }}</span>
+                <span class="utility__activity-by">by You</span>
+              </p>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="utility__section utility__section--footer" aria-labelledby="utility-global-heading">
+    <h2 id="utility-global-heading" class="utility__label">Global config</h2>
+    <div class="utility__config-card">
+      <ul class="utility__config-rows" role="list">
+        @for (row of globalConfigRows; track row.label) {
+          <li class="utility__config-row">
+            <span class="utility__config-key">{{ row.label }}</span>
+            <span class="utility__config-badge" [class.utility__config-badge--success]="row.tone === 'success'">
+              {{ row.badge }}
+            </span>
+          </li>
+        }
+      </ul>
+      <button type="button" class="utility__config-btn" (click)="editGlobalConfig.emit()">
+        <svg lucideSettings [size]="18" strokeWidth="1.75" aria-hidden="true"></svg>
+        Edit global config
+      </button>
+    </div>
+  </section>
+</aside>

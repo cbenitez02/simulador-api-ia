@@ -1,0 +1,160 @@
+<aside class="detail" aria-label="Log details">
+  @if (entry(); as log) {
+    <div class="detail__panel">
+      <header class="detail__head">
+        <span class="detail__head-label">Inspector</span>
+        <button type="button" class="detail__icon-btn" (click)="closePanel()" aria-label="Close details panel">
+          <svg lucideX [size]="18" strokeWidth="1.75"></svg>
+        </button>
+      </header>
+
+      <section class="detail__hero">
+        <div class="detail__hero-primary">
+          <h2 class="detail__request-title">
+            <app-http-method-badge [method]="log.method" appearance="emphasis" />
+            <span class="detail__path">{{ log.path }}</span>
+          </h2>
+          <div class="detail__status-hero" [ngClass]="statusHeroClass()">{{ log.statusCode }}</div>
+        </div>
+        <p class="detail__url">{{ log.fullUrl }}</p>
+        <button type="button" class="detail__btn-replay" title="Preview only — not wired to a runner yet">
+          <svg lucideRotateCcw [size]="16" strokeWidth="2" aria-hidden="true"></svg>
+          Replay request
+        </button>
+      </section>
+
+      <div class="detail__scroll cp-scrollbar">
+        <section class="detail__scenario-hero" [ngClass]="scenarioHeroClass(log.scenario)">
+          <div class="detail__scenario-hero-icon" aria-hidden="true">
+            @switch (log.scenario) {
+              @case ('success') {
+                <svg lucideCircleCheck [size]="22" strokeWidth="2"></svg>
+              }
+              @case ('error') {
+                <svg lucideAlertCircle [size]="22" strokeWidth="2"></svg>
+              }
+              @default {
+                <svg lucideMinus [size]="22" strokeWidth="2"></svg>
+              }
+            }
+          </div>
+          <div class="detail__scenario-hero-text">
+            <span class="detail__scenario-hero-kicker">Scenario</span>
+            <span class="detail__scenario-hero-name">{{ log.scenario }}</span>
+          </div>
+        </section>
+
+        <div class="detail__metrics detail__metrics--logs">
+          <div class="detail__metric">
+            <svg lucideClock [size]="16" strokeWidth="1.75" class="detail__metric-icon"></svg>
+            <span class="detail__metric-label">Latency</span>
+            <span class="detail__metric-value detail__metric-value--subtle">{{ log.latencyMs }}ms</span>
+          </div>
+          <div class="detail__metric">
+            <svg lucideClock [size]="16" strokeWidth="1.75" class="detail__metric-icon"></svg>
+            <span class="detail__metric-label">Time</span>
+            <span class="detail__metric-value detail__metric-value--subtle">{{ log.timeLabel }}</span>
+          </div>
+        </div>
+
+        <section class="detail__field">
+          <p class="detail__label">Execution</p>
+          <p class="detail__description">{{ executionSummary(log) }}</p>
+        </section>
+
+        <div class="detail__tabs" role="tablist" aria-label="Request and response">
+          <button
+            type="button"
+            role="tab"
+            class="detail__tab"
+            [class.detail__tab--active]="detailTab() === 'request'"
+            [attr.aria-selected]="detailTab() === 'request'"
+            (click)="selectTab('request')"
+          >
+            Request
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="detail__tab"
+            [class.detail__tab--active]="detailTab() === 'response'"
+            [attr.aria-selected]="detailTab() === 'response'"
+            (click)="selectTab('response')"
+          >
+            Response
+          </button>
+        </div>
+
+        @if (detailTab() === 'request') {
+          <section class="detail__field">
+            <p class="detail__label">Headers</p>
+            @if (requestHeaderRows().length === 0) {
+              <p class="detail__headers-empty">No request headers</p>
+            } @else {
+              <div class="detail__headers">
+                @for (row of requestHeaderRows(); track row[0]) {
+                  <div class="detail__header-row">
+                    <span class="detail__header-name">{{ row[0] }}</span>
+                    <span class="detail__header-val">{{ row[1] }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </section>
+          <section class="detail__field">
+            <p class="detail__label">Body</p>
+            @if (requestJsonLines().length === 0) {
+              <p class="detail__headers-empty">No body</p>
+            } @else {
+              <div class="detail__code cp-scrollbar" role="tabpanel" aria-label="Request body">
+                @for (line of requestJsonLines(); track $index) {
+                  <div class="detail__code-line" [innerHTML]="line | jsonLineHighlight"></div>
+                }
+              </div>
+            }
+          </section>
+        } @else {
+          <section class="detail__field">
+            <p class="detail__label">Status</p>
+            <span class="detail__log-status" [ngClass]="statusBadgeClass()">{{ log.statusCode }}</span>
+          </section>
+          <section class="detail__field">
+            <p class="detail__label">Headers</p>
+            @if (responseHeaderRows().length === 0) {
+              <p class="detail__headers-empty">No response headers</p>
+            } @else {
+              <div class="detail__headers">
+                @for (row of responseHeaderRows(); track row[0]) {
+                  <div class="detail__header-row">
+                    <span class="detail__header-name">{{ row[0] }}</span>
+                    <span class="detail__header-val">{{ row[1] }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </section>
+          <section class="detail__field">
+            <p class="detail__label">Body</p>
+            @if (responseJsonLines().length === 0) {
+              <p class="detail__headers-empty">No body</p>
+            } @else {
+              <div class="detail__code cp-scrollbar" role="tabpanel" aria-label="Response body">
+                @for (line of responseJsonLines(); track $index) {
+                  <div class="detail__code-line" [innerHTML]="line | jsonLineHighlight"></div>
+                }
+              </div>
+            }
+          </section>
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="detail__empty">
+      <div class="detail__empty-icon" aria-hidden="true">
+        <svg lucideFileText [size]="28" strokeWidth="1.5"></svg>
+      </div>
+      <h2 class="detail__empty-title">No log selected</h2>
+      <p class="detail__empty-desc">Choose a row from the list to inspect the request and response.</p>
+    </div>
+  }
+</aside>

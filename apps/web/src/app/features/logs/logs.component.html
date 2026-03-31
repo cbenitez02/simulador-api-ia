@@ -1,0 +1,81 @@
+<div class="logs">
+  <header class="logs__head">
+    <div class="logs__head-row">
+      <div class="logs__titles">
+        <h1 class="logs__title">Logs</h1>
+        <p class="logs__sub">Monitor and inspect all requests made to your mock API</p>
+      </div>
+      <div class="logs__actions">
+        <button
+          type="button"
+          class="logs__btn logs__btn--live"
+          [class.logs__btn--live-off]="!live()"
+          (click)="toggleLive()"
+          [attr.aria-pressed]="live()"
+        >
+          <svg lucideRadio [size]="16" strokeWidth="2" [class.logs__live-icon--pulse]="live()" aria-hidden="true"></svg>
+          {{ live() ? 'Live' : 'Paused' }}
+        </button>
+        <button type="button" class="logs__btn logs__btn--ghost" (click)="clearLogs()">
+          <svg lucideTrash2 [size]="16" strokeWidth="2" aria-hidden="true"></svg>
+          Clear logs
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="logs__body">
+    <div class="logs__filters">
+      <label class="logs__search">
+        <svg lucideSearch [size]="16" strokeWidth="2" class="logs__search-icon" aria-hidden="true"></svg>
+        <input
+          type="search"
+          class="logs__search-input"
+          placeholder="Search by endpoint or status..."
+          [value]="searchQuery()"
+          (input)="onSearchInput($event)"
+          aria-label="Search logs by endpoint or status"
+        />
+      </label>
+      <select
+        class="logs__select"
+        [value]="methodFilter()"
+        (change)="onMethodChange($event)"
+        aria-label="Filter by HTTP method"
+      >
+        <option value="all">All Methods</option>
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="PATCH">PATCH</option>
+        <option value="DELETE">DELETE</option>
+      </select>
+      <select
+        class="logs__select"
+        [value]="statusFilter()"
+        (change)="onStatusChange($event)"
+        aria-label="Filter by status code range"
+      >
+        <option value="all">All Status</option>
+        <option value="2xx">2xx</option>
+        <option value="4xx">4xx</option>
+        <option value="5xx">5xx</option>
+      </select>
+      <select
+        class="logs__select"
+        [value]="endpointFilter()"
+        (change)="onEndpointChange($event)"
+        aria-label="Filter by endpoint path"
+      >
+        <option value="all">All Endpoints</option>
+        @for (path of endpointOptions(); track path) {
+          <option [value]="path">{{ path }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="logs__list-wrap">
+      <app-logs-list [entries]="filteredEntries()" [selectedId]="selectedId()" (entrySelect)="selectEntry($event)" />
+    </div>
+  </div>
+</div>

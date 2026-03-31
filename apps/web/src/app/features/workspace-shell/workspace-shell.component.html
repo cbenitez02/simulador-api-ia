@@ -1,0 +1,61 @@
+<app-main-dashboard-sidebar
+  [projects]="sidebarProjects()"
+  [selectedProjectId]="selectedProjectId()"
+  [activeNav]="activeNav()"
+  (projectSelect)="selectProject($event)"
+  (navSelect)="selectNav($event)"
+/>
+
+@if (activeNav() === 'dashboard') {
+  <app-main-dashboard-data [project]="activeProject()" (createEndpoint)="createEndpoint()" (openLogs)="openLogs()" />
+} @else if (activeNav() === 'logs') {
+  <main class="workspace__main" aria-label="Logs">
+    <app-logs [selectedLog]="selectedLog()" (selectedLogChange)="selectedLog.set($event)" />
+  </main>
+} @else if (activeNav() === 'endpoints') {
+  <app-endpoints-page
+    [endpoints]="endpoints()"
+    [selectedEndpointId]="selectedEndpointId()"
+    (endpointSelect)="selectEndpoint($event)"
+    (createEndpoint)="createEndpoint()"
+  />
+} @else {
+  <main class="workspace__main workspace__main--placeholder" [attr.aria-label]="placeholderLabel()">
+    <header class="workspace__main-head">
+      <div class="workspace__main-titles">
+        <h1 class="workspace__main-title">{{ placeholderTitle() }}</h1>
+        <p class="workspace__main-sub">{{ placeholderSub() }}</p>
+      </div>
+    </header>
+    <div class="workspace__placeholder-body">
+      <p>This section is not implemented yet.</p>
+    </div>
+  </main>
+}
+
+@if (activeNav() === 'dashboard') {
+  <app-main-dashboard-utility-sidebar
+    (createEndpoint)="createEndpoint()"
+    (testAllEndpoints)="testAllEndpoints()"
+    (exportConfig)="exportConfig()"
+    (importEndpoints)="importEndpoints()"
+    (editGlobalConfig)="editGlobalConfig()"
+  />
+} @else if (activeNav() === 'endpoints') {
+  <app-endpoint-detail-panel
+    [selectedEndpoint]="selectedEndpoint()"
+    [baseUrl]="apiBaseUrl()"
+    (closed)="clearEndpointSelection()"
+    (editRequested)="editEndpoint($event)"
+    (deleteRequested)="deleteEndpoint($event)"
+  />
+} @else if (activeNav() === 'logs') {
+  <app-logs-detail-sidebar [entry]="selectedLog()" (closed)="clearLogSelection()" />
+}
+
+<app-create-endpoint-drawer
+  [open]="createEndpointDrawerOpen()"
+  [initialEndpoint]="endpointDrawerInitial()"
+  (dismiss)="closeCreateEndpointDrawer()"
+  (saved)="onEndpointSaved($event)"
+/>

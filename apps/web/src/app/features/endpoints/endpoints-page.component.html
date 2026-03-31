@@ -1,0 +1,37 @@
+<main class="endpoints-page" aria-label="Endpoints">
+  <header class="endpoints-page__head">
+    <div class="endpoints-page__head-row">
+      <div class="endpoints-page__titles">
+        <h1 class="endpoints-page__title">Endpoints</h1>
+        <p class="endpoints-page__sub">Select an endpoint to preview details on the right</p>
+      </div>
+      <button
+        type="button"
+        class="endpoints-page__create"
+        (click)="createEndpoint.emit()"
+        aria-label="Create new endpoint"
+      >
+        <span class="endpoints-page__create-icon" aria-hidden="true">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+          >
+            <path d="M12 5v14M5 12h14"></path>
+          </svg>
+        </span>
+        Create endpoint
+      </button>
+    </div>
+  </header>
+  <app-endpoints-list
+    [endpoints]="endpoints()"
+    [selectedEndpointId]="selectedEndpointId()"
+    (endpointSelect)="endpointSelect.emit($event)"
+    (createEndpointRequest)="createEndpoint.emit()"
+  />
+</main>

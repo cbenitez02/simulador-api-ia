@@ -17,7 +17,7 @@ libpeerconnection.log
 .nyc_output/
 
 # Logs y depuración de gestores de paquetes
-logs/
+
 *.log
 npm-debug.log*
 yarn-debug.log*

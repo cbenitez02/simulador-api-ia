@@ -1,0 +1,153 @@
+<aside class="detail" aria-label="Endpoint details">
+  @if (selectedEndpoint(); as ep) {
+    <div class="detail__panel">
+      <header class="detail__head">
+        <app-http-method-badge [method]="ep.method" appearance="emphasis" />
+        <h2 class="detail__title">Endpoint Details</h2>
+        <div class="detail__head-actions">
+          <button type="button" class="detail__icon-btn" (click)="onEdit()" aria-label="Edit endpoint" title="Edit">
+            <svg lucidePencil [size]="18" strokeWidth="1.75"></svg>
+          </button>
+          <button
+            type="button"
+            class="detail__icon-btn detail__icon-btn--danger"
+            (click)="openDeleteConfirm()"
+            aria-label="Delete endpoint"
+            title="Delete"
+          >
+            <svg lucideTrash2 [size]="18" strokeWidth="1.75"></svg>
+          </button>
+          <button type="button" class="detail__icon-btn" (click)="closePanel()" aria-label="Close details panel">
+            <svg lucideX [size]="18" strokeWidth="1.75"></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="detail__scroll">
+        <section class="detail__field">
+          <p class="detail__label">Endpoint path</p>
+          <div class="detail__value-box">{{ ep.path }}</div>
+        </section>
+
+        <section class="detail__field">
+          <p class="detail__label">Full URL</p>
+          <div class="detail__value-box detail__value-box--url">
+            <span class="detail__url-text">{{ fullUrl() }}</span>
+            <button type="button" class="detail__copy" (click)="copyFullUrl()" aria-label="Copy full URL">
+              <svg lucideCopy [size]="16" strokeWidth="1.75"></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="detail__field">
+          <p class="detail__label">Description</p>
+          <p class="detail__description">{{ ep.description }}</p>
+        </section>
+
+        <div class="detail__metrics">
+          <div class="detail__metric">
+            <svg lucideClock [size]="16" strokeWidth="1.75" class="detail__metric-icon"></svg>
+            <span class="detail__metric-label">Latency</span>
+            <span class="detail__metric-value">{{ ep.latencyMs }}ms</span>
+          </div>
+          <div class="detail__metric">
+            <svg lucideCircleCheck [size]="16" strokeWidth="1.75" class="detail__metric-icon"></svg>
+            <span class="detail__metric-label">Status</span>
+            <span class="detail__metric-value">{{ ep.statusCode }}</span>
+          </div>
+        </div>
+
+        @if (ep.config; as sim) {
+          <section class="detail__field">
+            <p class="detail__label">Mock simulator</p>
+            <div class="detail__sim">
+              <div class="detail__sim-row">
+                <span class="detail__sim-k">Configured latency</span>
+                <span class="detail__sim-v">{{ sim.latencyMs }}ms</span>
+              </div>
+              <div class="detail__sim-row">
+                <span class="detail__sim-k">Error rate</span>
+                <span class="detail__sim-v">{{ sim.errorRatePct }}%</span>
+              </div>
+              <div class="detail__sim-scenes">
+                @for (chip of scenarioChips(sim); track chip.key) {
+                  <span class="detail__scene-chip">{{ chip.label }}</span>
+                }
+              </div>
+            </div>
+          </section>
+        }
+
+        <div class="detail__tabs" role="tablist" aria-label="Response view">
+          <button
+            type="button"
+            role="tab"
+            class="detail__tab"
+            [class.detail__tab--active]="detailTab() === 'response'"
+            [attr.aria-selected]="detailTab() === 'response'"
+            (click)="selectTab('response')"
+          >
+            Response
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="detail__tab"
+            [class.detail__tab--active]="detailTab() === 'headers'"
+            [attr.aria-selected]="detailTab() === 'headers'"
+            (click)="selectTab('headers')"
+          >
+            Headers
+          </button>
+        </div>
+
+        @if (detailTab() === 'response') {
+          <div class="detail__code" role="tabpanel" aria-label="Response body">
+            @for (line of jsonLines(); track $index) {
+              <div class="detail__code-line" [innerHTML]="line | jsonLineHighlight"></div>
+            }
+          </div>
+        } @else {
+          <div class="detail__headers" role="tabpanel" aria-label="Response headers">
+            @if (headerRows().length === 0) {
+              <p class="detail__headers-empty">No response headers configured</p>
+            } @else {
+              @for (row of headerRows(); track row[0]) {
+                <div class="detail__header-row">
+                  <span class="detail__header-name">{{ row[0] }}</span>
+                  <span class="detail__header-val">{{ row[1] }}</span>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+
+      <footer class="detail__footer">
+        <button type="button" class="detail__test-btn" (click)="onTestEndpoint()">
+          <svg lucideCirclePlay [size]="18" strokeWidth="1.75"></svg>
+          Test Endpoint
+        </button>
+      </footer>
+    </div>
+  } @else {
+    <div class="detail__empty">
+      <div class="detail__empty-icon" aria-hidden="true">
+        <svg lucideLayers [size]="28" strokeWidth="1.5"></svg>
+      </div>
+      <h2 class="detail__empty-title">No endpoint selected</h2>
+      <p class="detail__empty-desc">Select an endpoint from the list to view its details and configuration</p>
+    </div>
+  }
+</aside>
+
+<app-confirm-dialog
+  [open]="deleteConfirmOpen()"
+  title="Eliminar endpoint"
+  [message]="deleteConfirmMessage()"
+  confirmLabel="Eliminar"
+  cancelLabel="Cancelar"
+  [destructive]="true"
+  (confirmed)="confirmDelete()"
+  (dismissed)="closeDeleteConfirm()"
+/>

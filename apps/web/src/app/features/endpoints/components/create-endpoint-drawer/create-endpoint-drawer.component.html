@@ -1,0 +1,276 @@
+@if (open()) {
+  <div class="drawer-root" role="presentation">
+    <button
+      type="button"
+      class="drawer__backdrop"
+      [attr.aria-label]="isEditing() ? 'Close edit endpoint' : 'Close create endpoint'"
+      (click)="close()"
+    ></button>
+
+    <div
+      class="drawer__panel cp-scrollbar"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-ep-title"
+      aria-describedby="create-ep-sub"
+    >
+      <header class="drawer__head">
+        <div class="drawer__head-text">
+          <h2 id="create-ep-title" class="drawer__title">
+            {{ isEditing() ? 'Edit endpoint' : 'Create endpoint' }}
+          </h2>
+          <p id="create-ep-sub" class="drawer__sub">
+            {{
+              isEditing()
+                ? 'Update path, response body, and simulator settings'
+                : 'Define a new mock endpoint for this project'
+            }}
+          </p>
+        </div>
+        <button type="button" class="drawer__icon-btn" (click)="close()" aria-label="Close">
+          <svg lucideX [size]="20" strokeWidth="1.75"></svg>
+        </button>
+      </header>
+
+      <div class="drawer__body">
+        @if (wizardStep() === 'define') {
+          <div class="drawer__define">
+            <section class="drawer__section" aria-labelledby="basic-label">
+              <h3 id="basic-label" class="drawer__section-title">Basics</h3>
+              <div class="drawer__fields">
+                <div class="drawer__field">
+                  <label class="drawer__label" for="create-ep-method">HTTP method</label>
+                  <app-select-menu
+                    class="drawer__method-select"
+                    [options]="methodOptions"
+                    [value]="httpMethod()"
+                    (valueChange)="onMethodChange($event)"
+                    triggerId="create-ep-method-trigger"
+                    listboxId="create-ep-method-listbox"
+                  >
+                    <span data-select-menu-icon>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 2v20M2 12h20"></path>
+                      </svg>
+                    </span>
+                  </app-select-menu>
+                </div>
+                <div class="drawer__field">
+                  <label class="drawer__label" for="create-ep-path">Route / path</label>
+                  <input
+                    id="create-ep-path"
+                    type="text"
+                    class="drawer__input"
+                    placeholder="/users, /orders/:id"
+                    autocomplete="off"
+                    [value]="pathInput()"
+                    (input)="onPathInput($event)"
+                  />
+                </div>
+                <div class="drawer__field drawer__field--full">
+                  <label class="drawer__label" for="create-ep-desc"
+                    >Description <span class="drawer__optional">(optional)</span></label
+                  >
+                  <textarea
+                    id="create-ep-desc"
+                    class="drawer__textarea drawer__textarea--sm"
+                    rows="2"
+                    placeholder="What this endpoint returns or validates"
+                    [value]="descriptionInput()"
+                    (input)="onDescriptionInput($event)"
+                  ></textarea>
+                </div>
+              </div>
+            </section>
+
+            <section class="drawer__section" aria-labelledby="mode-label">
+              <h3 id="mode-label" class="drawer__section-title">Response source</h3>
+              <div class="drawer__segments" role="tablist" aria-label="Creation mode">
+                <button
+                  type="button"
+                  role="tab"
+                  class="drawer__segment"
+                  [class.drawer__segment--active]="creationMode() === 'ai'"
+                  [attr.aria-selected]="creationMode() === 'ai'"
+                  (click)="selectCreationMode('ai')"
+                >
+                  AI Prompt
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  class="drawer__segment"
+                  [class.drawer__segment--active]="creationMode() === 'manual'"
+                  [attr.aria-selected]="creationMode() === 'manual'"
+                  (click)="selectCreationMode('manual')"
+                >
+                  JSON Manual
+                </button>
+              </div>
+
+              @if (creationMode() === 'ai') {
+                <div class="drawer__mode-block" role="tabpanel">
+                  <label class="drawer__label" for="create-ep-ai">Describe the response</label>
+                  <textarea
+                    id="create-ep-ai"
+                    class="drawer__textarea drawer__textarea--lg"
+                    placeholder="Create a GET /users endpoint that returns a list of users with id, name, email and orders. Some users should have no orders."
+                    [value]="aiPrompt()"
+                    (input)="onAiPromptInput($event)"
+                    [disabled]="aiGenerating()"
+                  ></textarea>
+                  <button
+                    type="button"
+                    class="drawer__btn drawer__btn--primary"
+                    (click)="generateWithAi()"
+                    [disabled]="aiGenerating()"
+                  >
+                    @if (aiGenerating()) {
+                      <svg lucideLoader2 class="drawer__spin" [size]="18" strokeWidth="2"></svg>
+                      Generating…
+                    } @else {
+                      <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
+                      Generate with AI
+                    }
+                  </button>
+                </div>
+              } @else {
+                <div class="drawer__mode-block" role="tabpanel">
+                  <label class="drawer__label" for="create-ep-json">JSON body</label>
+                  <textarea
+                    id="create-ep-json"
+                    class="drawer__textarea drawer__textarea--lg drawer__textarea--code"
+                    spellcheck="false"
+                    placeholder='{ "users": [ { "id": 1, "name": "Ada" } ] }'
+                    [value]="manualJsonText()"
+                    (input)="onManualJsonInput($event)"
+                  ></textarea>
+                  @if (manualJsonError(); as err) {
+                    <p class="drawer__json-error" role="alert">{{ err }}</p>
+                  } @else if (manualJsonText().trim() && draftJson()) {
+                    <p class="drawer__json-ok">Valid JSON — click Continue to adjust latency, scenarios, and save.</p>
+                  }
+                </div>
+              }
+            </section>
+          </div>
+        } @else {
+          <div class="drawer__configure">
+            <button type="button" class="drawer__back" (click)="goBackToDefine()">← Back to definition</button>
+
+            <div class="drawer__configure-grid">
+              <div class="drawer__configure-col drawer__configure-col--form">
+                <section class="drawer__section">
+                  <h3 class="drawer__section-title">Quick settings</h3>
+                  <div class="drawer__sliders">
+                    <div class="drawer__slider-field">
+                      <div class="drawer__slider-head">
+                        <span class="drawer__label">Latency</span>
+                        <span class="drawer__slider-val">{{ latencyMs() }} ms</span>
+                      </div>
+                      <input
+                        type="range"
+                        class="drawer__range"
+                        min="0"
+                        max="3000"
+                        step="50"
+                        [value]="latencyMs()"
+                        (input)="onLatencyInput($event)"
+                      />
+                    </div>
+                    <div class="drawer__slider-field">
+                      <div class="drawer__slider-head">
+                        <span class="drawer__label">Error rate</span>
+                        <span class="drawer__slider-val">{{ errorRatePct() }}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        class="drawer__range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        [value]="errorRatePct()"
+                        (input)="onErrorRateInput($event)"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section class="drawer__section">
+                  <h3 class="drawer__section-title">Scenarios</h3>
+                  <p class="drawer__hint">Enable variants the mock can serve when simulating traffic.</p>
+                  <ul class="drawer__checks">
+                    @for (sid of scenarioIds; track sid) {
+                      <li>
+                        <label class="drawer__check">
+                          <input
+                            type="checkbox"
+                            [checked]="scenarioChecked(sid)"
+                            (change)="toggleScenario(sid, $event)"
+                          />
+                          <span class="drawer__check-label">{{ scenarioLabel(sid) }}</span>
+                        </label>
+                      </li>
+                    }
+                  </ul>
+                </section>
+              </div>
+
+              <div class="drawer__configure-col drawer__configure-col--preview">
+                <div class="drawer__preview-head">
+                  <app-http-method-badge [method]="httpMethod()" appearance="emphasis" />
+                  <code class="drawer__preview-path">{{
+                    pathInput().trim()
+                      ? pathInput().startsWith('/')
+                        ? pathInput().trim()
+                        : '/' + pathInput().trim()
+                      : '/'
+                  }}</code>
+                </div>
+                <p class="drawer__preview-label">JSON preview</p>
+                <div class="drawer__code cp-scrollbar" aria-label="Response JSON preview">
+                  @for (line of previewLines(); track $index) {
+                    <div class="drawer__code-line" [innerHTML]="line | jsonLineHighlight"></div>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      <footer class="drawer__foot">
+        <button type="button" class="drawer__btn drawer__btn--ghost" (click)="cancel()">Cancel</button>
+        @if (wizardStep() === 'define') {
+          <button
+            type="button"
+            class="drawer__btn drawer__btn--primary"
+            (click)="continueToConfigure()"
+            [disabled]="!canContinueToConfigure()"
+          >
+            Continue
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="drawer__btn drawer__btn--primary"
+            (click)="submitSave()"
+            [disabled]="!canSubmit()"
+          >
+            {{ isEditing() ? 'Save changes' : 'Create endpoint' }}
+          </button>
+        }
+      </footer>
+    </div>
+  </div>
+}

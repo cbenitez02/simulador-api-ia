@@ -1,0 +1,150 @@
+Quiero que implementes y maquetes la feature "Create Endpoint", el boton que maquetamos antes.
+
+Stack y contexto:
+- Frontend: Angular moderno con standalone components
+- Usar Signals para estado local cuando tenga sentido
+- Estilos: CSS puro, diseño moderno, limpio, técnico y orientado a productividad
+- La app ya tiene una estructura con:
+  - sidebar izquierda con proyectos
+  - panel central con lista de endpoints
+  - panel derecho con preview/configuración del endpoint seleccionado
+
+Objetivo de la feature:
+Cuando el usuario haga click en el botón "Create Endpoint" dentro de un proyecto, debe abrirse un flujo UI claro, moderno y usable para crear un nuevo endpoint mock.
+
+Importante:
+No quiero una pantalla aparte. Quiero un modal o drawer lateral derecho/grande que mantenga al usuario dentro del contexto del proyecto.
+
+Qué debe incluir la UI del Create Endpoint:
+
+1. Header del modal/drawer
+- Título: "Create Endpoint"
+- Subtítulo corto: "Define a new mock endpoint for this project"
+- Botón para cerrar
+
+2. Primera sección: definición básica del endpoint
+Campos:
+- HTTP Method: select con GET, POST, PUT, PATCH, DELETE
+- Route/Path: input con placeholder tipo /users, /orders/:id
+- Description: input opcional o textarea corta
+
+3. Segunda sección: modo de creación
+Mostrar tabs o segmented control con estas opciones:
+- AI Prompt
+- JSON Manual
+
+Por ahora no implementar schema ni importación externa.
+
+4. Contenido del modo "AI Prompt"
+- Textarea grande para describir el endpoint en lenguaje natural
+- Placeholder útil, por ejemplo:
+  "Create a GET /users endpoint that returns a list of users with id, name, email and orders. Some users should have no orders."
+- Botón principal: "Generate with AI"
+
+Como no hay backend real todavía, mockear la generación localmente con datos fake o estáticos para demostrar el flujo.
+
+5. Contenido del modo "JSON Manual"
+- Textarea o editor simple donde el usuario pueda pegar o escribir un JSON
+- Validación visual básica de JSON válido/inválido
+- Si el JSON es válido, habilitar continuar
+
+6. Luego de generar o ingresar contenido válido, mostrar una segunda etapa dentro del mismo modal/drawer:
+Sección de preview + configuración
+
+Debe incluir:
+- JSON Preview en bloque visual con tipografía monoespaciada
+- Configuración rápida:
+  - Latency slider o range input
+  - Error rate slider o range input
+- Scenarios predefinidos con checkboxes o toggles:
+  - Success
+  - Empty
+  - Error
+  - Timeout
+
+Importante:
+El layout debe sentirse profesional. Idealmente:
+- columna izquierda: formulario / configuración
+- columna derecha: JSON preview
+
+7. Footer del modal/drawer
+Botones:
+- Cancel
+- Create Endpoint
+
+Comportamiento esperado:
+- Al abrir el modal, mostrar el paso de definición
+- Si el usuario usa AI Prompt y toca "Generate with AI":
+  - mostrar loading state
+  - luego mostrar un JSON mockeado y habilitar la sección de configuración
+- Si el usuario usa JSON Manual:
+  - al detectar JSON válido, mostrar el preview y habilitar configuración
+- Al tocar "Create Endpoint":
+  - simular creación local
+  - cerrar el modal
+  - agregar el endpoint nuevo a la lista de endpoints del proyecto en el panel central
+  - seleccionar automáticamente el endpoint recién creado
+  - mostrar su preview en el panel derecho
+
+Datos mock sugeridos para AI:
+Ejemplo si el método es GET y ruta /users:
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@example.com",
+      "orders": [
+        {
+          "id": 101,
+          "total": 1200
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Ana Gómez",
+      "email": "ana@example.com",
+      "orders": []
+    }
+  ]
+}
+
+Requisitos de UX/UI:
+- Diseño moderno tipo dashboard SaaS para developers
+- Bordes suaves, buen espaciado, jerarquía visual clara
+- Muy buena experiencia visual para método HTTP, ruta y preview JSON
+- Mostrar badges de método HTTP con estilo diferenciado
+- Mostrar estados loading, disabled y error
+- Hacer la UI responsive dentro de lo razonable
+- No usar librerías pesadas si no hace falta
+- Mantener componentes reutilizables si es posible
+
+Requisitos técnicos:
+- Crear componentes standalone
+- Separar responsabilidades:
+  - componente del modal/drawer create-endpoint
+  - types/interfaces para endpoint draft si hace falta
+  - estado manejado prolijamente
+- Usar datos mock locales, sin backend real
+- El código debe quedar prolijo, legible y preparado para conectar backend real después
+- No dejar TODOs vagos, resolver el flujo completo visual y funcionalmente
+
+Además:
+- Crear una estructura mínima de tipos para:
+  - Project
+  - Endpoint
+  - Scenario
+  - EndpointConfig
+- Simular que el endpoint creado se agrega al estado del proyecto actual
+- Incluir algunos endpoints mock iniciales en la lista para que se vea integrado al dashboard
+
+Entregable esperado:
+- código de los componentes
+- estilos
+- lógica del flujo
+- datos mock
+- integración con la lista de endpoints del proyecto
+- resultado visual completo, no solo skeleton
+
+Quiero que tomes decisiones razonables de diseño y arquitectura sin pedirme confirmación en cada paso.

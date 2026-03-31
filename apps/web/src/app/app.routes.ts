@@ -4,17 +4,15 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    redirectTo: 'projects',
+    redirectTo: 'dashboard',
   },
   {
-    path: 'projects',
+    path: 'dashboard',
     loadComponent: () =>
-      import('./features/projects/pages/projects-page.component').then(
-        (m) => m.ProjectsPageComponent,
-      ),
+      import('./features/workspace-shell/workspace-shell.component').then((m) => m.WorkspaceShellComponent),
   },
   {
     path: '**',
-    redirectTo: 'projects',
+    redirectTo: 'dashboard',
   },
 ];
