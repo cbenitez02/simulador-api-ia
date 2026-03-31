@@ -1,0 +1,52 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  background: #0b1020;
+  color: #e5e7eb;
+}
+
+.sidebar {
+  border-right: 1px solid #1f2937;
+  padding: 24px;
+  background: #111827;
+}
+
+.brand h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.brand p {
+  margin: 0 0 24px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav a {
+  color: #d1d5db;
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.nav a:hover,
+.nav a.active {
+  background: #1f2937;
+}
+
+.content {
+  padding: 24px;
+  background: #0f172a;
+}

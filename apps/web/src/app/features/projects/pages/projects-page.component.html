@@ -1,0 +1,17 @@
+<section class="page-header">
+  <div>
+    <h2>Proyectos</h2>
+    <p>Creá y administrá tus entornos mock.</p>
+  </div>
+
+  <button type="button">Nuevo proyecto</button>
+</section>
+
+<section class="grid">
+  @for (project of projects(); track project.id) {
+    <article class="card">
+      <h3>{{ project.name }}</h3>
+      <p>{{ project.description }}</p>
+    </article>
+  }
+</section>

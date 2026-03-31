@@ -1,0 +1,38 @@
+{
+  "name": "simulador-api-ia",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "start": "pnpm --dir apps/web start",
+    "build": "pnpm --dir apps/web build",
+    "test": "pnpm --dir apps/web test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "check": "pnpm format:check && pnpm lint",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs,cjs,html,json,md,yml,yaml,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,js,html}": [
+      "eslint --fix"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@eslint/js": "^10.0.1",
+    "angular-eslint": "^21.3.1",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "typescript-eslint": "^8.58.0"
+  }
+}
