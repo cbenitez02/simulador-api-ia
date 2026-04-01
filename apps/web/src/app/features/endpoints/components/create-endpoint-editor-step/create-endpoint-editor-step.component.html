@@ -1,0 +1,253 @@
+<div class="cep-editor">
+  <div class="cep-editor__meta">
+    <div class="cep-editor__meta-left">
+      <app-http-method-badge [method]="draft().method" appearance="emphasis" />
+      <app-select-menu
+        class="cep-editor__method-select"
+        [options]="methodOptions"
+        [value]="draft().method"
+        (valueChange)="onMethodChange($event)"
+        triggerId="cep-editor-method-trigger"
+        listboxId="cep-editor-method-listbox"
+      ></app-select-menu>
+      <input
+        type="text"
+        class="cep-editor__path"
+        aria-label="Route"
+        [value]="draft().route"
+        (input)="onRouteInput($event)"
+      />
+    </div>
+    <p class="cep-editor__prompt-ref" [attr.title]="sourcePrompt()">{{ sourcePrompt() }}</p>
+  </div>
+
+  <app-icon-tab-strip
+    ariaLabel="Editor sections"
+    [tabs]="editorTabs()"
+    [activeId]="activeTab()"
+    (tabChange)="onEditorTabChange($event)"
+  />
+
+  <div class="cep-editor__panel">
+    @switch (activeTab()) {
+      @case ('response') {
+        <div class="cep-editor__panel-inner">
+          <app-panel-header title="Response body" description="Default JSON response for the success scenario">
+            <div class="cep-editor__status-field">
+              <label class="cep-editor__mini-label" for="cep-status">Status code</label>
+              <input
+                id="cep-status"
+                type="number"
+                class="cep-editor__input cep-editor__input--sm cep-editor__input--num"
+                [value]="draft().statusCode"
+                (input)="onStatusCodeInput($event)"
+              />
+            </div>
+          </app-panel-header>
+          <label class="cep-editor__mini-label" for="cep-desc">Description</label>
+          <textarea
+            id="cep-desc"
+            class="cep-editor__textarea cep-editor__textarea--desc"
+            rows="2"
+            [value]="draft().description"
+            (input)="onDescriptionInput($event)"
+          ></textarea>
+          <textarea
+            id="cep-res-json"
+            class="cep-editor__textarea cep-editor__textarea--json"
+            spellcheck="false"
+            [value]="responseJsonText()"
+            (input)="onResponseJsonInput($event)"
+            (blur)="commitResponseJson()"
+          ></textarea>
+          <app-inline-alert [message]="responseJsonError()" />
+          <button type="button" class="cep-editor__btn-secondary" (click)="formatResponseJson()">Format JSON</button>
+        </div>
+      }
+      @case ('scenarios') {
+        <div class="cep-editor__panel-inner">
+          <app-panel-header
+            title="Response scenarios"
+            description="Define different responses for testing various states"
+          >
+            <div class="cep-editor__preset-btns">
+              <button type="button" class="cep-editor__chip" (click)="addPreset('empty')">+ empty</button>
+              <button type="button" class="cep-editor__chip" (click)="addPreset('error')">+ error</button>
+              <button type="button" class="cep-editor__chip" (click)="addPreset('timeout')">+ timeout</button>
+              <button type="button" class="cep-editor__chip" (click)="addPreset('unauthorized')">+ unauthorized</button>
+              <button type="button" class="cep-editor__chip" (click)="addScenario()">+ custom</button>
+            </div>
+          </app-panel-header>
+          @for (s of draft().scenarios; track s.id; let i = $index) {
+            <div class="cep-editor__scenario">
+              <div class="cep-editor__scenario-head">
+                @if (isSuccessScenario(s)) {
+                  <span class="cep-editor__scenario-tag"
+                    >Success <span class="cep-editor__scenario-default">(default)</span></span
+                  >
+                } @else {
+                  <span class="cep-editor__scenario-tag">{{ s.name }}</span>
+                }
+                @if (draft().scenarios.length > 1) {
+                  <button type="button" class="cep-editor__link-btn" (click)="removeScenario(i)">Remove</button>
+                }
+              </div>
+              <div class="cep-editor__scenario-grid">
+                <div>
+                  <label class="cep-editor__mini-label" [attr.for]="'cep-sc-' + i">Status code</label>
+                  <input
+                    [id]="'cep-sc-' + i"
+                    type="number"
+                    class="cep-editor__input cep-editor__input--num"
+                    [value]="s.statusCode"
+                    (input)="onScenarioStatus(i, $event)"
+                  />
+                </div>
+                <div>
+                  <label class="cep-editor__mini-label" [attr.for]="'cep-sd-' + i">Delay (ms)</label>
+                  <input
+                    [id]="'cep-sd-' + i"
+                    type="number"
+                    class="cep-editor__input cep-editor__input--num"
+                    [value]="s.delayMs"
+                    (input)="onScenarioDelay(i, $event)"
+                  />
+                </div>
+                <div>
+                  <label class="cep-editor__mini-label" [attr.for]="'cep-sw-' + i">Weight (%)</label>
+                  <input
+                    [id]="'cep-sw-' + i"
+                    type="number"
+                    class="cep-editor__input cep-editor__input--num"
+                    [value]="s.weight"
+                    (input)="onScenarioWeight(i, $event)"
+                  />
+                </div>
+                @if (!isSuccessScenario(s)) {
+                  <div class="cep-editor__scenario-grid-span">
+                    <label class="cep-editor__mini-label" [attr.for]="'cep-sn-' + i">Name</label>
+                    <input
+                      [id]="'cep-sn-' + i"
+                      type="text"
+                      class="cep-editor__input"
+                      [value]="s.name"
+                      (input)="onScenarioName(i, $event)"
+                    />
+                  </div>
+                  <div class="cep-editor__scenario-grid-span">
+                    <label class="cep-editor__mini-label" [attr.for]="'cep-st-trigger-' + i">Type</label>
+                    <app-select-menu
+                      class="cep-editor__scenario-select"
+                      [options]="scenarioTypeOptions"
+                      [value]="s.type"
+                      (valueChange)="onScenarioType(i, $event)"
+                      [triggerId]="'cep-st-trigger-' + i"
+                      [listboxId]="'cep-st-list-' + i"
+                    />
+                  </div>
+                }
+              </div>
+              <label class="cep-editor__mini-label" [attr.for]="'cep-sb-' + i">Body (JSON)</label>
+              <textarea
+                [id]="'cep-sb-' + i"
+                class="cep-editor__textarea cep-editor__textarea--json"
+                rows="8"
+                spellcheck="false"
+                [value]="scenarioBodyText(s)"
+                (blur)="onScenarioBodyBlur(i, $event)"
+              ></textarea>
+            </div>
+          }
+        </div>
+      }
+      @case ('behavior') {
+        <div class="cep-editor__panel-inner">
+          <app-panel-header title="Latency simulation" />
+          <app-segmented-control
+            ariaLabel="Latency mode"
+            [options]="latencyModeOptions"
+            [value]="draft().behavior.latencyMode"
+            (valueChange)="onLatencyModeChange($event)"
+          />
+          @if (draft().behavior.latencyMode === 'fixed') {
+            <app-labeled-range
+              label="Fixed delay"
+              [displayValue]="draft().behavior.fixedDelayMs + 'ms'"
+              [value]="draft().behavior.fixedDelayMs"
+              [min]="0"
+              [max]="3000"
+              [step]="50"
+              (valueChange)="onFixedDelayValue($event)"
+            />
+          } @else {
+            <div class="cep-editor__two-sliders">
+              <app-labeled-range
+                label="Minimum latency"
+                [displayValue]="draft().behavior.minDelayMs + 'ms'"
+                [value]="draft().behavior.minDelayMs"
+                [min]="0"
+                [max]="3000"
+                [step]="50"
+                (valueChange)="onMinDelayValue($event)"
+              />
+              <app-labeled-range
+                label="Maximum latency"
+                [displayValue]="draft().behavior.maxDelayMs + 'ms'"
+                [value]="draft().behavior.maxDelayMs"
+                [min]="0"
+                [max]="3000"
+                [step]="50"
+                (valueChange)="onMaxDelayValue($event)"
+              />
+            </div>
+          }
+          <div class="cep-editor__behavior-section-spaced">
+            <app-panel-header title="Error rate" />
+          </div>
+          <app-labeled-range
+            label="Random error probability"
+            [displayValue]="draft().behavior.errorRate + '%'"
+            [value]="draft().behavior.errorRate"
+            [min]="0"
+            [max]="100"
+            [step]="1"
+            (valueChange)="onErrorRateValue($event)"
+          />
+          <p class="cep-editor__help">Percentage of requests that will randomly return an error scenario</p>
+          <div class="cep-editor__weight-row">
+            <div>
+              <span class="cep-editor__panel-title" style="margin: 0">Use scenario weights</span>
+              <p class="cep-editor__panel-desc" style="margin: 0.25rem 0 0">
+                Distribute requests across scenarios based on weights
+              </p>
+            </div>
+            <label class="cep-editor__switch">
+              <input type="checkbox" [checked]="draft().behavior.useScenarioWeights" (change)="onUseWeights($event)" />
+              <span class="cep-editor__switch-ui"></span>
+            </label>
+          </div>
+        </div>
+      }
+      @case ('preview') {
+        <div class="cep-editor__panel-inner">
+          <app-panel-header title="Response preview" description="How your endpoint will respond" />
+          <div class="cep-editor__preview-box">
+            <span class="cep-editor__preview-box-label">Request</span>
+            <code class="cep-editor__preview-code">{{ mockRequestLine() }}</code>
+          </div>
+          <div class="cep-editor__preview-box">
+            <div class="cep-editor__preview-meta">
+              <span class="cep-editor__status-pill">{{ draft().statusCode }}</span>
+              <span class="cep-editor__latency-pill">{{ previewLatencyLabel() }}</span>
+            </div>
+            <div class="cep-editor__preview-json cp-scrollbar" aria-label="JSON preview">
+              @for (line of previewLines(); track $index) {
+                <div [innerHTML]="line | jsonLineHighlight"></div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</div>

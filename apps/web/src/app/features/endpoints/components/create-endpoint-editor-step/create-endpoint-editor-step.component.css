@@ -1,0 +1,431 @@
+:host {
+  display: block;
+  width: 100%;
+
+  /* Local tokens; parent can still override via --cep-wizard-* */
+  --cep-editor-input-bg: #0d0f12;
+  --cep-editor-surface-elevated: #121418;
+  --cep-editor-text: #f4f4f5;
+  --cep-editor-text-secondary: #e5e7eb;
+  --cep-editor-text-muted: #9ca3af;
+  --cep-editor-border: rgba(255, 255, 255, 0.12);
+  --cep-editor-border-subtle: rgba(255, 255, 255, 0.08);
+  --cep-editor-border-soft: rgba(255, 255, 255, 0.1);
+  --cep-editor-border-strong: rgba(255, 255, 255, 0.15);
+  --cep-editor-border-hover: rgba(255, 255, 255, 0.2);
+  --cep-editor-control-bg: rgba(255, 255, 255, 0.05);
+  --cep-editor-control-bg-hover: rgba(255, 255, 255, 0.08);
+  --cep-editor-switch-track-off: rgba(255, 255, 255, 0.12);
+  --cep-editor-switch-thumb: #ffffff;
+  --cep-editor-preview-code: #a5b4fc;
+  --cep-editor-json-key: #93c5fd;
+  --cep-editor-json-string: #86efac;
+  --cep-editor-json-number: #fcd34d;
+  --cep-editor-json-boolean: #c4b5fd;
+}
+
+.cep-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 0.5rem 1rem;
+}
+
+.cep-editor__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 0.35rem 0 1rem;
+  border-bottom: 1px solid var(--cep-wizard-border, var(--cep-editor-border-subtle));
+  margin-bottom: 0.5rem;
+}
+
+.cep-editor__meta-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+}
+
+.cep-editor__method-select ::ng-deep .select-menu__trigger {
+  min-width: 5.5rem;
+  background: var(--cep-wizard-input-bg, var(--cep-editor-input-bg));
+  border-color: var(--cep-wizard-border, var(--cep-editor-border));
+  color: var(--cep-wizard-text, var(--cep-editor-text));
+}
+
+.cep-editor__path {
+  min-width: 12rem;
+  flex: 1;
+  max-width: 22rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border));
+  background: var(--cep-wizard-input-bg, var(--cep-editor-input-bg));
+  color: var(--cep-wizard-text, var(--cep-editor-text));
+  font-family: ui-monospace, monospace;
+  font-size: 0.9375rem;
+}
+
+.cep-editor__path:focus {
+  outline: none;
+  border-color: var(--cp-accent-primary);
+}
+
+.cep-editor__prompt-ref {
+  margin: 0;
+  max-width: min(100%, 280px);
+  font-size: 0.8125rem;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cep-editor__panel {
+  padding: 1rem 0 0;
+  min-height: min(420px, 50vh);
+}
+
+.cep-editor__panel-inner {
+  padding: 0.25rem 0 1rem;
+}
+
+.cep-editor__panel-title {
+  display: block;
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cep-wizard-text, var(--cep-editor-text));
+}
+
+.cep-editor__panel-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  line-height: 1.45;
+}
+
+.cep-editor__behavior-section-spaced {
+  margin-top: 1.5rem;
+}
+
+.cep-editor__status-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.cep-editor__mini-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  margin-bottom: 0.3rem;
+}
+
+.cep-editor__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border));
+  background: var(--cep-wizard-input-bg, var(--cep-editor-input-bg));
+  color: var(--cep-wizard-text, var(--cep-editor-text));
+  font-size: 0.875rem;
+}
+
+.cep-editor__input--sm {
+  width: 5.5rem;
+}
+
+.cep-editor__input--num {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, monospace;
+}
+
+.cep-editor__input:focus {
+  outline: none;
+  border-color: var(--cp-accent-primary);
+}
+
+.cep-editor__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border));
+  background: var(--cep-wizard-input-bg, var(--cep-editor-input-bg));
+  color: var(--cep-wizard-text, var(--cep-editor-text));
+  padding: 0.85rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.cep-editor__textarea--desc {
+  margin-bottom: 1rem;
+  min-height: 3rem;
+}
+
+.cep-editor__textarea--json {
+  min-height: 16rem;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-size: 0.8125rem;
+}
+
+.cep-editor__textarea:focus {
+  outline: none;
+  border-color: var(--cp-accent-primary);
+}
+
+.cep-editor__btn-secondary {
+  margin-top: 0.65rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border-strong));
+  background: var(--cep-editor-control-bg);
+  color: var(--cep-wizard-text, var(--cep-editor-text-secondary));
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cep-editor__btn-secondary:hover {
+  background: var(--cep-editor-control-bg-hover);
+}
+
+.cep-editor__preset-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.cep-editor__chip {
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border));
+  background: transparent;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.cep-editor__chip:hover {
+  color: var(--cep-wizard-text, var(--cep-editor-text-secondary));
+  border-color: var(--cep-editor-border-hover);
+}
+
+.cep-editor__scenario {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border-soft));
+  background: var(--cep-wizard-surface, var(--cep-editor-surface-elevated));
+}
+
+.cep-editor__scenario-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.cep-editor__scenario-tag {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--cep-wizard-text, var(--cep-editor-text));
+}
+
+.cep-editor__scenario-default {
+  font-weight: 500;
+  color: var(--cp-accent-primary);
+}
+
+.cep-editor__link-btn {
+  border: none;
+  background: none;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.cep-editor__scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.cep-editor__scenario-grid-span {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .cep-editor__scenario-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cep-editor__scenario-select {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+}
+
+.cep-editor__scenario-select ::ng-deep .select-menu__trigger {
+  width: 100%;
+  background: var(--cep-wizard-input-bg, var(--cep-editor-input-bg));
+  border-color: var(--cep-wizard-border, var(--cep-editor-border));
+  color: var(--cep-wizard-text, var(--cep-editor-text));
+}
+
+.cep-editor__two-sliders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 560px) {
+  .cep-editor__two-sliders {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cep-editor__help {
+  margin: -0.35rem 0 1.25rem;
+  font-size: 0.75rem;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  line-height: 1.45;
+}
+
+.cep-editor__weight-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.5rem;
+}
+
+.cep-editor__switch {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.cep-editor__switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.cep-editor__switch-ui {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--cep-editor-switch-track-off);
+  transition: background 0.2s ease;
+  position: relative;
+}
+
+.cep-editor__switch-ui::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--cep-editor-switch-thumb);
+  transition: transform 0.2s ease;
+}
+
+.cep-editor__switch input:checked + .cep-editor__switch-ui {
+  background: var(--cp-accent-primary);
+}
+
+.cep-editor__switch input:checked + .cep-editor__switch-ui::after {
+  transform: translateX(20px);
+}
+
+.cep-editor__preview-box {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border-soft));
+  background: var(--cep-wizard-input-bg, var(--cep-editor-input-bg));
+}
+
+.cep-editor__preview-box-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  margin-bottom: 0.5rem;
+}
+
+.cep-editor__preview-code {
+  font-size: 0.8125rem;
+  font-family: ui-monospace, monospace;
+  color: var(--cep-editor-preview-code);
+  word-break: break-all;
+}
+
+.cep-editor__preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cep-editor__status-pill {
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--cp-accent-primary) 22%, transparent);
+  color: var(--cp-accent-primary);
+}
+
+.cep-editor__latency-pill {
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--cep-wizard-muted, var(--cep-editor-text-muted));
+  border: 1px solid var(--cep-wizard-border, var(--cep-editor-border-soft));
+}
+
+.cep-editor__preview-json {
+  max-height: min(360px, 42vh);
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.cep-editor__preview-json ::ng-deep .json-line-highlight__key {
+  color: var(--cp-syntax-json-key, var(--cep-editor-json-key));
+}
+
+.cep-editor__preview-json ::ng-deep .json-line-highlight__str {
+  color: var(--cp-syntax-json-string, var(--cep-editor-json-string));
+}
+
+.cep-editor__preview-json ::ng-deep .json-line-highlight__num {
+  color: var(--cp-syntax-json-number, var(--cep-editor-json-number));
+}
+
+.cep-editor__preview-json ::ng-deep .json-line-highlight__bool,
+.cep-editor__preview-json ::ng-deep .json-line-highlight__null {
+  color: var(--cp-syntax-json-boolean, var(--cep-editor-json-boolean));
+}

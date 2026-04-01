@@ -1,4 +1,4 @@
-import type { HttpMethod } from '../../../../shared/models/endpoint-preview.model';
+import type { HttpMethod } from '../../../shared/models/endpoint-preview.model';
 
 /** Local fake “AI” payload for the create-endpoint flow (replace with API later). */
 export function mockAiResponseBody(method: HttpMethod, pathRaw: string): unknown {
@@ -29,6 +29,13 @@ export function mockAiResponseBody(method: HttpMethod, pathRaw: string): unknown
         { id: 101, userId: 1, total: 4999, currency: 'usd', status: 'paid' },
         { id: 102, userId: 2, total: 1200, currency: 'usd', status: 'pending' },
       ],
+    };
+  }
+
+  if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && normalized.includes('orders')) {
+    return {
+      data: [{ id: 1, userId: 1, status: 'pending', total: 99.99 }],
+      total: 1,
     };
   }
 

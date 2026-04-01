@@ -1,0 +1,102 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cep-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 1rem 1rem 2.5rem;
+  text-align: center;
+}
+
+.cep-prompt__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cp-accent-primary) 18%, transparent);
+  color: var(--cp-accent-primary);
+  border: 1px solid color-mix(in srgb, var(--cp-accent-primary) 35%, transparent);
+}
+
+.cep-prompt__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cep-prompt__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 11rem;
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--cep-wizard-border, rgba(255, 255, 255, 0.1));
+  background: var(--cep-wizard-input-bg, #0d0f12);
+  color: var(--cep-wizard-text, #f4f4f5);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  resize: vertical;
+  text-align: left;
+}
+
+.cep-prompt__textarea::placeholder {
+  color: var(--cep-wizard-muted, #6b7280);
+}
+
+.cep-prompt__textarea:focus {
+  outline: none;
+  border-color: var(--cp-accent-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cp-accent-primary) 35%, transparent);
+}
+
+.cep-prompt__textarea:disabled {
+  opacity: 0.65;
+}
+
+.cep-prompt__examples {
+  width: 100%;
+  margin-top: 1.75rem;
+  padding: 1rem 1.15rem;
+  border-radius: 12px;
+  text-align: left;
+  background: var(--cep-wizard-surface, #121418);
+  border: 1px solid var(--cep-wizard-border, rgba(255, 255, 255, 0.08));
+}
+
+.cep-prompt__examples-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--cep-wizard-text, #e5e7eb);
+}
+
+.cep-prompt__examples-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--cep-wizard-muted, #9ca3af);
+}
+
+.cep-prompt__examples-list code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: #a5b4fc;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}

@@ -1,0 +1,17 @@
+<button
+  [attr.type]="type()"
+  class="cp-pending-button"
+  [class.cp-pending-button--block]="fullWidth()"
+  [disabled]="pending() || disabled()"
+  (click)="onClick()"
+>
+  @if (pending()) {
+    <svg lucideLoader2 class="cp-pending-button__spin" [size]="18" strokeWidth="2"></svg>
+    {{ pendingLabel() }}
+  } @else {
+    <span class="cp-pending-button__idle">
+      <ng-content />
+    </span>
+    {{ label() }}
+  }
+</button>

@@ -1,0 +1,22 @@
+.cp-segmented {
+  display: inline-flex;
+  margin-bottom: 1.25rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--cep-wizard-border, rgba(255, 255, 255, 0.12));
+}
+
+.cp-segmented__opt {
+  padding: 0.45rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--cep-wizard-muted, #9ca3af);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cp-segmented__opt--on {
+  background: color-mix(in srgb, var(--cp-accent-primary) 22%, transparent);
+  color: var(--cp-accent-primary);
+}

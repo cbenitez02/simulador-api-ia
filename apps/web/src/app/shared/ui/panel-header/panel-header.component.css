@@ -1,0 +1,30 @@
+.cp-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cp-panel-header__start {
+  min-width: 0;
+}
+
+.cp-panel-header__title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cep-wizard-text, #f4f4f5);
+}
+
+.cp-panel-header__desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--cep-wizard-muted, #9ca3af);
+  line-height: 1.45;
+}
+
+.cp-panel-header__end:empty {
+  display: none;
+}

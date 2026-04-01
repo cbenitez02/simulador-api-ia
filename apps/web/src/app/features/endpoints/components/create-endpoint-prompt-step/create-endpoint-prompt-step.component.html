@@ -1,0 +1,45 @@
+<div class="cep-prompt">
+  <app-section-heading
+    variant="hero"
+    title="Describe your endpoint"
+    description="Use natural language to describe the API endpoint you want to create"
+  >
+    <div cp-section-leading class="cep-prompt__icon" aria-hidden="true">
+      <svg lucideSparkles [size]="22" strokeWidth="1.75"></svg>
+    </div>
+  </app-section-heading>
+
+  <label class="cep-prompt__sr-only" for="cep-prompt">Endpoint description</label>
+  <textarea
+    id="cep-prompt"
+    class="cep-prompt__textarea"
+    spellcheck="true"
+    [value]="promptText()"
+    (input)="onInput($event)"
+    [disabled]="generating()"
+    placeholder="e.g. 'GET /users that returns a list of users with name and email. Some users may have no orders. Include error scenarios.'"
+  ></textarea>
+
+  <app-inline-alert [message]="promptError()" [tight]="true" />
+  <app-inline-alert [message]="generationError()" [tight]="true" />
+
+  <app-pending-button
+    [fullWidth]="true"
+    [disabled]="!promptText().trim()"
+    [pending]="generating()"
+    label="Generate endpoint"
+    pendingLabel="Generating…"
+    (clicked)="onGenerate()"
+  >
+    <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
+  </app-pending-button>
+
+  <div class="cep-prompt__examples">
+    <p class="cep-prompt__examples-title">Examples:</p>
+    <ul class="cep-prompt__examples-list">
+      <li><code>POST /orders</code> to create an order with items and total</li>
+      <li><code>GET /products/:id</code> with 404 error scenario</li>
+      <li><code>DELETE /users/:id</code> that requires authentication</li>
+    </ul>
+  </div>
+</div>

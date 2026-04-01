@@ -1,0 +1,24 @@
+.cp-labeled-range {
+  margin-bottom: 1rem;
+}
+
+.cp-labeled-range__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8125rem;
+  color: var(--cep-wizard-text, #e5e7eb);
+  margin-bottom: 0.35rem;
+}
+
+.cp-labeled-range__value {
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--cep-wizard-muted, #9ca3af);
+}
+
+.cp-labeled-range__input {
+  width: 100%;
+  accent-color: var(--cp-accent-primary);
+  height: 0.35rem;
+}

@@ -1,0 +1,29 @@
+<nav class="cp-icon-tabs" [attr.aria-label]="ariaLabel()">
+  @for (t of tabs(); track t.id) {
+    <button
+      type="button"
+      class="cp-icon-tabs__tab"
+      [class.cp-icon-tabs__tab--active]="activeId() === t.id"
+      (click)="select(t.id)"
+    >
+      @switch (t.icon) {
+        @case ('fileText') {
+          <svg lucideFileText [size]="16" strokeWidth="1.75"></svg>
+        }
+        @case ('gitBranch') {
+          <svg lucideGitBranch [size]="16" strokeWidth="1.75"></svg>
+        }
+        @case ('sliders') {
+          <svg lucideSlidersHorizontal [size]="16" strokeWidth="1.75"></svg>
+        }
+        @case ('eye') {
+          <svg lucideEye [size]="16" strokeWidth="1.75"></svg>
+        }
+      }
+      {{ t.label }}
+      @if (t.badge !== undefined) {
+        <span class="cp-icon-tabs__badge">{{ t.badge }}</span>
+      }
+    </button>
+  }
+</nav>

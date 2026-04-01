@@ -3,8 +3,8 @@ import {
   LucideArrowRightLeft,
   LucideCopy,
   LucideFileText,
+  LucideHandMetal,
   LucideLayoutGrid,
-  LucideLeaf,
   LucidePlus,
   LucideSettings,
 } from '@lucide/angular';
@@ -16,7 +16,15 @@ import type { SidebarProjectRow, WorkspaceNavId } from '../../../workspace-shell
   templateUrl: './main-dashboard-sidebar.component.html',
   styleUrls: ['./main-dashboard-sidebar.component.css'],
   standalone: true,
-  imports: [LucideArrowRightLeft, LucideCopy, LucideFileText, LucideLayoutGrid, LucideLeaf, LucidePlus, LucideSettings],
+  imports: [
+    LucideArrowRightLeft,
+    LucideHandMetal,
+    LucideCopy,
+    LucideFileText,
+    LucideLayoutGrid,
+    LucidePlus,
+    LucideSettings,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardSidebarComponent {
@@ -26,14 +34,19 @@ export class MainDashboardSidebarComponent {
 
   readonly projectSelect = output<string>();
   readonly navSelect = output<WorkspaceNavId>();
+  readonly createProjectRequested = output<void>();
 
-  protected readonly activeProject = computed(() => {
+  protected readonly activeProject = computed((): SidebarProjectRow | null => {
+    const list = this.projects();
+    if (!list.length) return null;
     const id = this.selectedProjectId();
-    return this.projects().find((p) => p.id === id) ?? this.projects()[0];
+    return list.find((p) => p.id === id) ?? list[0]!;
   });
 
   protected readonly displayMockUrl = computed(() => {
-    const url = this.activeProject().mockUrl;
+    const ap = this.activeProject();
+    if (!ap) return '';
+    const url = ap.mockUrl;
     const max = 20;
     return url.length <= max ? url : `${url.slice(0, max)}...`;
   });
@@ -47,11 +60,12 @@ export class MainDashboardSidebarComponent {
   }
 
   protected addProject(): void {
-    // Placeholder until project creation exists
+    this.createProjectRequested.emit();
   }
 
   protected copyMockUrl(): void {
-    const url = this.activeProject().mockUrl;
-    void navigator.clipboard.writeText(url);
+    const ap = this.activeProject();
+    if (!ap) return;
+    void navigator.clipboard.writeText(ap.mockUrl);
   }
 }

@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, effect, model, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, model, signal, untracked } from '@angular/core';
 import { LucideRadio, LucideSearch, LucideTrash2 } from '@lucide/angular';
-import { MOCK_API_LOGS } from './data/api-logs.mock';
+import { mockApiLogsForProject } from './data/api-logs.mock';
 import { LogsListComponent } from './components/logs-list/logs-list.component';
 import type { ApiLogEntry } from './models/api-log.model';
 import type { HttpMethod } from '../../shared/models/endpoint-preview.model';
@@ -17,10 +17,13 @@ type StatusBand = 'all' | '2xx' | '4xx' | '5xx';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LogsComponent {
+  /** Workspace project; drives which mock log lines are shown. */
+  readonly projectId = input.required<string>();
+
   /** Sincronizado con el panel derecho del dashboard (mismo patrón que endpoints). */
   readonly selectedLog = model<ApiLogEntry | null>(null);
 
-  protected readonly entries = signal<ApiLogEntry[]>([...MOCK_API_LOGS]);
+  protected readonly entries = signal<ApiLogEntry[]>([]);
   protected readonly searchQuery = signal('');
   protected readonly methodFilter = signal<MethodFilter>('all');
   protected readonly statusFilter = signal<StatusBand>('all');
@@ -59,6 +62,17 @@ export class LogsComponent {
   });
 
   constructor() {
+    effect(() => {
+      const pid = this.projectId();
+      untracked(() => {
+        this.entries.set([...mockApiLogsForProject(pid)]);
+        this.searchQuery.set('');
+        this.methodFilter.set('all');
+        this.statusFilter.set('all');
+        this.endpointFilter.set('all');
+      });
+    });
+
     effect(() => {
       const sel = this.selectedLog();
       const filtered = this.filteredEntries();

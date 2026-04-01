@@ -1,0 +1,10 @@
+.cp-inline-alert {
+  margin: 0.35rem 0;
+  font-size: 0.8125rem;
+  color: #f87171;
+}
+
+.cp-inline-alert--tight {
+  margin: -0.35rem 0 0.75rem;
+  text-align: left;
+}

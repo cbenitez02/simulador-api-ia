@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
 import {
   LucideAlertCircle,
   LucideAlertTriangle,
@@ -9,6 +9,7 @@ import {
   LucideFileText,
 } from '@lucide/angular';
 import { HttpMethodBadgeComponent } from '../../../../shared/ui/http-method-badge/http-method-badge.component';
+import { copyTextToClipboard } from '../../../../shared/utils/copy-text-to-clipboard';
 import type { DashboardProject } from '../../models/dashboard-project.model';
 import type { EndpointPreview } from '../../../../shared/models/endpoint-preview.model';
 
@@ -30,6 +31,8 @@ import type { EndpointPreview } from '../../../../shared/models/endpoint-preview
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardDataComponent {
+  private readonly destroyRef = inject(DestroyRef);
+
   readonly project = input.required<DashboardProject>();
 
   readonly openLogs = output<void>();
@@ -75,9 +78,33 @@ export class MainDashboardDataComponent {
     })),
   );
 
-  protected copyProjectUrl(): void {
+  /** Brief UI state after attempting to copy the mock base URL. */
+  protected readonly copyBaseUrlState = signal<'idle' | 'copied' | 'error'>('idle');
+
+  private copyBaseUrlResetHandle: ReturnType<typeof setTimeout> | null = null;
+
+  protected readonly canCopyBaseUrl = computed(() => this.project().mockUrl.trim().length > 0);
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.copyBaseUrlResetHandle !== null) clearTimeout(this.copyBaseUrlResetHandle);
+    });
+  }
+
+  protected async copyProjectUrl(): Promise<void> {
     const url = this.project().mockUrl;
-    void navigator.clipboard.writeText(url);
+    if (this.copyBaseUrlResetHandle !== null) {
+      clearTimeout(this.copyBaseUrlResetHandle);
+      this.copyBaseUrlResetHandle = null;
+    }
+
+    const ok = await copyTextToClipboard(url);
+    this.copyBaseUrlState.set(ok ? 'copied' : 'error');
+
+    this.copyBaseUrlResetHandle = setTimeout(() => {
+      this.copyBaseUrlState.set('idle');
+      this.copyBaseUrlResetHandle = null;
+    }, 2000);
   }
 }
 

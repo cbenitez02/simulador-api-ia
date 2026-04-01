@@ -95,6 +95,41 @@
   color: var(--cp-text-body);
 }
 
+.sidebar__projects-empty {
+  margin: 0 0.25rem;
+  padding: 1rem 0.75rem;
+  border-radius: 10px;
+  border: 1px dashed var(--cp-border-dashed);
+  background: var(--cp-surface-subtle);
+  text-align: center;
+}
+
+.sidebar__projects-empty-text {
+  margin: 0 0 0.875rem;
+  font-size: 0.8125rem;
+  color: var(--cp-text-subtle);
+}
+
+.sidebar__create-project-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--cp-accent-primary);
+  color: var(--cp-accent-on-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sidebar__create-project-btn:hover {
+  background: var(--cp-accent-primary-hover);
+}
+
 .sidebar__projects {
   list-style: none;
   margin: 0;

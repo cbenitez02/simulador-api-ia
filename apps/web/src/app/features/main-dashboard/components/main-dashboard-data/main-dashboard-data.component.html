@@ -6,9 +6,30 @@
         <p class="dash__sub">Overview and health of your mock API project</p>
       </div>
       <div class="dash__actions">
-        <button type="button" class="dash__btn dash__btn--ghost" (click)="copyProjectUrl()">
-          <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
-          Copy Base URL
+        <button
+          type="button"
+          class="dash__btn dash__btn--ghost"
+          [class.dash__btn--copy-done]="copyBaseUrlState() === 'copied'"
+          [disabled]="!canCopyBaseUrl()"
+          (click)="copyProjectUrl()"
+          [attr.aria-label]="
+            copyBaseUrlState() === 'copied'
+              ? 'Base URL copied to clipboard'
+              : copyBaseUrlState() === 'error'
+                ? 'Copy failed; try again or copy manually'
+                : 'Copy base URL to clipboard'
+          "
+        >
+          @if (copyBaseUrlState() === 'copied') {
+            <svg lucideCircleCheck [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Copied
+          } @else if (copyBaseUrlState() === 'error') {
+            <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Copy failed
+          } @else {
+            <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Copy Base URL
+          }
         </button>
         <button type="button" class="dash__btn dash__btn--ghost" (click)="openLogs.emit()">
           <svg lucideFileText [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>

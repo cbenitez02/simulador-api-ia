@@ -49,6 +49,26 @@ export const MOCK_DASHBOARD_PROJECTS: DashboardProject[] = [
         responseBody: {},
         responseHeaders: {},
       },
+      {
+        id: 'eco-get-orders',
+        method: 'GET',
+        path: '/orders',
+        description: 'List orders',
+        latencyMs: 95,
+        statusCode: 200,
+        responseBody: { orders: [] },
+        responseHeaders: { 'content-type': 'application/json' },
+      },
+      {
+        id: 'eco-put-orders',
+        method: 'PUT',
+        path: '/orders',
+        description: 'Update order status',
+        latencyMs: 210,
+        statusCode: 500,
+        responseBody: { error: 'Internal error', requestId: 'req_8f2a' },
+        responseHeaders: { 'content-type': 'application/json' },
+      },
     ],
   },
   {
@@ -132,3 +152,29 @@ export const MOCK_DASHBOARD_PROJECTS: DashboardProject[] = [
     ],
   },
 ];
+
+/** Single-project demo used for onboarding (“Try a demo project”). */
+export const DEMO_DASHBOARD_PROJECT: DashboardProject = {
+  id: 'demo-users',
+  name: 'Demo: Users API',
+  mockUrl: 'https://mock.api.simulator/demo-users',
+  description: 'Sample users endpoint generated for the demo.',
+  lastUpdatedRelative: 'Just now',
+  endpoints: [
+    {
+      id: 'demo-get-users',
+      method: 'GET',
+      path: '/users',
+      description: 'Users with name, email and orders. Some users without orders. 20% error rate.',
+      latencyMs: 140,
+      statusCode: 200,
+      responseBody: {
+        data: [
+          { id: 'u1', name: 'Ada', email: 'ada@example.com', orders: [{ id: 'o1' }] },
+          { id: 'u2', name: 'Grace', email: 'grace@example.com', orders: [] },
+        ],
+      },
+      responseHeaders: { 'content-type': 'application/json' },
+    },
+  ],
+};

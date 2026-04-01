@@ -1,0 +1,16 @@
+<div class="cp-labeled-range">
+  <div class="cp-labeled-range__head">
+    <span class="cp-labeled-range__label">{{ label() }}</span>
+    <span class="cp-labeled-range__value">{{ displayValue() }}</span>
+  </div>
+  <input
+    type="range"
+    class="cp-labeled-range__input"
+    [attr.id]="inputId()"
+    [min]="min()"
+    [max]="max()"
+    [step]="step()"
+    [value]="value()"
+    (input)="onInput($event)"
+  />
+</div>
