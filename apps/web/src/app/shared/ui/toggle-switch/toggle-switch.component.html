@@ -1,0 +1,15 @@
+<button
+  type="button"
+  class="toggle-switch"
+  role="switch"
+  [attr.id]="inputId()"
+  [attr.aria-label]="ariaLabel()"
+  [attr.aria-checked]="checked()"
+  [attr.aria-disabled]="disabled() || null"
+  [disabled]="disabled()"
+  (click)="toggle()"
+>
+  <span class="toggle-switch__track" aria-hidden="true">
+    <span class="toggle-switch__thumb"></span>
+  </span>
+</button>

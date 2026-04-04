@@ -1,0 +1,276 @@
+<div
+  class="gcfg-drawer"
+  [class.gcfg-drawer--open]="open()"
+  [attr.aria-hidden]="!open()"
+  (click)="onBackdropClick($event)"
+>
+  <div class="gcfg-drawer__backdrop" aria-hidden="true"></div>
+  <aside
+    class="gcfg-drawer__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gcfg-drawer-title"
+    aria-describedby="gcfg-drawer-desc"
+    [attr.inert]="open() ? null : ''"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="gcfg-drawer__body">
+      <header class="gcfg-drawer__header">
+        <div class="gcfg-drawer__header-icon" aria-hidden="true">
+          <svg lucideSlidersHorizontal [size]="20" strokeWidth="2"></svg>
+        </div>
+        <div class="gcfg-drawer__header-text">
+          <h2 id="gcfg-drawer-title" class="gcfg-drawer__title">Global Configuration</h2>
+          <p id="gcfg-drawer-desc" class="gcfg-drawer__subtitle">Define default behavior for all endpoints</p>
+        </div>
+        <button
+          type="button"
+          class="gcfg-drawer__close"
+          aria-label="Close global configuration"
+          (click)="requestClose()"
+        >
+          <svg lucideX [size]="20" strokeWidth="2" aria-hidden="true"></svg>
+        </button>
+      </header>
+
+      <div class="gcfg-drawer__sections cp-scrollbar">
+        <!-- Latency -->
+        <section class="gcfg-card" aria-labelledby="gcfg-latency-heading">
+          <div class="gcfg-card__head">
+            <h3 id="gcfg-latency-heading" class="gcfg-card__title">
+              <span class="gcfg-card__title-icon" aria-hidden="true">
+                <svg lucideClock [size]="18" strokeWidth="1.75"></svg>
+              </span>
+              Latency
+            </h3>
+            <app-toggle-switch
+              inputId="gcfg-latency-enabled"
+              ariaLabel="Enable latency simulation"
+              [checked]="state().latency.enabled"
+              (checkedChange)="setLatencyEnabled($event)"
+            />
+          </div>
+          @if (state().latency.enabled) {
+            <div class="gcfg-card__body">
+              <div class="gcfg-row-label">
+                <span class="gcfg-label" id="gcfg-latency-range-label">Range (ms)</span>
+                <span class="gcfg-value-mono" aria-live="polite">{{ latencyRangeLabel() }}</span>
+              </div>
+              <div class="gcfg-dual-range" role="group" aria-labelledby="gcfg-latency-range-label">
+                <div class="gcfg-dual-range__rail" [style.background]="dualRangeTrackStyle()"></div>
+                <input
+                  type="range"
+                  class="gcfg-dual-range__input gcfg-dual-range__input--lower"
+                  min="0"
+                  [max]="latencyMax"
+                  step="10"
+                  [value]="state().latency.minMs"
+                  aria-label="Minimum latency in milliseconds"
+                  (input)="onLatencyMinInput($any($event.target).valueAsNumber)"
+                />
+                <input
+                  type="range"
+                  class="gcfg-dual-range__input gcfg-dual-range__input--upper"
+                  min="0"
+                  [max]="latencyMax"
+                  step="10"
+                  [value]="state().latency.maxMs"
+                  aria-label="Maximum latency in milliseconds"
+                  (input)="onLatencyMaxInput($any($event.target).valueAsNumber)"
+                />
+              </div>
+              <div class="gcfg-dual-range__ticks">
+                <span>0ms</span>
+                <span>{{ latencyMax }}ms</span>
+              </div>
+              <div class="gcfg-radio-row" role="radiogroup" aria-label="Latency mode">
+                <label class="gcfg-radio">
+                  <input
+                    type="radio"
+                    name="gcfg-latency-mode"
+                    value="fixed"
+                    [checked]="state().latency.mode === 'fixed'"
+                    (change)="setLatencyMode('fixed')"
+                  />
+                  <span class="gcfg-radio__ui" aria-hidden="true"></span>
+                  <span>Fixed</span>
+                </label>
+                <label class="gcfg-radio">
+                  <input
+                    type="radio"
+                    name="gcfg-latency-mode"
+                    value="random"
+                    [checked]="state().latency.mode === 'random'"
+                    (change)="setLatencyMode('random')"
+                  />
+                  <span class="gcfg-radio__ui" aria-hidden="true"></span>
+                  <span>Random</span>
+                </label>
+              </div>
+            </div>
+          }
+        </section>
+
+        <!-- Error simulation -->
+        <section class="gcfg-card" aria-labelledby="gcfg-error-heading">
+          <div class="gcfg-card__head">
+            <h3 id="gcfg-error-heading" class="gcfg-card__title">
+              <span class="gcfg-card__title-icon" aria-hidden="true">
+                <svg lucideAlertTriangle [size]="18" strokeWidth="1.75"></svg>
+              </span>
+              Error Simulation
+            </h3>
+            <app-toggle-switch
+              inputId="gcfg-error-enabled"
+              ariaLabel="Enable error simulation"
+              [checked]="state().errorSimulation.enabled"
+              (checkedChange)="setErrorEnabled($event)"
+            />
+          </div>
+          @if (state().errorSimulation.enabled) {
+            <div class="gcfg-card__body">
+              <div class="gcfg-row-label">
+                <label class="gcfg-label" id="gcfg-error-rate-label" for="gcfg-error-rate">Error rate</label>
+                <span class="gcfg-value-mono gcfg-value-mono--danger" aria-live="polite"
+                  >{{ state().errorSimulation.rate }}%</span
+                >
+              </div>
+              <input
+                id="gcfg-error-rate"
+                type="range"
+                class="gcfg-range-single"
+                min="0"
+                max="100"
+                step="1"
+                [value]="state().errorSimulation.rate"
+                aria-labelledby="gcfg-error-rate-label"
+                (input)="onErrorRateInput($any($event.target).valueAsNumber)"
+              />
+              <div class="gcfg-dual-range__ticks">
+                <span>0%</span>
+                <span>100%</span>
+              </div>
+              <p class="gcfg-chips-label" id="gcfg-chips-label">Status codes to simulate</p>
+              <div class="gcfg-chips" role="group" aria-labelledby="gcfg-chips-label">
+                @for (code of statusCodes; track code) {
+                  <button
+                    type="button"
+                    class="gcfg-chip"
+                    [class.gcfg-chip--selected]="isStatusSelected(code)"
+                    [class.gcfg-chip--selected-danger]="isStatusSelected(code) && isDangerCode(code)"
+                    [attr.aria-pressed]="isStatusSelected(code)"
+                    (click)="toggleStatusCode(code)"
+                  >
+                    {{ code }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </section>
+
+        <!-- Rate limiting -->
+        <section
+          class="gcfg-card"
+          [class.gcfg-card--dimmed]="!state().rateLimiting.enabled"
+          aria-labelledby="gcfg-rl-heading"
+        >
+          <div class="gcfg-card__head">
+            <h3 id="gcfg-rl-heading" class="gcfg-card__title">
+              <span class="gcfg-card__title-icon" aria-hidden="true">
+                <svg lucideGauge [size]="18" strokeWidth="1.75"></svg>
+              </span>
+              Rate Limiting
+            </h3>
+            <app-toggle-switch
+              inputId="gcfg-rl-enabled"
+              ariaLabel="Enable rate limiting"
+              [checked]="state().rateLimiting.enabled"
+              (checkedChange)="setRateLimitEnabled($event)"
+            />
+          </div>
+          <div class="gcfg-card__body">
+            <label class="gcfg-field-label" for="gcfg-rpm">Requests per minute</label>
+            <input
+              id="gcfg-rpm"
+              type="number"
+              class="gcfg-input"
+              min="1"
+              [value]="state().rateLimiting.requestsPerMinute"
+              [disabled]="!state().rateLimiting.enabled"
+              (input)="onRpmInput($any($event.target).value)"
+            />
+            <p class="gcfg-helper">Limit how many requests can be handled per minute</p>
+          </div>
+        </section>
+
+        <!-- Logging -->
+        <section class="gcfg-card" aria-labelledby="gcfg-log-heading">
+          <div class="gcfg-card__head gcfg-card__head--block">
+            <h3 id="gcfg-log-heading" class="gcfg-card__title">
+              <span class="gcfg-card__title-icon" aria-hidden="true">
+                <svg lucideFileText [size]="18" strokeWidth="1.75"></svg>
+              </span>
+              Logging
+            </h3>
+          </div>
+          <div class="gcfg-card__body">
+            <span class="gcfg-field-label" id="gcfg-logging-label">Logging level</span>
+            <div class="gcfg-select-wrap" role="group" aria-labelledby="gcfg-logging-label">
+              <app-select-menu
+                [options]="loggingOptions"
+                [value]="state().logging.level"
+                triggerId="gcfg-logging-trigger"
+                listboxId="gcfg-logging-listbox"
+                (valueChange)="onLoggingMenuChange($event)"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- Apply to -->
+        <section class="gcfg-card" aria-labelledby="gcfg-apply-heading">
+          <div class="gcfg-card__head gcfg-card__head--block">
+            <h3 id="gcfg-apply-heading" class="gcfg-card__title">
+              <span class="gcfg-card__title-icon" aria-hidden="true">
+                <svg lucideTarget [size]="18" strokeWidth="1.75"></svg>
+              </span>
+              Apply To
+            </h3>
+          </div>
+          <div class="gcfg-card__body">
+            <div class="gcfg-radio-stack" role="radiogroup" aria-label="Apply configuration to">
+              <label class="gcfg-radio gcfg-radio--block">
+                <input
+                  type="radio"
+                  name="gcfg-apply-scope"
+                  value="all"
+                  [checked]="state().scope === 'all'"
+                  (change)="setScope('all')"
+                />
+                <span class="gcfg-radio__ui" aria-hidden="true"></span>
+                <span>All endpoints</span>
+              </label>
+              <label class="gcfg-radio gcfg-radio--block">
+                <input
+                  type="radio"
+                  name="gcfg-apply-scope"
+                  value="without-overrides"
+                  [checked]="state().scope === 'without-overrides'"
+                  (change)="setScope('without-overrides')"
+                />
+                <span class="gcfg-radio__ui" aria-hidden="true"></span>
+                <span>Only endpoints without custom configuration</span>
+              </label>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <footer class="gcfg-drawer__footer">
+      <button type="button" class="gcfg-btn gcfg-btn--secondary" (click)="requestClose()">Cancel</button>
+      <button type="button" class="gcfg-btn gcfg-btn--primary" (click)="onSave()">Save changes</button>
+    </footer>
+  </aside>
+</div>

@@ -1,0 +1,14 @@
+<div
+  class="cp-section-heading"
+  [class.cp-section-heading--hero]="variant() === 'hero'"
+  [class.cp-section-heading--card]="variant() === 'card'"
+  [class.cp-section-heading--panel]="variant() === 'panel'"
+>
+  <div class="cp-section-heading__leading">
+    <ng-content select="[cp-section-leading]" />
+  </div>
+  <h2 class="cp-section-heading__title">{{ title() }}</h2>
+  @if (description(); as d) {
+    <p class="cp-section-heading__desc">{{ d }}</p>
+  }
+</div>

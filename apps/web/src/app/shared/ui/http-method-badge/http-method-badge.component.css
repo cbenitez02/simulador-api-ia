@@ -1,0 +1,77 @@
+:host {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.http-method-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+
+.http-method-badge--compact {
+  padding: 0.2rem 0.45rem;
+}
+
+.http-method-badge--compact.http-method-badge--get {
+  background: var(--cp-http-get-bg-soft);
+  color: var(--cp-http-get-text-soft);
+}
+
+.http-method-badge--compact.http-method-badge--post {
+  background: var(--cp-http-post-bg-soft);
+  color: var(--cp-http-post-text-soft);
+}
+
+.http-method-badge--compact.http-method-badge--put {
+  background: var(--cp-http-put-bg-soft);
+  color: var(--cp-http-put-text-soft);
+}
+
+.http-method-badge--compact.http-method-badge--patch {
+  background: var(--cp-http-patch-bg-soft);
+  color: var(--cp-http-patch-text-soft);
+}
+
+.http-method-badge--compact.http-method-badge--delete {
+  background: var(--cp-http-delete-bg-soft);
+  color: var(--cp-http-delete-text-soft);
+}
+
+.http-method-badge--emphasis {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.http-method-badge--emphasis.http-method-badge--get {
+  background: var(--cp-http-get-bg-strong);
+  color: var(--cp-http-get-text-strong);
+}
+
+.http-method-badge--emphasis.http-method-badge--post {
+  background: var(--cp-http-post-bg-strong);
+  color: var(--cp-http-post-text-strong);
+}
+
+.http-method-badge--emphasis.http-method-badge--put {
+  background: var(--cp-http-put-bg-strong);
+  color: var(--cp-http-put-text-strong);
+}
+
+.http-method-badge--emphasis.http-method-badge--patch {
+  background: var(--cp-http-patch-bg-strong);
+  color: var(--cp-http-patch-text-strong);
+}
+
+.http-method-badge--emphasis.http-method-badge--delete {
+  background: var(--cp-http-delete-bg-strong);
+  color: var(--cp-http-delete-text-strong);
+}

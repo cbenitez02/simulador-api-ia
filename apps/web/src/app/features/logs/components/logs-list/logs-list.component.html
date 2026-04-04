@@ -1,0 +1,78 @@
+<div class="logs-table-wrap" role="region" aria-label="Request log entries">
+  @if (entries().length === 0) {
+    <p class="logs-table__empty">No log entries match your filters.</p>
+  } @else {
+    <table class="logs-table">
+      <thead>
+        <tr>
+          <th class="logs-table__th logs-table__th--method" scope="col">Method</th>
+          <th class="logs-table__th" scope="col">Endpoint</th>
+          <th class="logs-table__th logs-table__th--narrow" scope="col">Status</th>
+          <th class="logs-table__th logs-table__th--narrow" scope="col">Latency</th>
+          <th class="logs-table__th logs-table__th--tag" scope="col">Scenario</th>
+          <th class="logs-table__th logs-table__th--time" scope="col">Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of entries(); track row.id) {
+          <tr
+            class="logs-table__row"
+            [@logRowEnter]
+            [class.logs-table__row--selected]="selectedId() === row.id"
+            (click)="entrySelect.emit(row.id)"
+            (keydown.enter)="entrySelect.emit(row.id)"
+            (keydown.space)="entrySelect.emit(row.id); $event.preventDefault()"
+            tabindex="0"
+            role="button"
+            [attr.aria-label]="'Open log ' + row.method + ' ' + row.path"
+            [attr.aria-pressed]="selectedId() === row.id"
+          >
+            <td class="logs-table__td logs-table__td--method">
+              <app-http-method-badge [method]="row.method" appearance="compact" />
+            </td>
+            <td class="logs-table__td logs-table__endpoint">{{ row.path }}</td>
+            <td class="logs-table__td">
+              <span class="logs-table__status" [ngClass]="statusClass(row.statusCode)">{{ row.statusCode }}</span>
+            </td>
+            <td class="logs-table__td logs-table__muted">{{ row.latencyMs }}ms</td>
+            <td class="logs-table__td">
+              <span class="logs-table__scenario" [ngClass]="scenarioClass(row.scenario)">
+                @switch (row.scenario) {
+                  @case ('success') {
+                    <svg
+                      lucideCircleCheck
+                      class="logs-table__scenario-icon"
+                      [size]="14"
+                      strokeWidth="2.25"
+                      aria-hidden="true"
+                    ></svg>
+                  }
+                  @case ('error') {
+                    <svg
+                      lucideAlertCircle
+                      class="logs-table__scenario-icon"
+                      [size]="14"
+                      strokeWidth="2.25"
+                      aria-hidden="true"
+                    ></svg>
+                  }
+                  @default {
+                    <svg
+                      lucideMinus
+                      class="logs-table__scenario-icon"
+                      [size]="14"
+                      strokeWidth="2.25"
+                      aria-hidden="true"
+                    ></svg>
+                  }
+                }
+                {{ row.scenario }}
+              </span>
+            </td>
+            <td class="logs-table__td logs-table__time">{{ row.timeLabel }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

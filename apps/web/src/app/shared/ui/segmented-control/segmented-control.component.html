@@ -1,0 +1,12 @@
+<div class="cp-segmented" role="group" [attr.aria-label]="ariaLabel()">
+  @for (o of options(); track o.value) {
+    <button
+      type="button"
+      class="cp-segmented__opt"
+      [class.cp-segmented__opt--on]="value() === o.value"
+      (click)="select(o.value)"
+    >
+      {{ o.label }}
+    </button>
+  }
+</div>

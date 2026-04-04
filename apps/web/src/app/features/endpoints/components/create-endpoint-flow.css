@@ -1,0 +1,332 @@
+/* Shared layout + controls for create-endpoint flow (imported by step components). */
+.cep-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: min(420px, 55vh);
+}
+
+.cep-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cp-text-subtle);
+}
+
+.cep-steps__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cep-steps__item--active {
+  color: var(--cp-accent-primary);
+}
+
+.cep-steps__sep {
+  opacity: 0.45;
+  user-select: none;
+}
+
+.cep-card {
+  border: 1px solid var(--cp-border-muted);
+  border-radius: 12px;
+  background: var(--cp-surface-page);
+  padding: 1rem 1.1rem;
+}
+
+.cep-card__title {
+  margin: 0 0 0.65rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cp-text-subtle);
+}
+
+.cep-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--cp-text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.cep-input,
+.cep-textarea {
+  width: 100%;
+  border: 1px solid var(--cp-border-muted);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  background: var(--cp-surface-app);
+  color: var(--cp-text-primary);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cep-input:focus,
+.cep-textarea:focus {
+  outline: none;
+  border-color: var(--cp-accent-primary);
+  box-shadow: 0 0 0 3px var(--cp-accent-focus-ring);
+}
+
+.cep-textarea {
+  resize: vertical;
+  min-height: 6rem;
+  line-height: 1.5;
+}
+
+.cep-textarea--prompt {
+  min-height: 11rem;
+  font-size: 0.875rem;
+}
+
+.cep-textarea--code {
+  min-height: 10rem;
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.cep-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--cp-text-subtle);
+}
+
+.cep-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: #f87171;
+}
+
+.cep-success-banner {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  background: color-mix(in srgb, var(--cp-accent-primary) 12%, transparent);
+  color: var(--cp-text-primary);
+  border: 1px solid color-mix(in srgb, var(--cp-accent-primary) 35%, transparent);
+}
+
+.cep-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.cep-actions--foot {
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+  margin-top: auto;
+}
+
+.cep-actions--foot .cep-btn--ghost {
+  margin-right: auto;
+}
+
+.cep-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  border: none;
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease;
+}
+
+.cep-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cep-btn--ghost {
+  background: transparent;
+  color: var(--cp-text-subtle);
+}
+
+.cep-btn--ghost:hover:not(:disabled) {
+  background: var(--cp-surface-subtle);
+  color: var(--cp-text-primary);
+}
+
+.cep-btn--primary {
+  background: var(--cp-accent-primary);
+  color: var(--cp-accent-on-primary);
+  box-shadow: 0 2px 14px rgba(34, 197, 94, 0.3);
+}
+
+.cep-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.cep-btn--secondary {
+  background: var(--cp-surface-subtle);
+  color: var(--cp-text-primary);
+  border: 1px solid var(--cp-border-muted);
+}
+
+.cep-btn--secondary:hover:not(:disabled) {
+  background: var(--cp-surface-page);
+}
+
+.cep-spin {
+  animation: cep-spin 0.75s linear infinite;
+}
+
+@keyframes cep-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cep-method-select {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+}
+
+.cep-method-select ::ng-deep .select-menu__trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.cep-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+@media (max-width: 560px) {
+  .cep-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cep-editor-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  padding-bottom: 0.85rem;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--cp-border-muted);
+}
+
+.cep-editor-header__path {
+  font-family: ui-monospace, monospace;
+  font-size: 0.875rem;
+  color: var(--cp-text-primary);
+}
+
+.cep-desc-input {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
+.cep-scenario {
+  border: 1px solid var(--cp-border-muted);
+  border-radius: 10px;
+  padding: 0.75rem;
+  margin-bottom: 0.65rem;
+  background: var(--cp-surface-app);
+}
+
+.cep-scenario:last-child {
+  margin-bottom: 0;
+}
+
+.cep-scenario__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.cep-scenario__type {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-subtle);
+}
+
+.cep-scenario__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .cep-scenario__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cep-preview-panel {
+  border: 1px solid var(--cp-border-muted);
+  border-radius: 10px;
+  background: var(--cp-surface-subtle);
+  overflow: hidden;
+}
+
+.cep-preview-panel__head {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cp-text-subtle);
+  border-bottom: 1px solid var(--cp-border-muted);
+}
+
+.cep-preview-panel__body {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  max-height: min(280px, 32vh);
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.cep-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.cep-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--cp-text-primary);
+  cursor: pointer;
+}
+
+.cep-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--cp-accent-primary);
+}
+
+.cep-range {
+  width: 100%;
+  accent-color: var(--cp-accent-primary);
+}

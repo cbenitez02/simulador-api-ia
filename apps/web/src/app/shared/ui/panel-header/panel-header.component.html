@@ -1,0 +1,11 @@
+<div class="cp-panel-header">
+  <div class="cp-panel-header__start">
+    <h3 class="cp-panel-header__title">{{ title() }}</h3>
+    @if (description(); as d) {
+      <p class="cp-panel-header__desc">{{ d }}</p>
+    }
+  </div>
+  <div class="cp-panel-header__end">
+    <ng-content />
+  </div>
+</div>

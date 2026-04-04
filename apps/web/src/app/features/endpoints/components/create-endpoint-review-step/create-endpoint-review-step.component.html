@@ -1,0 +1,48 @@
+<div class="cep-review">
+  <div class="cep-review__card">
+    <app-section-heading
+      variant="card"
+      title="Review endpoint basics"
+      description="Confirm or edit the inferred method and route"
+    />
+
+    <div class="cep-review__field">
+      <div class="cep-review__label-row">
+        <label class="cep-review__label" for="cep-review-method-trigger">Method</label>
+        <span class="cep-review__badge">Inferred</span>
+      </div>
+      <app-select-menu
+        class="cep-review__select"
+        [options]="methodOptions()"
+        [value]="method()"
+        (valueChange)="onMethodChange($event)"
+        triggerId="cep-review-method-trigger"
+        listboxId="cep-review-method-listbox"
+      />
+    </div>
+
+    <div class="cep-review__field">
+      <div class="cep-review__label-row">
+        <label class="cep-review__label" for="cep-review-route">Route</label>
+        <span class="cep-review__badge">Inferred</span>
+      </div>
+      <input
+        id="cep-review-route"
+        type="text"
+        class="cep-review__input cep-review__input--mono"
+        autocomplete="off"
+        placeholder="/orders"
+        [value]="route()"
+        (input)="onRouteInput($event)"
+      />
+    </div>
+
+    <div class="cep-review__preview">
+      <span class="cep-review__preview-label">Preview</span>
+      <div class="cep-review__preview-value">
+        <span class="cep-review__preview-method">{{ method() }}</span>
+        <span class="cep-review__preview-path">{{ displayRoute(route()) }}</span>
+      </div>
+    </div>
+  </div>
+</div>

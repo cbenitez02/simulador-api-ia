@@ -1,0 +1,58 @@
+/**
+ * Custom elements default to inline sizing; without this, width:100% on the inner
+ * button only fills the host’s shrink-wrapped width (fit-content).
+ */
+:host {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+}
+
+:host(.cp-pending-button-host--full) {
+  width: 100%;
+}
+
+.cp-pending-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--cp-accent-primary);
+  color: var(--cp-accent-on-primary);
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--cp-accent-primary) 45%, transparent);
+  transition: filter 0.15s ease;
+}
+
+.cp-pending-button--block {
+  width: 100%;
+}
+
+.cp-pending-button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.cp-pending-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cp-pending-button__idle {
+  display: inline-flex;
+  align-items: center;
+}
+
+.cp-pending-button__spin {
+  animation: cp-pending-spin 0.75s linear infinite;
+}
+
+@keyframes cp-pending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,99 @@
+<div class="cep-wizard">
+  <header class="cep-wizard__header">
+    <div class="cep-wizard__header-left">
+      <div class="cep-wizard__logo" aria-hidden="true">
+        <svg lucideRoute class="cep-wizard__logo-icon" [size]="24" strokeWidth="2"></svg>
+      </div>
+      <div>
+        <h1 class="cep-wizard__title">{{ isEditing() ? 'Edit endpoint' : 'Create endpoint' }}</h1>
+        <p class="cep-wizard__subtitle">{{ wizardSubtitle() }}</p>
+      </div>
+    </div>
+
+    <ol class="cep-wizard__stepper" aria-label="Steps">
+      @for (n of [1, 2, 3]; track n) {
+        <li class="cep-wizard__stepper-item">
+          @if (n > 1) {
+            <span class="cep-wizard__stepper-line" [class.cep-wizard__stepper-line--done]="stepComplete(n - 1)"></span>
+          }
+          <span
+            class="cep-wizard__step-dot"
+            [class.cep-wizard__step-dot--active]="stepActiveDot(n)"
+            [class.cep-wizard__step-dot--done]="stepComplete(n)"
+            [attr.aria-current]="stepActiveDot(n) ? 'step' : null"
+          >
+            @if (stepComplete(n)) {
+              <svg lucideCircleCheck [size]="16" strokeWidth="2.25"></svg>
+            } @else {
+              {{ n }}
+            }
+          </span>
+        </li>
+      }
+    </ol>
+  </header>
+
+  <div class="cep-wizard__main cp-scrollbar">
+    @switch (step()) {
+      @case ('prompt') {
+        <app-create-endpoint-prompt-step
+          [promptText]="promptText()"
+          [generating]="generating()"
+          [promptError]="promptError()"
+          [generationError]="generationError()"
+          (promptTextChange)="onPromptTextChange($event)"
+          (generate)="onGenerateRequested()"
+        />
+      }
+      @case ('review') {
+        <app-create-endpoint-review-step
+          [method]="reviewMethod()"
+          [route]="reviewRoute()"
+          [methodOptions]="methodOptions"
+          (methodChange)="onReviewMethodChange($event)"
+          (routeChange)="onReviewRouteChange($event)"
+        />
+      }
+      @case ('editor') {
+        @if (draft(); as d) {
+          <app-create-endpoint-editor-step
+            [draft]="d"
+            [sourcePrompt]="sourcePrompt()"
+            [apiBaseUrl]="apiBaseUrl()"
+            (draftChange)="onDraftChange($event)"
+          />
+        }
+      }
+    }
+  </div>
+
+  <footer class="cep-wizard__footer" [class.cep-wizard__footer--start]="step() === 'prompt'">
+    @if (step() === 'prompt') {
+      <button type="button" class="cep-wizard__btn cep-wizard__btn--ghost" (click)="cancel()">Cancel</button>
+    }
+    @if (step() === 'review') {
+      <button type="button" class="cep-wizard__btn cep-wizard__btn--outline" (click)="backToPrompt()">
+        <svg lucideArrowLeft [size]="18" strokeWidth="2"></svg>
+        Back
+      </button>
+      <button type="button" class="cep-wizard__btn cep-wizard__btn--primary" (click)="continueFromReview()">
+        Continue
+        <svg lucideArrowRight [size]="18" strokeWidth="2"></svg>
+      </button>
+    }
+    @if (step() === 'editor') {
+      <button type="button" class="cep-wizard__btn cep-wizard__btn--outline" (click)="onEditorBack()">
+        <svg lucideArrowLeft [size]="18" strokeWidth="2"></svg>
+        Back
+      </button>
+      <button
+        type="button"
+        class="cep-wizard__btn cep-wizard__btn--primary"
+        (click)="saveEndpoint()"
+        [disabled]="!canSave()"
+      >
+        Save endpoint
+      </button>
+    }
+  </footer>
+</div>

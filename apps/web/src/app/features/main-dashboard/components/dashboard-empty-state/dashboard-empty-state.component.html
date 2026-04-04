@@ -1,0 +1,43 @@
+<div class="empty" role="region" aria-label="Welcome">
+  <div class="empty__hero">
+    <div class="empty__hero-icon" aria-hidden="true">
+      <svg lucideSparkles [size]="22" strokeWidth="1.75"></svg>
+    </div>
+    <h1 class="empty__title">Welcome to your API Simulator</h1>
+    <p class="empty__sub">Create smart mock APIs in seconds. No backend required.</p>
+    <button type="button" class="empty__btn empty__btn--primary" (click)="createFirstProject.emit()">
+      <svg lucidePlus [size]="18" strokeWidth="2.25" aria-hidden="true"></svg>
+      Create your first project
+    </button>
+    <button type="button" class="empty__link" (click)="tryDemoProject.emit()">
+      <svg lucidePlay [size]="14" strokeWidth="2" aria-hidden="true"></svg>
+      Try a demo project
+      <span class="empty__link-chevron" aria-hidden="true">&gt;</span>
+    </button>
+  </div>
+
+  <section class="empty__example" aria-labelledby="empty-example-heading">
+    <span id="empty-example-heading" class="visually-hidden">Example project</span>
+    <div class="empty__example-chrome">
+      <span class="empty__example-label">Example</span>
+      <div class="empty__example-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
+    <div class="empty__example-body">
+      <p class="empty__example-route">
+        <span class="empty__method">GET</span>
+        <span class="empty__path">/users</span>
+      </p>
+      <p class="empty__example-desc">Users with name, email and orders. Some users without orders. 20% error rate.</p>
+    </div>
+    <div class="empty__example-footer">
+      <p class="empty__example-hint">AI will generate endpoints, scenarios &amp; mock data</p>
+      <button type="button" class="empty__btn empty__btn--outline" (click)="generateDemoFromCard.emit()">
+        <svg lucideSparkles [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+        Generate demo project
+        <svg lucideArrowRight [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+      </button>
+    </div>
+  </section>
+
+  <p class="empty__footnote">You can create endpoints using AI or by pasting JSON.</p>
+</div>

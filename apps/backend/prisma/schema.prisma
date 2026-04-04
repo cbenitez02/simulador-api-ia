@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  endpoints    Endpoint[]
+  globalConfig GlobalConfig?
+  logs         ApiLog[]
+}
+
+model Endpoint {
+  id           String   @id @default(cuid())
+  projectId    String
+  method       String
+  path         String
+  description  String   @default("")
+  statusCode   Int      @default(200)
+  responseBody Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenarios      Scenario[]
+  endpointConfig EndpointConfig?
+
+  @@unique([projectId, method, path])
+}
+
+model Scenario {
+  id         String   @id @default(cuid())
+  endpointId String
+  name       String
+  type       String
+  statusCode Int
+  body       Json
+  delayMs    Int      @default(0)
+  weight     Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+}
+
+model EndpointConfig {
+  id                 String   @id @default(cuid())
+  endpointId         String   @unique
+  latencyMode        String   @default("fixed")
+  fixedDelayMs       Int      @default(0)
+  minDelayMs         Int      @default(0)
+  maxDelayMs         Int      @default(500)
+  errorRate          Float    @default(0)
+  useScenarioWeights Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+
+  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+}
+
+model GlobalConfig {
+  id                     String   @id @default(cuid())
+  projectId              String   @unique
+  latencyEnabled         Boolean  @default(false)
+  latencyMinMs           Int      @default(0)
+  latencyMaxMs           Int      @default(1000)
+  latencyMode            String   @default("fixed")
+  errorSimulationEnabled Boolean  @default(false)
+  errorSimulationRate    Float    @default(0)
+  errorSimulationCodes   Json     @default("[500]")
+  rateLimitingEnabled    Boolean  @default(false)
+  rateLimitingRpm        Int      @default(60)
+  loggingLevel           String   @default("basic")
+  scope                  String   @default("all")
+  updatedAt              DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ApiLog {
+  id                      String   @id @default(cuid())
+  projectId               String
+  method                  String
+  path                    String
+  fullUrl                 String
+  statusCode              Int
+  latencyMs               Int
+  scenarioType            String
+  scenarioSelectionSource String
+  requestHeaders          Json
+  requestBody             Json?
+  responseHeaders         Json
+  responseBody            Json
+  createdAt               DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+}

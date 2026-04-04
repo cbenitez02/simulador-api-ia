@@ -1,0 +1,184 @@
+<div class="dash">
+  <header class="dash__head">
+    <div class="dash__head-row">
+      <div class="dash__titles">
+        <h1 class="dash__title">Dashboard</h1>
+        <p class="dash__sub">Overview and health of your mock API project</p>
+      </div>
+      <div class="dash__actions">
+        <button
+          type="button"
+          class="dash__btn dash__btn--ghost"
+          [class.dash__btn--copy-done]="copyBaseUrlState() === 'copied'"
+          [disabled]="!canCopyBaseUrl()"
+          (click)="copyProjectUrl()"
+          [attr.aria-label]="
+            copyBaseUrlState() === 'copied'
+              ? 'Base URL copied to clipboard'
+              : copyBaseUrlState() === 'error'
+                ? 'Copy failed; try again or copy manually'
+                : 'Copy base URL to clipboard'
+          "
+        >
+          @if (copyBaseUrlState() === 'copied') {
+            <svg lucideCircleCheck [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Copied
+          } @else if (copyBaseUrlState() === 'error') {
+            <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Copy failed
+          } @else {
+            <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Copy Base URL
+          }
+        </button>
+        <button type="button" class="dash__btn dash__btn--ghost" (click)="openLogs.emit()">
+          <svg lucideFileText [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+          Open Logs
+        </button>
+        <!-- <button type="button" class="dash__btn dash__btn--primary" (click)="createEndpoint.emit()">
+          <span class="dash__btn-plus" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+          </span>
+          Create endpoint
+        </button> -->
+      </div>
+    </div>
+  </header>
+
+  <div class="dash__scroll">
+    <section class="dash__hero card">
+      <div class="dash__hero-main">
+        <div class="dash__hero-top">
+          <h2 class="dash__hero-name">{{ project().name }}</h2>
+          <span class="dash__pill dash__pill--ok">Running</span>
+        </div>
+        <p class="dash__hero-desc">{{ project().description }}</p>
+        <div class="dash__hero-meta">
+          <span class="dash__hero-url" [title]="project().mockUrl">{{ project().mockUrl }}</span>
+          <span class="dash__hero-updated">Last updated: {{ project().lastUpdatedRelative }}</span>
+        </div>
+      </div>
+      <dl class="dash__hero-stats">
+        <div class="dash__stat">
+          <dt class="dash__stat-label">Endpoints</dt>
+          <dd class="dash__stat-value">{{ endpointCount() }}</dd>
+        </div>
+        <div class="dash__stat">
+          <dt class="dash__stat-label">Scenarios</dt>
+          <dd class="dash__stat-value">{{ scenarioCount() }}</dd>
+        </div>
+        <div class="dash__stat">
+          <dt class="dash__stat-label">Avg latency</dt>
+          <dd class="dash__stat-value">{{ avgLatencyMs() }}ms</dd>
+        </div>
+        <div class="dash__stat">
+          <dt class="dash__stat-label">Error rate</dt>
+          <dd class="dash__stat-value">{{ errorRatePct() }}%</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div class="dash__metrics">
+      <article class="dash__metric card">
+        <h3 class="dash__metric-label">Total endpoints</h3>
+        <p class="dash__metric-value">{{ endpointCount() }}</p>
+      </article>
+      <article class="dash__metric card">
+        <h3 class="dash__metric-label">Total scenarios</h3>
+        <p class="dash__metric-value">{{ scenarioCount() }}</p>
+      </article>
+      <article class="dash__metric card">
+        <h3 class="dash__metric-label">Average latency</h3>
+        <p class="dash__metric-value">{{ avgLatencyMs() }}ms</p>
+      </article>
+      <article class="dash__metric card">
+        <h3 class="dash__metric-label">Error rate</h3>
+        <p class="dash__metric-value">{{ errorRatePct() }}%</p>
+      </article>
+    </div>
+
+    <div class="dash__grid">
+      <section class="dash__health card" aria-labelledby="dash-health-heading">
+        <h2 id="dash-health-heading" class="dash__card-title">Project health</h2>
+        <ul class="dash__health-list" role="list">
+          <li class="dash__health-item">
+            <span class="dash__health-icon dash__health-icon--ok" aria-hidden="true">
+              <svg lucideCircleCheck [size]="18" strokeWidth="1.75"></svg>
+            </span>
+            <span class="dash__health-text"
+              ><strong>{{ health().ready }}</strong> endpoints ready</span
+            >
+          </li>
+          <li class="dash__health-item">
+            <span class="dash__health-icon dash__health-icon--warn" aria-hidden="true">
+              <svg lucideAlertCircle [size]="18" strokeWidth="1.75"></svg>
+            </span>
+            <span class="dash__health-text"
+              ><strong>{{ health().missingScenarios }}</strong> endpoint missing alternative scenarios</span
+            >
+          </li>
+          <li class="dash__health-item">
+            <span class="dash__health-icon dash__health-icon--info" aria-hidden="true">
+              <svg lucideAlertTriangle [size]="18" strokeWidth="1.75"></svg>
+            </span>
+            <span class="dash__health-text"
+              ><strong>{{ health().errorSim }}</strong> endpoints with error simulation</span
+            >
+          </li>
+          <li class="dash__health-item">
+            <span class="dash__health-icon dash__health-icon--muted" aria-hidden="true">
+              <svg lucideCircle [size]="18" strokeWidth="1.75"></svg>
+            </span>
+            <span class="dash__health-text"
+              ><strong>{{ health().emptyState }}</strong> endpoint with empty state</span
+            >
+          </li>
+          <li class="dash__health-item">
+            <span class="dash__health-icon dash__health-icon--muted" aria-hidden="true">
+              <svg lucideClock [size]="18" strokeWidth="1.75"></svg>
+            </span>
+            <span class="dash__health-text"
+              ><strong>{{ health().timeouts }}</strong> endpoints with timeout scenario</span
+            >
+          </li>
+        </ul>
+      </section>
+
+      <section class="dash__table-wrap card" aria-labelledby="dash-endpoints-heading">
+        <h2 id="dash-endpoints-heading" class="dash__card-title">Endpoints overview</h2>
+        <div class="dash__table-scroll">
+          <table class="dash__table">
+            <thead>
+              <tr>
+                <th scope="col">Endpoint</th>
+                <th scope="col">Scenarios</th>
+                <th scope="col">Latency</th>
+                <th scope="col">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of endpointRows(); track row.endpoint.id) {
+                <tr>
+                  <td>
+                    <div class="dash__ep">
+                      <app-http-method-badge [method]="row.endpoint.method" appearance="compact" />
+                      <div class="dash__ep-text">
+                        <span class="dash__ep-path">{{ row.endpoint.path }}</span>
+                        <span class="dash__ep-desc">{{ row.endpoint.description }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{{ row.scenarios }}</td>
+                  <td>{{ row.latencyMs }}ms</td>
+                  <td>{{ row.errorLabel }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

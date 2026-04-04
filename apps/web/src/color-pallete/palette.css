@@ -1,0 +1,103 @@
+/**
+ * Design tokens — use var(--cp-*) in components instead of raw hex/rgb.
+ * App shell / dashboard dark theme.
+ */
+:root {
+  /* Surfaces */
+  --cp-surface-page: #0f172a;
+  --cp-surface-app: #0a0a0a;
+  --cp-surface-raised: #141414;
+  --cp-surface-code: #0f0f0f;
+  --cp-surface-subtle: #171717;
+  --cp-surface-overlay: #1a1a1a;
+  --cp-surface-muted: #1f1f1f;
+  --cp-surface-interactive-hover: #262626;
+  --cp-surface-interactive-active: #2a2a2a;
+
+  /* Borders */
+  --cp-border-default: #262626;
+  --cp-border-muted: #171717;
+  --cp-border-dashed: #333333;
+  --cp-border-input-hover: #404040;
+
+  /* Text */
+  --cp-text-primary: #ffffff;
+  --cp-text-body: #e5e7eb;
+  --cp-text-heading: #f3f4f6;
+  --cp-text-heading-strong: #fafafa;
+  --cp-text-muted: #9ca3af;
+  --cp-text-subtle: #6b7280;
+  --cp-text-secondary-line: #737373;
+  --cp-text-icon-muted: #a3a3a3;
+  --cp-text-chevron: #737373;
+  --cp-text-nav: #d1d5db;
+
+  /* Accent (brand green) */
+  --cp-accent-primary: #22c55e;
+  --cp-accent-primary-hover: #16a34a;
+  --cp-accent-on-primary: #ffffff;
+  --cp-accent-on-primary-strong: #052e16;
+  --cp-accent-soft-bg: rgba(34, 197, 94, 0.08);
+  --cp-accent-focus-ring: rgba(34, 197, 94, 0.25);
+  --cp-accent-focus-outline: #4ade80;
+
+  /* Menus & list selection */
+  --cp-menu-surface: #1a1a1a;
+  --cp-menu-border: #333333;
+  --cp-menu-option-current-bg: rgba(34, 197, 94, 0.14);
+  --cp-menu-option-current-text: #4ade80;
+  --cp-menu-option-current-bg-hover: rgba(34, 197, 94, 0.22);
+  --cp-menu-option-current-text-hover: #86efac;
+
+  /* Elevation */
+  --cp-shadow-dropdown: 0 4px 6px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.45);
+
+  /* JSON / code syntax (detail panel) */
+  --cp-syntax-json-key: #d4a574;
+  --cp-syntax-json-string: #fbbf24;
+  --cp-syntax-json-number: #93c5fd;
+  --cp-syntax-json-boolean: #c084fc;
+  --cp-syntax-json-null: #9ca3af;
+
+  /* HTTP method badges — compact (list) */
+  --cp-http-get-bg-soft: rgba(34, 197, 94, 0.18);
+  --cp-http-get-text-soft: #4ade80;
+  --cp-http-post-bg-soft: rgba(59, 130, 246, 0.2);
+  --cp-http-post-text-soft: #93c5fd;
+  --cp-http-put-bg-soft: rgba(245, 158, 11, 0.2);
+  --cp-http-put-text-soft: #fbbf24;
+  --cp-http-patch-bg-soft: rgba(180, 83, 9, 0.22);
+  --cp-http-patch-text-soft: #fdba74;
+  --cp-http-delete-bg-soft: rgba(239, 68, 68, 0.18);
+  --cp-http-delete-text-soft: #f87171;
+
+  /* HTTP method badges — emphasis (panel header) */
+  --cp-http-get-bg-strong: #14532d;
+  --cp-http-get-text-strong: #86efac;
+  --cp-http-post-bg-strong: #1e3a5f;
+  --cp-http-post-text-strong: #93c5fd;
+  --cp-http-put-bg-strong: #713f12;
+  --cp-http-put-text-strong: #fcd34d;
+  --cp-http-patch-bg-strong: #4c1d95;
+  --cp-http-patch-text-strong: #c4b5fd;
+  --cp-http-delete-bg-strong: #450a0a;
+  --cp-http-delete-text-strong: #fca5a5;
+
+  /* Sidebar project indicator */
+  --cp-nav-dot-idle: #6b7280;
+  --cp-nav-dot-active: #22c55e;
+
+  /* Scrollbars (thin, dark — use in scrollable regions) */
+  --cp-scrollbar-size: 6px;
+  --cp-scrollbar-track: var(--cp-surface-code);
+  --cp-scrollbar-thumb: #404040;
+  --cp-scrollbar-thumb-hover: #525252;
+
+  /* Activity feed (utility sidebar — verb tones) */
+  --cp-activity-verb-add: #7dd3fc;
+  --cp-activity-verb-update: #fb923c;
+
+  /* Project health row icons (dashboard) */
+  --cp-health-icon-warn: #f97316;
+  --cp-health-icon-info: #60a5fa;
+}

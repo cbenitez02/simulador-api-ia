@@ -1,0 +1,125 @@
+<app-main-dashboard-sidebar
+  [projects]="sidebarProjects()"
+  [selectedProjectId]="selectedProjectId()"
+  [activeNav]="activeNav()"
+  (projectSelect)="selectProject($event)"
+  (navSelect)="selectNav($event)"
+  (createProjectRequested)="openCreateProjectModal()"
+/>
+
+@if (createEndpointFlowOpen()) {
+  <main class="workspace__main workspace__main--create-wizard" aria-label="Create endpoint">
+    <app-create-endpoint-page
+      [open]="true"
+      [initialEndpoint]="endpointWizardInitial()"
+      [isEditing]="endpointWizardInitial() !== null"
+      [apiBaseUrl]="apiBaseUrl()"
+      (saved)="onEndpointSaved($event)"
+      (cancelled)="closeCreateEndpointWizard(true)"
+    />
+  </main>
+} @else if (!hasProjects()) {
+  @if (activeNav() === 'dashboard') {
+    <div class="workspace__main workspace__main--welcome">
+      <app-dashboard-empty-state
+        (createFirstProject)="openCreateProjectModal()"
+        (tryDemoProject)="loadDemoProject()"
+        (generateDemoFromCard)="loadDemoProject()"
+      />
+    </div>
+  } @else {
+    <main class="workspace__main workspace__main--needs-project" aria-label="No project">
+      <div class="workspace__needs-project">
+        <h1 class="workspace__needs-project-title">Create a project first</h1>
+        <p class="workspace__needs-project-sub">
+          You need at least one project to use this section. Start from the dashboard or add one below.
+        </p>
+        <div class="workspace__needs-project-actions">
+          <button
+            type="button"
+            class="workspace__needs-project-btn workspace__needs-project-btn--primary"
+            (click)="selectNav('dashboard')"
+          >
+            Go to dashboard
+          </button>
+          <button type="button" class="workspace__needs-project-btn" (click)="openCreateProjectModal()">
+            Create project
+          </button>
+          <button
+            type="button"
+            class="workspace__needs-project-btn workspace__needs-project-btn--ghost"
+            (click)="loadDemoProject()"
+          >
+            Try demo project
+          </button>
+        </div>
+      </div>
+    </main>
+  }
+} @else if (activeNav() === 'dashboard') {
+  @if (activeProject(); as project) {
+    <app-main-dashboard-data [project]="project" (createEndpoint)="createEndpoint()" (openLogs)="openLogs()" />
+  }
+} @else if (activeNav() === 'logs') {
+  <main class="workspace__main" aria-label="Logs">
+    <app-logs
+      [projectId]="selectedProjectId()"
+      [selectedLog]="selectedLog()"
+      (selectedLogChange)="selectedLog.set($event)"
+    />
+  </main>
+} @else if (activeNav() === 'endpoints') {
+  <app-endpoints-page
+    [endpoints]="endpoints()"
+    [selectedEndpointId]="selectedEndpointId()"
+    (endpointSelect)="selectEndpoint($event)"
+    (createEndpoint)="createEndpoint()"
+  />
+} @else {
+  <main class="workspace__main workspace__main--placeholder" [attr.aria-label]="placeholderLabel()">
+    <header class="workspace__main-head">
+      <div class="workspace__main-titles">
+        <h1 class="workspace__main-title">{{ placeholderTitle() }}</h1>
+        <p class="workspace__main-sub">{{ placeholderSub() }}</p>
+      </div>
+    </header>
+    <div class="workspace__placeholder-body">
+      <p>This section is not implemented yet.</p>
+    </div>
+  </main>
+}
+
+@if (activeNav() === 'dashboard' && hasProjects()) {
+  <app-main-dashboard-utility-sidebar
+    (createEndpoint)="createEndpoint()"
+    (testAllEndpoints)="testAllEndpoints()"
+    (exportConfig)="exportConfig()"
+    (importEndpoints)="importEndpoints()"
+    (editGlobalConfig)="editGlobalConfig()"
+  />
+} @else if (activeNav() === 'endpoints' && !createEndpointFlowOpen() && hasProjects()) {
+  <app-endpoint-detail-panel
+    [selectedEndpoint]="selectedEndpoint()"
+    [baseUrl]="apiBaseUrl()"
+    (closed)="clearEndpointSelection()"
+    (editRequested)="editEndpoint($event)"
+    (deleteRequested)="deleteEndpoint($event)"
+  />
+} @else if (activeNav() === 'logs' && hasProjects()) {
+  <app-logs-detail-sidebar [entry]="selectedLog()" (closed)="clearLogSelection()" />
+}
+
+<app-create-project-modal
+  [open]="createProjectModalOpen()"
+  [loading]="createProjectModalLoading()"
+  (cancelled)="onCreateProjectModalDismiss()"
+  (createProjectOnly)="onCreateProjectModalProjectOnly($event)"
+  (createProjectAndEndpoint)="onCreateProjectModalWithEndpoint($event)"
+/>
+
+<app-global-config-drawer
+  [open]="globalConfigDrawerOpen()"
+  [initialConfig]="globalConfig()"
+  (closed)="onGlobalConfigDrawerClose()"
+  (save)="onGlobalConfigSaved($event)"
+/>

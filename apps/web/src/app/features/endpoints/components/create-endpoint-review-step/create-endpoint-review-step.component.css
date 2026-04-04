@@ -1,0 +1,121 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cep-review {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0.5rem 1rem 2rem;
+}
+
+.cep-review__card {
+  width: min(440px, 100%);
+  padding: 1.75rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--cep-wizard-border, rgba(255, 255, 255, 0.08));
+  background: var(--cep-wizard-surface, #121418);
+}
+
+.cep-review__field {
+  margin-bottom: 1.15rem;
+}
+
+.cep-review__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.cep-review__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--cep-wizard-text, #f4f4f5);
+}
+
+.cep-review__badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--cp-accent-primary) 22%, transparent);
+  color: var(--cp-accent-primary);
+  border: 1px solid color-mix(in srgb, var(--cp-accent-primary) 40%, transparent);
+}
+
+.cep-review__select {
+  display: block;
+  width: 100%;
+}
+
+.cep-review__select ::ng-deep .select-menu__trigger {
+  width: 100%;
+  justify-content: space-between;
+  background: var(--cep-wizard-input-bg, #0d0f12);
+  border-color: var(--cep-wizard-border, rgba(255, 255, 255, 0.1));
+  color: var(--cep-wizard-text, #f4f4f5);
+}
+
+.cep-review__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--cep-wizard-border, rgba(255, 255, 255, 0.1));
+  background: var(--cep-wizard-input-bg, #0d0f12);
+  color: var(--cep-wizard-text, #f4f4f5);
+  font-size: 0.875rem;
+}
+
+.cep-review__input:focus {
+  outline: none;
+  border-color: var(--cp-accent-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cp-accent-primary) 35%, transparent);
+}
+
+.cep-review__input--mono {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+
+.cep-review__preview {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: var(--cep-wizard-input-bg, #0d0f12);
+  border: 1px solid var(--cep-wizard-border, rgba(255, 255, 255, 0.06));
+}
+
+.cep-review__preview-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cep-wizard-muted, #9ca3af);
+  margin-bottom: 0.45rem;
+}
+
+.cep-review__preview-value {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cep-review__preview-method {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  color: #60a5fa;
+}
+
+.cep-review__preview-path {
+  font-size: 0.9375rem;
+  font-family: ui-monospace, monospace;
+  color: var(--cep-wizard-text, #f4f4f5);
+}

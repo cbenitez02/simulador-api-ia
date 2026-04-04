@@ -1,0 +1,202 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  --cep-wizard-bg: #0a0b0d;
+  --cep-wizard-surface: #121418;
+  --cep-wizard-input-bg: #0d0f12;
+  --cep-wizard-border: rgba(255, 255, 255, 0.08);
+  --cep-wizard-text: #f4f4f5;
+  --cep-wizard-muted: #9ca3af;
+}
+
+.cep-wizard {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--cep-wizard-bg);
+  color: var(--cep-wizard-text);
+}
+
+.cep-wizard__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--cep-wizard-border);
+  flex-shrink: 0;
+}
+
+.cep-wizard__header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.cep-wizard__logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--cp-accent-primary) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cp-accent-primary) 40%, transparent);
+  color: var(--cp-accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cep-wizard__logo-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.cep-wizard__title {
+  margin: 0 0 0.2rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--cep-wizard-text);
+}
+
+.cep-wizard__subtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--cep-wizard-muted);
+  line-height: 1.4;
+}
+
+.cep-wizard__stepper {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+}
+
+.cep-wizard__stepper-item {
+  display: flex;
+  align-items: center;
+}
+
+.cep-wizard__stepper-line {
+  width: 28px;
+  height: 2px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 1px;
+}
+
+.cep-wizard__stepper-line--done {
+  background: var(--cp-accent-primary);
+}
+
+.cep-wizard__step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: var(--cep-wizard-muted);
+  background: var(--cep-wizard-input-bg);
+  padding-bottom: 2px;
+}
+
+.cep-wizard__step-dot--active {
+  border-color: var(--cp-accent-primary);
+  color: var(--cp-accent-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cp-accent-primary) 35%, transparent);
+}
+
+.cep-wizard__step-dot--done {
+  border-color: var(--cp-accent-primary);
+  background: color-mix(in srgb, var(--cp-accent-primary) 18%, transparent);
+  color: var(--cp-accent-primary);
+}
+
+.cep-wizard__main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.5rem 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cep-wizard__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  padding: 1rem 1.5rem 1.25rem;
+  border-top: 1px solid var(--cep-wizard-border);
+  flex-shrink: 0;
+  background: var(--cep-wizard-bg);
+}
+
+.cep-wizard__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease,
+    background 0.15s ease;
+}
+
+.cep-wizard__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cep-wizard__btn--ghost {
+  background: transparent;
+  color: var(--cep-wizard-muted);
+}
+
+.cep-wizard__btn--ghost:hover:not(:disabled) {
+  color: var(--cep-wizard-text);
+}
+
+.cep-wizard__btn--outline {
+  background: transparent;
+  color: var(--cep-wizard-text);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.cep-wizard__btn--outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cep-wizard__btn--primary {
+  background: var(--cp-accent-primary);
+  color: var(--cp-accent-on-primary);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--cp-accent-primary) 40%, transparent);
+}
+
+.cep-wizard__btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.cep-wizard__footer--start {
+  justify-content: flex-start;
+}

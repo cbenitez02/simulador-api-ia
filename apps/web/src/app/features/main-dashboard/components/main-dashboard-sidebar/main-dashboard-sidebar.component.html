@@ -1,0 +1,104 @@
+<aside class="sidebar" aria-label="Navegación principal">
+  <div class="sidebar__brand">
+    <div class="sidebar__brand-icon" aria-hidden="true">
+      <svg lucideHandMetal [size]="18" class="sidebar__brand-leaf"></svg>
+    </div>
+    <span class="sidebar__brand-title">AI API Simulator</span>
+  </div>
+
+  <div class="sidebar__scroll">
+    <section class="sidebar__section" aria-labelledby="projects-heading">
+      <div class="sidebar__section-head">
+        <h2 id="projects-heading" class="sidebar__label">Projects</h2>
+        <button type="button" class="sidebar__icon-btn" (click)="addProject()" aria-label="Añadir proyecto">
+          <svg lucidePlus [size]="16"></svg>
+        </button>
+      </div>
+      @if (projects().length === 0) {
+        <div class="sidebar__projects-empty">
+          <p class="sidebar__projects-empty-text">No projects yet.</p>
+          <button type="button" class="sidebar__create-project-btn" (click)="addProject()">
+            <svg lucidePlus [size]="18" strokeWidth="2.25" aria-hidden="true"></svg>
+            Create Project
+          </button>
+        </div>
+      } @else {
+        <ul class="sidebar__projects">
+          @for (p of projects(); track p.id) {
+            <li>
+              <button
+                type="button"
+                class="sidebar__project"
+                [class.sidebar__project--active]="selectedProjectId() === p.id"
+                (click)="selectProject(p.id)"
+              >
+                <span
+                  class="sidebar__project-dot"
+                  [class.sidebar__project-dot--active]="selectedProjectId() === p.id"
+                  aria-hidden="true"
+                ></span>
+                <span class="sidebar__project-name">{{ p.name }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <div class="sidebar__divider" role="separator"></div>
+
+    <nav class="sidebar__nav" aria-label="Aplicación">
+      <button
+        type="button"
+        class="sidebar__nav-item"
+        [class.sidebar__nav-item--active]="activeNav() === 'dashboard'"
+        (click)="selectNav('dashboard')"
+        [attr.aria-current]="activeNav() === 'dashboard' ? 'page' : null"
+      >
+        <svg lucideLayoutGrid [size]="18" strokeWidth="1.75"></svg>
+        <span>Dashboard</span>
+      </button>
+      <button
+        type="button"
+        class="sidebar__nav-item"
+        [class.sidebar__nav-item--active]="activeNav() === 'endpoints'"
+        (click)="selectNav('endpoints')"
+      >
+        <svg lucideArrowRightLeft [size]="18" strokeWidth="1.75"></svg>
+        <span>Endpoints</span>
+      </button>
+      <button
+        type="button"
+        class="sidebar__nav-item"
+        [class.sidebar__nav-item--active]="activeNav() === 'logs'"
+        (click)="selectNav('logs')"
+      >
+        <svg lucideFileText [size]="18" strokeWidth="1.75"></svg>
+        <span>Logs</span>
+      </button>
+      <button
+        type="button"
+        class="sidebar__nav-item"
+        [class.sidebar__nav-item--active]="activeNav() === 'settings'"
+        (click)="selectNav('settings')"
+      >
+        <svg lucideSettings [size]="18" strokeWidth="1.75"></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </div>
+
+  @if (activeProject(); as ap) {
+    <section class="sidebar__active-card" aria-label="Proyecto activo">
+      <p class="sidebar__label sidebar__label--card">Active project</p>
+      <p class="sidebar__active-name">{{ ap.name }}</p>
+      <div class="sidebar__url-row">
+        <span class="sidebar__url-text" [title]="ap.mockUrl">{{ displayMockUrl() }}</span>
+        <button type="button" class="sidebar__copy-btn" (click)="copyMockUrl()" aria-label="Copiar URL del mock">
+          <svg lucideCopy [size]="16" strokeWidth="1.75"></svg>
+        </button>
+      </div>
+      <p class="sidebar__meta">{{ ap.endpointCount }} endpoints</p>
+    </section>
+  }
+</aside>
