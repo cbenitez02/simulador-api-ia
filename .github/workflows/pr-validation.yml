@@ -1,0 +1,61 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  check-issue-reference:
+    name: Check Issue Reference
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR body references an issue
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! echo "$PR_BODY" | grep -Eiq '(closes|fixes|resolves)\s+#([0-9]+)'; then
+            echo "PR body must include: Closes #<issue-number> (or Fixes/Resolves)."
+            exit 1
+          fi
+
+  check-issue-approved:
+    name: Check Issue Has status:approved
+    runs-on: ubuntu-latest
+    needs: check-issue-reference
+    steps:
+      - name: Validate linked issue has status:approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          ISSUE_NUMBER=$(echo "$PR_BODY" | grep -Eio '(closes|fixes|resolves)\s+#([0-9]+)' | head -n 1 | grep -Eo '[0-9]+')
+
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "Could not extract issue number from PR body."
+            exit 1
+          fi
+
+          LABELS=$(gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name')
+
+          if ! echo "$LABELS" | grep -Fxq 'status:approved'; then
+            echo "Linked issue #$ISSUE_NUMBER is missing label status:approved."
+            exit 1
+          fi
+
+  check-type-label:
+    name: Check PR Has type:* Label
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate exactly one type:* label exists
+        run: |
+          TYPE_LABEL_COUNT=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" | grep -E '^type:' | wc -l | tr -d ' ')
+
+          if [ "$TYPE_LABEL_COUNT" -ne 1 ]; then
+            echo "PR must have exactly one type:* label. Found: $TYPE_LABEL_COUNT"
+            exit 1
+          fi
