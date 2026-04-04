@@ -18,6 +18,28 @@ async function cleanDatabase() {
   await prisma.project.deleteMany();
 }
 
+async function waitForLogEntries(
+  appInstance: Express,
+  projectId: string,
+  timeoutMs = 3000
+): Promise<unknown[]> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const response = await request(appInstance).get(`/api/v1/projects/${projectId}/logs`);
+
+    if (response.status === 200 && Array.isArray(response.body) && response.body.length > 0) {
+      return response.body;
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
+  }
+
+  return [];
+}
+
 describeDb('db integration (real postgres)', () => {
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -89,10 +111,9 @@ describeDb('db integration (real postgres)', () => {
     expect(mockRes.body).toEqual({ source: 'scenario' });
     expect(mockRes.headers['x-simulador-scenario']).toBe('success-case');
 
-    const logsRes = await request(app).get(`/api/v1/projects/${projectRes.body.id}/logs`);
-    expect(logsRes.status).toBe(200);
-    expect(Array.isArray(logsRes.body)).toBe(true);
-    expect(logsRes.body.length).toBeGreaterThan(0);
+    const logs = await waitForLogEntries(app, projectRes.body.id);
+    expect(Array.isArray(logs)).toBe(true);
+    expect(logs.length).toBeGreaterThan(0);
   });
 
   it('forced-error global responde código configurado', async () => {
