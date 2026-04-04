@@ -50,3 +50,9 @@ desktop.ini
 
 # Cachés genéricas
 .cache/
+
+# Agent Teams Lite local artifacts
+.atl/
+
+# Prisma generated client
+apps/backend/src/generated/
