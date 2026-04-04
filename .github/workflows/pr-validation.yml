@@ -31,6 +31,7 @@ jobs:
       - name: Validate linked issue has status:approved
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           ISSUE_NUMBER=$(echo "$PR_BODY" | grep -Eio '(closes|fixes|resolves)\s+#([0-9]+)' | head -n 1 | grep -Eo '[0-9]+')
@@ -40,7 +41,7 @@ jobs:
             exit 1
           fi
 
-          LABELS=$(gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name')
+          LABELS=$(gh issue view "$ISSUE_NUMBER" --repo "$GH_REPO" --json labels --jq '.labels[].name')
 
           if ! echo "$LABELS" | grep -Fxq 'status:approved'; then
             echo "Linked issue #$ISSUE_NUMBER is missing label status:approved."
