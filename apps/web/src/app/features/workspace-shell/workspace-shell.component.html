@@ -2,21 +2,48 @@
   [projects]="sidebarProjects()"
   [selectedProjectId]="selectedProjectId()"
   [activeNav]="activeNav()"
+  [loading]="projectsLoading()"
+  [errorMessage]="projectsError()"
   (projectSelect)="selectProject($event)"
   (navSelect)="selectNav($event)"
   (createProjectRequested)="openCreateProjectModal()"
+  (retryRequested)="retryLoadProjects()"
 />
 
 @if (createEndpointFlowOpen()) {
   <main class="workspace__main workspace__main--create-wizard" aria-label="Create endpoint">
     <app-create-endpoint-page
       [open]="true"
+      [projectId]="selectedProjectId()"
       [initialEndpoint]="endpointWizardInitial()"
       [isEditing]="endpointWizardInitial() !== null"
       [apiBaseUrl]="apiBaseUrl()"
       (saved)="onEndpointSaved($event)"
       (cancelled)="closeCreateEndpointWizard(true)"
     />
+  </main>
+} @else if (projectsLoading()) {
+  <main class="workspace__main workspace__main--status" aria-label="Loading projects">
+    <div class="workspace__status-card">
+      <h1 class="workspace__needs-project-title">Loading projects...</h1>
+      <p class="workspace__needs-project-sub">We are fetching your backend workspace.</p>
+    </div>
+  </main>
+} @else if (projectsError()) {
+  <main class="workspace__main workspace__main--status" aria-label="Project load error">
+    <div class="workspace__status-card">
+      <h1 class="workspace__needs-project-title">Could not load projects</h1>
+      <p class="workspace__needs-project-sub">{{ projectsError() }}</p>
+      <div class="workspace__needs-project-actions">
+        <button
+          type="button"
+          class="workspace__needs-project-btn workspace__needs-project-btn--primary"
+          (click)="retryLoadProjects()"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
   </main>
 } @else if (!hasProjects()) {
   @if (activeNav() === 'dashboard') {
@@ -69,12 +96,17 @@
     />
   </main>
 } @else if (activeNav() === 'endpoints') {
-  <app-endpoints-page
-    [endpoints]="endpoints()"
-    [selectedEndpointId]="selectedEndpointId()"
-    (endpointSelect)="selectEndpoint($event)"
-    (createEndpoint)="createEndpoint()"
-  />
+  <main class="workspace__main" aria-label="Endpoints">
+    @if (endpointMutationError()) {
+      <div class="workspace__inline-error">{{ endpointMutationError() }}</div>
+    }
+    <app-endpoints-page
+      [endpoints]="endpoints()"
+      [selectedEndpointId]="selectedEndpointId()"
+      (endpointSelect)="selectEndpoint($event)"
+      (createEndpoint)="createEndpoint()"
+    />
+  </main>
 } @else {
   <main class="workspace__main workspace__main--placeholder" [attr.aria-label]="placeholderLabel()">
     <header class="workspace__main-head">
@@ -112,6 +144,7 @@
 <app-create-project-modal
   [open]="createProjectModalOpen()"
   [loading]="createProjectModalLoading()"
+  [errorMessage]="createProjectError()"
   (cancelled)="onCreateProjectModalDismiss()"
   (createProjectOnly)="onCreateProjectModalProjectOnly($event)"
   (createProjectAndEndpoint)="onCreateProjectModalWithEndpoint($event)"
@@ -120,6 +153,9 @@
 <app-global-config-drawer
   [open]="globalConfigDrawerOpen()"
   [initialConfig]="globalConfig()"
+  [loading]="globalConfigLoading()"
+  [saving]="globalConfigSaving()"
+  [errorMessage]="globalConfigError()"
   (closed)="onGlobalConfigDrawerClose()"
   (save)="onGlobalConfigSaved($event)"
 />

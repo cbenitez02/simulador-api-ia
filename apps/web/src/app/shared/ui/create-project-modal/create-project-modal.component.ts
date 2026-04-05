@@ -27,6 +27,7 @@ export class CreateProjectModalComponent {
   readonly open = input(false);
   /** When true, primary action shows “Generating…” and all controls are disabled. */
   readonly loading = input(false);
+  readonly errorMessage = input<string | null>(null);
 
   readonly cancelled = output<void>();
   readonly createProjectOnly = output<CreateProjectModalPayload>();

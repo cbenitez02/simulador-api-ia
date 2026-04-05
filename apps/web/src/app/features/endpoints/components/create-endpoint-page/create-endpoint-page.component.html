@@ -33,35 +33,47 @@
     </ol>
   </header>
 
+  @if (loadingError()) {
+    <app-inline-alert [message]="loadingError()" />
+  }
+
+  @if (saveError()) {
+    <app-inline-alert [message]="saveError()" />
+  }
+
   <div class="cep-wizard__main cp-scrollbar">
-    @switch (step()) {
-      @case ('prompt') {
-        <app-create-endpoint-prompt-step
-          [promptText]="promptText()"
-          [generating]="generating()"
-          [promptError]="promptError()"
-          [generationError]="generationError()"
-          (promptTextChange)="onPromptTextChange($event)"
-          (generate)="onGenerateRequested()"
-        />
-      }
-      @case ('review') {
-        <app-create-endpoint-review-step
-          [method]="reviewMethod()"
-          [route]="reviewRoute()"
-          [methodOptions]="methodOptions"
-          (methodChange)="onReviewMethodChange($event)"
-          (routeChange)="onReviewRouteChange($event)"
-        />
-      }
-      @case ('editor') {
-        @if (draft(); as d) {
-          <app-create-endpoint-editor-step
-            [draft]="d"
-            [sourcePrompt]="sourcePrompt()"
-            [apiBaseUrl]="apiBaseUrl()"
-            (draftChange)="onDraftChange($event)"
+    @if (loadingDraft()) {
+      <p class="cep-wizard__subtitle" style="padding: 1rem 1.5rem 0">Loading endpoint details...</p>
+    } @else {
+      @switch (step()) {
+        @case ('prompt') {
+          <app-create-endpoint-prompt-step
+            [promptText]="promptText()"
+            [generating]="generating()"
+            [promptError]="promptError()"
+            [generationError]="generationError()"
+            (promptTextChange)="onPromptTextChange($event)"
+            (generate)="onGenerateRequested()"
           />
+        }
+        @case ('review') {
+          <app-create-endpoint-review-step
+            [method]="reviewMethod()"
+            [route]="reviewRoute()"
+            [methodOptions]="methodOptions"
+            (methodChange)="onReviewMethodChange($event)"
+            (routeChange)="onReviewRouteChange($event)"
+          />
+        }
+        @case ('editor') {
+          @if (draft(); as d) {
+            <app-create-endpoint-editor-step
+              [draft]="d"
+              [sourcePrompt]="sourcePrompt()"
+              [apiBaseUrl]="apiBaseUrl()"
+              (draftChange)="onDraftChange($event)"
+            />
+          }
         }
       }
     }
@@ -69,20 +81,37 @@
 
   <footer class="cep-wizard__footer" [class.cep-wizard__footer--start]="step() === 'prompt'">
     @if (step() === 'prompt') {
-      <button type="button" class="cep-wizard__btn cep-wizard__btn--ghost" (click)="cancel()">Cancel</button>
+      <button type="button" class="cep-wizard__btn cep-wizard__btn--ghost" [disabled]="saving()" (click)="cancel()">
+        Cancel
+      </button>
     }
     @if (step() === 'review') {
-      <button type="button" class="cep-wizard__btn cep-wizard__btn--outline" (click)="backToPrompt()">
+      <button
+        type="button"
+        class="cep-wizard__btn cep-wizard__btn--outline"
+        [disabled]="saving()"
+        (click)="backToPrompt()"
+      >
         <svg lucideArrowLeft [size]="18" strokeWidth="2"></svg>
         Back
       </button>
-      <button type="button" class="cep-wizard__btn cep-wizard__btn--primary" (click)="continueFromReview()">
+      <button
+        type="button"
+        class="cep-wizard__btn cep-wizard__btn--primary"
+        [disabled]="saving()"
+        (click)="continueFromReview()"
+      >
         Continue
         <svg lucideArrowRight [size]="18" strokeWidth="2"></svg>
       </button>
     }
     @if (step() === 'editor') {
-      <button type="button" class="cep-wizard__btn cep-wizard__btn--outline" (click)="onEditorBack()">
+      <button
+        type="button"
+        class="cep-wizard__btn cep-wizard__btn--outline"
+        [disabled]="saving()"
+        (click)="onEditorBack()"
+      >
         <svg lucideArrowLeft [size]="18" strokeWidth="2"></svg>
         Back
       </button>
@@ -92,7 +121,7 @@
         (click)="saveEndpoint()"
         [disabled]="!canSave()"
       >
-        Save endpoint
+        {{ saving() ? 'Saving...' : 'Save endpoint' }}
       </button>
     }
   </footer>

@@ -55,6 +55,9 @@ export class GlobalConfigDrawerComponent {
   readonly open = input(false);
   /** When the drawer opens, form state is reset from this value (or defaults). */
   readonly initialConfig = input<GlobalConfig | null>(null);
+  readonly loading = input(false);
+  readonly saving = input(false);
+  readonly errorMessage = input<string | null>(null);
 
   readonly closed = output<void>();
   readonly save = output<GlobalConfig>();
@@ -104,10 +107,12 @@ export class GlobalConfigDrawerComponent {
   }
 
   protected requestClose(): void {
+    if (this.saving()) return;
     this.closed.emit();
   }
 
   protected onSave(): void {
+    if (this.loading() || this.saving()) return;
     this.save.emit(structuredClone(this.state()));
   }
 

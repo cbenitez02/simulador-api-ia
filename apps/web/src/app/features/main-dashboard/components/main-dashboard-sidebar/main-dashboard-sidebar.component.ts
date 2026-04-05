@@ -31,10 +31,13 @@ export class MainDashboardSidebarComponent {
   readonly projects = input.required<SidebarProjectRow[]>();
   readonly selectedProjectId = input.required<string>();
   readonly activeNav = input.required<WorkspaceNavId>();
+  readonly loading = input(false);
+  readonly errorMessage = input<string | null>(null);
 
   readonly projectSelect = output<string>();
   readonly navSelect = output<WorkspaceNavId>();
   readonly createProjectRequested = output<void>();
+  readonly retryRequested = output<void>();
 
   protected readonly activeProject = computed((): SidebarProjectRow | null => {
     const list = this.projects();
@@ -61,6 +64,10 @@ export class MainDashboardSidebarComponent {
 
   protected addProject(): void {
     this.createProjectRequested.emit();
+  }
+
+  protected retry(): void {
+    this.retryRequested.emit();
   }
 
   protected copyMockUrl(): void {

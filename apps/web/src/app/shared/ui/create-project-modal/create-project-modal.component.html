@@ -7,6 +7,10 @@
         <p class="cnp-modal__subtitle">Name your project and optionally generate your first mock endpoint with AI.</p>
       </header>
 
+      @if (errorMessage()) {
+        <p class="cnp-modal__subtitle" style="color: #fca5a5; margin-top: 0.75rem">{{ errorMessage() }}</p>
+      }
+
       <div class="cnp-modal__body">
         <section class="cnp-modal__section" aria-labelledby="cnp-section-project">
           <h3 id="cnp-section-project" class="cnp-modal__section-label">Project</h3>

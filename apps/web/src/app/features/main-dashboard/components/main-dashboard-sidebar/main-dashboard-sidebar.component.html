@@ -14,7 +14,16 @@
           <svg lucidePlus [size]="16"></svg>
         </button>
       </div>
-      @if (projects().length === 0) {
+      @if (loading()) {
+        <div class="sidebar__projects-empty">
+          <p class="sidebar__projects-empty-text">Loading projects...</p>
+        </div>
+      } @else if (errorMessage(); as errorMessage) {
+        <div class="sidebar__projects-empty">
+          <p class="sidebar__projects-empty-text">{{ errorMessage }}</p>
+          <button type="button" class="sidebar__create-project-btn" (click)="retry()">Retry</button>
+        </div>
+      } @else if (projects().length === 0) {
         <div class="sidebar__projects-empty">
           <p class="sidebar__projects-empty-text">No projects yet.</p>
           <button type="button" class="sidebar__create-project-btn" (click)="addProject()">

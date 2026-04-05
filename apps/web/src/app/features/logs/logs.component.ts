@@ -1,9 +1,19 @@
-import { ChangeDetectionStrategy, Component, computed, effect, input, model, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  model,
+  signal,
+  untracked,
+} from '@angular/core';
 import { LucideRadio, LucideSearch, LucideTrash2 } from '@lucide/angular';
-import { mockApiLogsForProject } from './data/api-logs.mock';
 import { LogsListComponent } from './components/logs-list/logs-list.component';
 import type { ApiLogEntry } from './models/api-log.model';
 import type { HttpMethod } from '../../shared/models/endpoint-preview.model';
+import { LogsRepository } from './data-access/logs.repository';
 
 type MethodFilter = 'all' | HttpMethod;
 type StatusBand = 'all' | '2xx' | '4xx' | '5xx';
@@ -17,6 +27,7 @@ type StatusBand = 'all' | '2xx' | '4xx' | '5xx';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LogsComponent {
+  private readonly logsRepository = inject(LogsRepository);
   /** Workspace project; drives which mock log lines are shown. */
   readonly projectId = input.required<string>();
 
@@ -24,6 +35,8 @@ export class LogsComponent {
   readonly selectedLog = model<ApiLogEntry | null>(null);
 
   protected readonly entries = signal<ApiLogEntry[]>([]);
+  protected readonly loading = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
   protected readonly searchQuery = signal('');
   protected readonly methodFilter = signal<MethodFilter>('all');
   protected readonly statusFilter = signal<StatusBand>('all');
@@ -64,13 +77,7 @@ export class LogsComponent {
   constructor() {
     effect(() => {
       const pid = this.projectId();
-      untracked(() => {
-        this.entries.set([...mockApiLogsForProject(pid)]);
-        this.searchQuery.set('');
-        this.methodFilter.set('all');
-        this.statusFilter.set('all');
-        this.endpointFilter.set('all');
-      });
+      void untracked(async () => this.loadLogs(pid));
     });
 
     effect(() => {
@@ -110,11 +117,47 @@ export class LogsComponent {
   }
 
   protected clearLogs(): void {
-    this.entries.set([]);
-    this.selectedLog.set(null);
+    void this.clearRemoteLogs();
   }
 
   protected toggleLive(): void {
     this.live.update((v) => !v);
+  }
+
+  protected retry(): void {
+    void this.loadLogs(this.projectId());
+  }
+
+  private async loadLogs(projectId: string): Promise<void> {
+    this.loading.set(true);
+    this.errorMessage.set(null);
+    try {
+      const entries = await this.logsRepository.listLogs(projectId);
+      this.entries.set(entries);
+      this.searchQuery.set('');
+      this.methodFilter.set('all');
+      this.statusFilter.set('all');
+      this.endpointFilter.set('all');
+    } catch (error) {
+      this.entries.set([]);
+      this.selectedLog.set(null);
+      this.errorMessage.set(error instanceof Error ? error.message : 'Could not load logs.');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private async clearRemoteLogs(): Promise<void> {
+    this.loading.set(true);
+    this.errorMessage.set(null);
+    try {
+      await this.logsRepository.clearLogs(this.projectId());
+      this.entries.set([]);
+      this.selectedLog.set(null);
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'Could not clear logs.');
+    } finally {
+      this.loading.set(false);
+    }
   }
 }
