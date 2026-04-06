@@ -17,6 +17,11 @@ export interface CreateProjectDto {
   description?: string;
 }
 
+export interface UpdateProjectDto {
+  name?: string;
+  description?: string;
+}
+
 export interface EndpointConfigDto {
   endpointId: string;
   latencyMode: 'fixed' | 'range';

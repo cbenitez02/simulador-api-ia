@@ -13,9 +13,13 @@ import { GlobalConfigDrawerComponent } from '../global-config/components/global-
 import { createDefaultGlobalConfig, type GlobalConfig } from '../global-config/models/global-config.model';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
+import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
 import type {
   CreateProjectModalPayload,
   CreateProjectWithEndpointPayload,
+  EditProjectModalPayload,
+  ProjectModalInitialValues,
+  ProjectModalMode,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type { SidebarProjectRow, WorkspaceNavId } from './models/workspace-shell.model';
@@ -39,6 +43,7 @@ import { EndpointsRepository } from '../endpoints/data-access/endpoints.reposito
     MainDashboardUtilitySidebarComponent,
     GlobalConfigDrawerComponent,
     CreateProjectModalComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './workspace-shell.component.html',
   styleUrls: ['./workspace-shell.component.css'],
@@ -91,6 +96,18 @@ export class WorkspaceShellComponent {
   protected readonly createProjectModalLoading = signal(false);
   protected readonly createProjectError = signal<string | null>(null);
 
+  protected readonly editProjectModalOpen = signal(false);
+  protected readonly editProjectModalLoading = signal(false);
+  protected readonly editProjectError = signal<string | null>(null);
+  protected readonly editProjectTargetId = signal<string | null>(null);
+  protected readonly editProjectInitialValues = signal<ProjectModalInitialValues | null>(null);
+
+  protected readonly deleteProjectDialogOpen = signal(false);
+  protected readonly deleteProjectPending = signal(false);
+  protected readonly deleteProjectError = signal<string | null>(null);
+  protected readonly deleteProjectTargetId = signal<string | null>(null);
+  protected readonly deleteProjectTargetName = signal('');
+
   protected readonly createEndpointFlowOpen = signal(false);
   protected readonly endpointWizardInitial = signal<EndpointPreview | null>(null);
   protected readonly navBeforeCreateFlow = signal<WorkspaceNavId | null>(null);
@@ -106,6 +123,25 @@ export class WorkspaceShellComponent {
     this.activeNav() === 'settings' ? 'Workspace and simulator preferences.' : '',
   );
   protected readonly placeholderLabel = computed(() => this.placeholderTitle() || 'Section');
+  protected readonly projectModalOpen = computed(() => this.createProjectModalOpen() || this.editProjectModalOpen());
+  protected readonly projectModalMode = computed<ProjectModalMode>(() =>
+    this.editProjectModalOpen() ? 'edit' : 'create',
+  );
+  protected readonly projectModalLoading = computed(() =>
+    this.editProjectModalOpen() ? this.editProjectModalLoading() : this.createProjectModalLoading(),
+  );
+  protected readonly projectModalError = computed(() =>
+    this.editProjectModalOpen() ? this.editProjectError() : this.createProjectError(),
+  );
+  protected readonly projectModalInitialValues = computed(() =>
+    this.editProjectModalOpen() ? this.editProjectInitialValues() : null,
+  );
+  protected readonly deleteProjectMessage = computed(() => {
+    const projectName = this.deleteProjectTargetName();
+    if (!projectName) return '';
+
+    return `Delete “${projectName}” permanently? This removes its endpoints, scenarios, config, and logs. This action cannot be undone.`;
+  });
 
   constructor() {
     void this.reloadProjects();
@@ -116,7 +152,30 @@ export class WorkspaceShellComponent {
     this.createProjectModalOpen.set(true);
   }
 
-  protected onCreateProjectModalDismiss(): void {
+  protected openEditProjectModal(): void {
+    const project = this.activeProject();
+    if (!project) return;
+
+    this.editProjectTargetId.set(project.id);
+    this.editProjectInitialValues.set({
+      name: project.name,
+      description: project.description,
+    });
+    this.editProjectError.set(null);
+    this.editProjectModalOpen.set(true);
+  }
+
+  protected onProjectModalDismiss(): void {
+    if (this.projectModalLoading()) return;
+
+    if (this.editProjectModalOpen()) {
+      this.editProjectModalOpen.set(false);
+      this.editProjectError.set(null);
+      this.editProjectTargetId.set(null);
+      this.editProjectInitialValues.set(null);
+      return;
+    }
+
     if (this.createProjectModalLoading()) return;
     this.createProjectModalOpen.set(false);
     this.createProjectError.set(null);
@@ -128,6 +187,34 @@ export class WorkspaceShellComponent {
 
   protected onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void {
     void this.createProject(payload, payload.endpointPrompt);
+  }
+
+  protected onEditProjectModalSave(payload: EditProjectModalPayload): void {
+    const projectId = this.editProjectTargetId() ?? this.activeProject()?.id;
+    if (!projectId || this.editProjectModalLoading()) return;
+    void this.updateProject(projectId, payload);
+  }
+
+  protected openDeleteProjectDialog(): void {
+    const project = this.activeProject();
+    if (!project) return;
+
+    this.deleteProjectTargetId.set(project.id);
+    this.deleteProjectTargetName.set(project.name);
+    this.deleteProjectError.set(null);
+    this.deleteProjectDialogOpen.set(true);
+  }
+
+  protected closeDeleteProjectDialog(): void {
+    if (this.deleteProjectPending()) return;
+    this.deleteProjectDialogOpen.set(false);
+    this.deleteProjectError.set(null);
+  }
+
+  protected confirmDeleteProject(): void {
+    const projectId = this.deleteProjectTargetId() ?? this.activeProject()?.id;
+    if (!projectId || this.deleteProjectPending()) return;
+    void this.deleteProjectRemote(projectId);
   }
 
   protected createBlankProject(): void {
@@ -317,6 +404,26 @@ export class WorkspaceShellComponent {
     }
   }
 
+  private async updateProject(projectId: string, payload: EditProjectModalPayload): Promise<void> {
+    this.editProjectModalLoading.set(true);
+    this.editProjectError.set(null);
+
+    try {
+      const updatedProject = await this.projectsRepository.updateProject(projectId, payload);
+      this.projects.update((projects) =>
+        projects.map((project) => (project.id === projectId ? updatedProject : project)),
+      );
+      this.selectedProjectId.set(projectId);
+      this.editProjectModalOpen.set(false);
+      this.editProjectTargetId.set(null);
+      this.editProjectInitialValues.set(null);
+    } catch (error) {
+      this.editProjectError.set(error instanceof Error ? error.message : 'Could not update project.');
+    } finally {
+      this.editProjectModalLoading.set(false);
+    }
+  }
+
   private buildStubEndpointFromPrompt(prompt: string): EndpointPreview {
     const trimmed = prompt.trim();
     const match = trimmed.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(\S+)/i);
@@ -353,6 +460,39 @@ export class WorkspaceShellComponent {
     } finally {
       this.endpointMutationPending.set(false);
     }
+  }
+
+  private async deleteProjectRemote(projectId: string): Promise<void> {
+    this.deleteProjectPending.set(true);
+    this.deleteProjectError.set(null);
+
+    const nextProjectId = this.projects().find((project) => project.id !== projectId)?.id;
+
+    try {
+      await this.projectsRepository.deleteProject(projectId);
+      this.clearProjectScopedUiState();
+      this.deleteProjectDialogOpen.set(false);
+      this.deleteProjectTargetId.set(null);
+      this.deleteProjectTargetName.set('');
+      if (!nextProjectId) this.activeNav.set('dashboard');
+      await this.reloadProjects(nextProjectId);
+    } catch (error) {
+      this.deleteProjectError.set(error instanceof Error ? error.message : 'Could not delete project.');
+    } finally {
+      this.deleteProjectPending.set(false);
+    }
+  }
+
+  private clearProjectScopedUiState(): void {
+    this.selectedLog.set(null);
+    this.selectedEndpointId.set(null);
+    this.endpointMutationError.set(null);
+    this.closeCreateEndpointWizard(false);
+    this.globalConfigDrawerOpen.set(false);
+    this.globalConfigLoading.set(false);
+    this.globalConfigSaving.set(false);
+    this.globalConfigError.set(null);
+    this.globalConfig.set(createDefaultGlobalConfig());
   }
 
   private async loadGlobalConfig(projectId: string): Promise<void> {

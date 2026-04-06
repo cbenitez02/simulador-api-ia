@@ -1,25 +1,39 @@
 @if (open()) {
   <div class="confirm-dialog-root" role="presentation">
-    <button type="button" class="confirm-dialog__backdrop" aria-label="Cancel" (click)="onDismiss()"></button>
+    <button
+      type="button"
+      class="confirm-dialog__backdrop"
+      aria-label="Cancel"
+      [disabled]="loading()"
+      (click)="onDismiss()"
+    ></button>
     <div
       class="confirm-dialog__panel cp-scrollbar"
       role="alertdialog"
       aria-modal="true"
+      [attr.aria-busy]="loading()"
       [attr.aria-labelledby]="titleDomId"
     >
       <h2 [id]="titleDomId" class="confirm-dialog__title">{{ title() }}</h2>
       <p class="confirm-dialog__message">{{ message() }}</p>
+      <app-inline-alert [message]="errorMessage()" />
       <footer class="confirm-dialog__actions">
-        <button type="button" class="confirm-dialog__btn confirm-dialog__btn--ghost" (click)="onDismiss()">
+        <button
+          type="button"
+          class="confirm-dialog__btn confirm-dialog__btn--ghost"
+          [disabled]="loading()"
+          (click)="onDismiss()"
+        >
           {{ cancelLabel() }}
         </button>
         <button
           type="button"
           class="confirm-dialog__btn confirm-dialog__btn--primary"
+          [disabled]="loading()"
           [class.confirm-dialog__btn--danger]="destructive()"
           (click)="onConfirm()"
         >
-          {{ confirmLabel() }}
+          {{ loading() ? confirmLabel() + '…' : confirmLabel() }}
         </button>
       </footer>
     </div>

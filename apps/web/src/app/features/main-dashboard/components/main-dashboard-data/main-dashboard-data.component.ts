@@ -7,6 +7,8 @@ import {
   LucideClock,
   LucideCopy,
   LucideFileText,
+  LucidePencil,
+  LucideTrash2,
 } from '@lucide/angular';
 import { HttpMethodBadgeComponent } from '../../../../shared/ui/http-method-badge/http-method-badge.component';
 import { copyTextToClipboard } from '../../../../shared/utils/copy-text-to-clipboard';
@@ -27,6 +29,8 @@ import type { EndpointPreview } from '../../../../shared/models/endpoint-preview
     LucideClock,
     LucideCopy,
     LucideFileText,
+    LucidePencil,
+    LucideTrash2,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -37,6 +41,8 @@ export class MainDashboardDataComponent {
 
   readonly openLogs = output<void>();
   readonly createEndpoint = output<void>();
+  readonly editProjectRequested = output<void>();
+  readonly deleteProjectRequested = output<void>();
 
   protected readonly endpointCount = computed(() => this.project().endpoints.length);
 

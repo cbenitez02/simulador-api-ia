@@ -118,6 +118,56 @@ describe('app integration', () => {
     expect(tx.globalConfig.create).toHaveBeenCalledTimes(1);
   });
 
+  it('PATCH /api/v1/projects/:projectId actualiza metadata sin cambiar slug', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.update.mockResolvedValueOnce({
+      id: 'p1',
+      name: 'Mi API v2',
+      slug: 'mi-api',
+      description: 'Nuevo texto',
+      globalConfig: { projectId: 'p1' },
+      _count: { endpoints: 0 },
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .send({ name: 'Mi API v2', description: 'Nuevo texto' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Mi API v2');
+    expect(response.body.slug).toBe('mi-api');
+  });
+
+  it('PATCH /api/v1/projects/:projectId responde 404 si el proyecto no existe', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce(null);
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p404')
+      .send({ name: 'Ghost project' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('Project not found');
+  });
+
+  it('DELETE /api/v1/projects/:projectId responde 204 sin body', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.delete.mockResolvedValueOnce({ id: 'p1' });
+
+    const response = await request(app).delete('/api/v1/projects/p1');
+
+    expect(response.status).toBe(204);
+    expect(response.text).toBe('');
+  });
+
+  it('DELETE /api/v1/projects/:projectId responde 404 si el proyecto no existe', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce(null);
+
+    const response = await request(app).delete('/api/v1/projects/p404');
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('Project not found');
+  });
+
   it('POST /api/v1/projects/:projectId/endpoints responde 409 si ya existe', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
     prismaMock.endpoint.findFirst.mockResolvedValueOnce({ id: 'e1' });
