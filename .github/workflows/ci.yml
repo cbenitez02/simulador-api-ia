@@ -48,6 +48,40 @@ jobs:
           OPENAI_MODEL: gpt-4.1-mini
         run: pnpm --dir apps/backend test
 
+  frontend-validation:
+    name: Frontend Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend lint
+        run: pnpm exec eslint "apps/web/src/**/*.{ts,html}"
+
+      - name: Frontend app typecheck
+        run: pnpm --dir apps/web exec tsc --project tsconfig.app.json --noEmit
+
+      - name: Frontend spec typecheck
+        run: pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
+
+      - name: Frontend headless tests
+        run: pnpm --dir apps/web test --watch=false
+
   backend-db-integration:
     name: Backend DB Integration
     runs-on: ubuntu-latest
