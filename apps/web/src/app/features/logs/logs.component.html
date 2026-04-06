@@ -10,13 +10,14 @@
           type="button"
           class="logs__btn logs__btn--live"
           [class.logs__btn--live-off]="!live()"
+          [disabled]="loading()"
           (click)="toggleLive()"
           [attr.aria-pressed]="live()"
         >
           <svg lucideRadio [size]="16" strokeWidth="2" [class.logs__live-icon--pulse]="live()" aria-hidden="true"></svg>
           {{ live() ? 'Live' : 'Paused' }}
         </button>
-        <button type="button" class="logs__btn logs__btn--ghost" (click)="clearLogs()">
+        <button type="button" class="logs__btn logs__btn--ghost" [disabled]="loading()" (click)="clearLogs()">
           <svg lucideTrash2 [size]="16" strokeWidth="2" aria-hidden="true"></svg>
           Clear logs
         </button>
@@ -75,7 +76,18 @@
     </div>
 
     <div class="logs__list-wrap">
-      <app-logs-list [entries]="filteredEntries()" [selectedId]="selectedId()" (entrySelect)="selectEntry($event)" />
+      @if (loading()) {
+        <p class="logs__empty-state">Loading logs...</p>
+      } @else if (errorMessage(); as errorMessage) {
+        <div class="logs__empty-state">
+          <p>{{ errorMessage }}</p>
+          <button type="button" class="logs__btn logs__btn--ghost" (click)="retry()">Retry</button>
+        </div>
+      } @else if (filteredEntries().length === 0) {
+        <p class="logs__empty-state">No logs yet for this project.</p>
+      } @else {
+        <app-logs-list [entries]="filteredEntries()" [selectedId]="selectedId()" (entrySelect)="selectEntry($event)" />
+      }
     </div>
   </div>
 </div>

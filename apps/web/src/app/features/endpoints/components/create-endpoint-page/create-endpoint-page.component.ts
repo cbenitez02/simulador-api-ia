@@ -14,15 +14,12 @@ import type { EndpointPreview, HttpMethod } from '../../../../shared/models/endp
 import { HTTP_METHOD_SELECT_OPTIONS } from '../../../../shared/constants/http-method-select-options';
 import type { CreateEndpointStep, EndpointDraft } from '../../models/endpoint-draft.model';
 import { EndpointAiGeneratorService } from '../../services/endpoint-ai-generator.service';
-import {
-  aiShapeToDraft,
-  draftToEndpointPreview,
-  endpointPreviewToDraft,
-  statusCodeForMethod,
-} from '../../services/endpoint-draft.mapper';
+import { aiShapeToDraft, endpointPreviewToDraft, statusCodeForMethod } from '../../services/endpoint-draft.mapper';
 import { CreateEndpointEditorStepComponent } from '../create-endpoint-editor-step/create-endpoint-editor-step.component';
 import { CreateEndpointPromptStepComponent } from '../create-endpoint-prompt-step/create-endpoint-prompt-step.component';
 import { CreateEndpointReviewStepComponent } from '../create-endpoint-review-step/create-endpoint-review-step.component';
+import { EndpointsRepository } from '../../data-access/endpoints.repository';
+import { InlineAlertComponent } from '../../../../shared/ui/inline-alert/inline-alert.component';
 
 function normalizeReviewRoute(raw: string): string {
   let t = raw.trim();
@@ -41,6 +38,7 @@ function normalizeReviewRoute(raw: string): string {
     CreateEndpointEditorStepComponent,
     CreateEndpointPromptStepComponent,
     CreateEndpointReviewStepComponent,
+    InlineAlertComponent,
     LucideArrowLeft,
     LucideArrowRight,
     LucideCircleCheck,
@@ -49,8 +47,10 @@ function normalizeReviewRoute(raw: string): string {
 })
 export class CreateEndpointPageComponent {
   private readonly ai = inject(EndpointAiGeneratorService);
+  private readonly endpointsRepository = inject(EndpointsRepository);
 
   readonly open = input(false);
+  readonly projectId = input<string | null>(null);
   readonly initialEndpoint = input<EndpointPreview | null>(null);
   readonly isEditing = input(false);
   /** Mock base URL for the preview tab (e.g. https://mock.apisim.dev/v1). */
@@ -74,6 +74,10 @@ export class CreateEndpointPageComponent {
 
   protected readonly draft = signal<EndpointDraft | null>(null);
   protected readonly editingEndpointId = signal<string | null>(null);
+  protected readonly loadingDraft = signal(false);
+  protected readonly loadingError = signal<string | null>(null);
+  protected readonly saving = signal(false);
+  protected readonly saveError = signal<string | null>(null);
 
   protected readonly wizardSubtitle = computed(() => {
     if (this.isEditing()) return 'Configure endpoint';
@@ -118,14 +122,11 @@ export class CreateEndpointPageComponent {
 
   private bootstrapSession(): void {
     const ep = this.initialEndpoint();
-    if (ep) {
+    this.loadingError.set(null);
+    this.saveError.set(null);
+    if (ep && this.projectId()) {
       this.editingEndpointId.set(ep.id);
-      this.draft.set(endpointPreviewToDraft(ep));
-      this.step.set('editor');
-      this.promptText.set('');
-      this.promptError.set(null);
-      this.generationError.set(null);
-      this.sourcePrompt.set(ep.description || '—');
+      void this.hydrateDraft(this.projectId()!, ep);
     } else {
       this.editingEndpointId.set(null);
       this.resetCreateFlow();
@@ -190,6 +191,7 @@ export class CreateEndpointPageComponent {
   }
 
   protected backToPrompt(): void {
+    if (this.saving()) return;
     this.step.set('prompt');
   }
 
@@ -212,6 +214,7 @@ export class CreateEndpointPageComponent {
   }
 
   protected onEditorBack(): void {
+    if (this.saving()) return;
     if (this.isEditing()) {
       this.cancelled.emit();
       return;
@@ -228,19 +231,50 @@ export class CreateEndpointPageComponent {
     this.draft.set(d);
   }
 
-  protected saveEndpoint(): void {
+  protected async saveEndpoint(): Promise<void> {
+    if (this.saving()) return;
     const d = this.draft();
-    if (!d) return;
-    const id = this.editingEndpointId();
-    const ep = draftToEndpointPreview(d, id ?? undefined);
-    this.saved.emit(ep);
+    const projectId = this.projectId();
+    if (!d || !projectId) return;
+    this.saving.set(true);
+    this.saveError.set(null);
+    try {
+      const ep = await this.endpointsRepository.saveEndpoint(projectId, d, this.editingEndpointId());
+      this.saved.emit(ep);
+    } catch (error) {
+      this.saveError.set(error instanceof Error ? error.message : 'Could not save endpoint.');
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   protected cancel(): void {
+    if (this.saving()) return;
     this.cancelled.emit();
   }
 
   protected canSave(): boolean {
-    return this.step() === 'editor' && this.draft() !== null;
+    return this.step() === 'editor' && this.draft() !== null && !this.loadingDraft() && !this.saving();
+  }
+
+  private async hydrateDraft(projectId: string, preview: EndpointPreview): Promise<void> {
+    this.loadingDraft.set(true);
+    this.loadingError.set(null);
+    try {
+      const draft = await this.endpointsRepository.loadDraft(projectId, preview.id);
+      this.draft.set(draft);
+      this.step.set('editor');
+      this.promptText.set('');
+      this.promptError.set(null);
+      this.generationError.set(null);
+      this.sourcePrompt.set(preview.description || '—');
+    } catch {
+      this.draft.set(endpointPreviewToDraft(preview));
+      this.step.set('editor');
+      this.sourcePrompt.set(preview.description || '—');
+      this.loadingError.set('We could not load the full backend draft. You can still edit the fallback data.');
+    } finally {
+      this.loadingDraft.set(false);
+    }
   }
 }

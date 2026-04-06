@@ -75,6 +75,16 @@
   overflow: auto;
 }
 
+.workspace__main--status {
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+}
+
+.workspace__status-card {
+  max-width: 32rem;
+}
+
 .workspace__needs-project {
   max-width: 28rem;
   text-align: center;
@@ -138,4 +148,14 @@
 .workspace__needs-project-btn--ghost:hover {
   color: var(--cp-text-body);
   background: var(--cp-surface-subtle);
+}
+
+.workspace__inline-error {
+  margin: 1rem 1.5rem 0;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.18);
+  color: #fecaca;
+  font-size: 0.875rem;
 }

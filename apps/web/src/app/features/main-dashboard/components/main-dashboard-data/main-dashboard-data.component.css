@@ -111,6 +111,17 @@
   background: var(--cp-accent-primary-hover);
 }
 
+.dash__btn--danger {
+  background: color-mix(in srgb, var(--cp-danger, #dc2626) 14%, var(--cp-surface-raised));
+  color: var(--cp-danger, #dc2626);
+  border-color: color-mix(in srgb, var(--cp-danger, #dc2626) 34%, var(--cp-border-default));
+}
+
+.dash__btn--danger:hover {
+  background: color-mix(in srgb, var(--cp-danger, #dc2626) 20%, var(--cp-surface-overlay));
+  border-color: color-mix(in srgb, var(--cp-danger, #dc2626) 46%, var(--cp-border-input-hover));
+}
+
 .dash__btn-plus {
   display: flex;
 }
@@ -188,6 +199,13 @@
   gap: 0.35rem;
   font-size: 0.75rem;
   color: var(--cp-text-subtle);
+}
+
+.dash__hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 .dash__hero-url {

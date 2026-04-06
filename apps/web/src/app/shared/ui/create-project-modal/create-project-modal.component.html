@@ -3,9 +3,11 @@
     <div class="cnp-modal__backdrop" aria-hidden="true"></div>
     <div class="cnp-modal__panel cp-scrollbar" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleDomId">
       <header class="cnp-modal__header">
-        <h2 [id]="titleDomId" class="cnp-modal__title">Create new project</h2>
-        <p class="cnp-modal__subtitle">Name your project and optionally generate your first mock endpoint with AI.</p>
+        <h2 [id]="titleDomId" class="cnp-modal__title">{{ modalTitle() }}</h2>
+        <p class="cnp-modal__subtitle">{{ modalSubtitle() }}</p>
       </header>
+
+      <app-inline-alert [message]="errorMessage()" />
 
       <div class="cnp-modal__body">
         <section class="cnp-modal__section" aria-labelledby="cnp-section-project">
@@ -39,49 +41,55 @@
               (input)="onDescriptionInput($event)"
             ></textarea>
           </div>
+
+          @if (isEditMode()) {
+            <p class="cnp-modal__info-note">{{ stableUrlMessage() }}</p>
+          }
         </section>
 
-        <section class="cnp-modal__section" aria-labelledby="cnp-section-endpoint">
-          <h3 id="cnp-section-endpoint" class="cnp-modal__section-label">First endpoint</h3>
+        @if (!isEditMode()) {
+          <section class="cnp-modal__section" aria-labelledby="cnp-section-endpoint">
+            <h3 id="cnp-section-endpoint" class="cnp-modal__section-label">First endpoint</h3>
 
-          <div class="cnp-modal__ai-card" [class.cnp-modal__ai-card--active]="aiEnabled()">
-            <div class="cnp-modal__ai-card-icon" aria-hidden="true">
-              <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
+            <div class="cnp-modal__ai-card" [class.cnp-modal__ai-card--active]="aiEnabled()">
+              <div class="cnp-modal__ai-card-icon" aria-hidden="true">
+                <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
+              </div>
+              <div class="cnp-modal__ai-card-copy">
+                <p class="cnp-modal__ai-card-title">Generate your first endpoint with AI</p>
+                <p class="cnp-modal__ai-card-sub">
+                  We'll generate structure, realistic data and response scenarios automatically.
+                </p>
+              </div>
+              <app-toggle-switch
+                class="cnp-modal__ai-toggle"
+                [inputId]="aiToggleId"
+                [checked]="aiEnabled()"
+                [disabled]="actionsDisabled()"
+                ariaLabel="Generate first endpoint with AI"
+                (checkedChange)="onAiToggle($event)"
+              />
             </div>
-            <div class="cnp-modal__ai-card-copy">
-              <p class="cnp-modal__ai-card-title">Generate your first endpoint with AI</p>
-              <p class="cnp-modal__ai-card-sub">
-                We'll generate structure, realistic data and response scenarios automatically.
-              </p>
-            </div>
-            <app-toggle-switch
-              class="cnp-modal__ai-toggle"
-              [inputId]="aiToggleId"
-              [checked]="aiEnabled()"
-              [disabled]="actionsDisabled()"
-              ariaLabel="Generate first endpoint with AI"
-              (checkedChange)="onAiToggle($event)"
-            />
-          </div>
 
-          <div class="cnp-modal__prompt-wrap" [class.cnp-modal__prompt-wrap--open]="aiEnabled()">
-            <div class="cnp-modal__prompt-inner">
-              <div class="cnp-modal__field cnp-modal__field--prompt">
-                <label class="cnp-modal__label" [attr.for]="promptInputId">Describe your endpoint</label>
-                <textarea
-                  [id]="promptInputId"
-                  class="cnp-modal__textarea cnp-modal__textarea--prompt"
-                  rows="4"
-                  placeholder="GET /users with name, email and orders. Some users without orders. 20% error rate."
-                  [disabled]="actionsDisabled()"
-                  [value]="prompt()"
-                  (input)="onPromptInput($event)"
-                ></textarea>
-                <p class="cnp-modal__helper">Describe route, fields, behaviors, errors or edge cases.</p>
+            <div class="cnp-modal__prompt-wrap" [class.cnp-modal__prompt-wrap--open]="aiEnabled()">
+              <div class="cnp-modal__prompt-inner">
+                <div class="cnp-modal__field cnp-modal__field--prompt">
+                  <label class="cnp-modal__label" [attr.for]="promptInputId">Describe your endpoint</label>
+                  <textarea
+                    [id]="promptInputId"
+                    class="cnp-modal__textarea cnp-modal__textarea--prompt"
+                    rows="4"
+                    placeholder="GET /users with name, email and orders. Some users without orders. 20% error rate."
+                    [disabled]="actionsDisabled()"
+                    [value]="prompt()"
+                    (input)="onPromptInput($event)"
+                  ></textarea>
+                  <p class="cnp-modal__helper">Describe route, fields, behaviors, errors or edge cases.</p>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        }
       </div>
 
       <footer class="cnp-modal__footer">
@@ -93,7 +101,7 @@
         >
           Cancel
         </button>
-        @if (aiEnabled()) {
+        @if (!isEditMode() && aiEnabled()) {
           <button
             type="button"
             class="cnp-modal__btn cnp-modal__btn--secondary"

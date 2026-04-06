@@ -88,13 +88,22 @@
   border: 1px solid transparent;
 }
 
+.confirm-dialog__backdrop:disabled,
+.confirm-dialog__btn:disabled {
+  cursor: not-allowed;
+}
+
+.confirm-dialog__btn:disabled {
+  opacity: 0.6;
+}
+
 .confirm-dialog__btn--ghost {
   border-color: var(--cp-border-muted);
   background: transparent;
   color: var(--cp-text-primary);
 }
 
-.confirm-dialog__btn--ghost:hover {
+.confirm-dialog__btn--ghost:hover:not(:disabled) {
   background: var(--cp-surface-subtle);
 }
 
@@ -104,7 +113,7 @@
   border-color: transparent;
 }
 
-.confirm-dialog__btn--primary:hover {
+.confirm-dialog__btn--primary:hover:not(:disabled) {
   filter: brightness(1.06);
 }
 
@@ -113,6 +122,6 @@
   color: #fff;
 }
 
-.confirm-dialog__btn--primary.confirm-dialog__btn--danger:hover {
+.confirm-dialog__btn--primary.confirm-dialog__btn--danger:hover:not(:disabled) {
   filter: brightness(1.05);
 }

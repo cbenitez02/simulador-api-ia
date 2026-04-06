@@ -231,3 +231,14 @@
   flex: 1;
   min-height: 0;
 }
+
+.logs__empty-state {
+  display: grid;
+  gap: 0.75rem;
+  place-items: start;
+  padding: 1rem;
+  border: 1px solid var(--cp-border-muted);
+  border-radius: 12px;
+  color: var(--cp-text-subtle);
+  background: rgba(255, 255, 255, 0.02);
+}

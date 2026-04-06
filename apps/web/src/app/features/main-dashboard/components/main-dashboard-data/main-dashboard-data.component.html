@@ -59,6 +59,16 @@
           <span class="dash__hero-url" [title]="project().mockUrl">{{ project().mockUrl }}</span>
           <span class="dash__hero-updated">Last updated: {{ project().lastUpdatedRelative }}</span>
         </div>
+        <div class="dash__hero-actions">
+          <button type="button" class="dash__btn dash__btn--ghost" (click)="editProjectRequested.emit()">
+            <svg lucidePencil [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Edit project
+          </button>
+          <button type="button" class="dash__btn dash__btn--danger" (click)="deleteProjectRequested.emit()">
+            <svg lucideTrash2 [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+            Delete project
+          </button>
+        </div>
       </div>
       <dl class="dash__hero-stats">
         <div class="dash__stat">
