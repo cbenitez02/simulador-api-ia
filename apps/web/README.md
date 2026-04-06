@@ -1,59 +1,112 @@
-# Web
+# Frontend Web
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.5.
+Aplicación Angular 21 del simulador. Es la UI principal para gestionar proyectos, operar el workspace y consumir el backend real.
 
-## Development server
+## Stack
 
-To start a local development server, run:
+- Angular 21
+- Angular Material / CDK
+- Vitest
+- TypeScript
 
-```bash
-ng serve
+## Qué cubre hoy
+
+- dashboard principal de proyectos
+- workspace del proyecto activo
+- gestión de endpoints manuales
+- edición y eliminación de proyectos
+- configuración global
+- visualización de logs
+- settings
+
+## Estructura principal
+
+```text
+apps/web/src/app/
+├── features/
+│   ├── endpoints/
+│   ├── global-config/
+│   ├── logs/
+│   ├── main-dashboard/
+│   ├── settings/
+│   └── workspace-shell/
+├── shared/
+│   ├── config/
+│   ├── http/
+│   ├── ui/
+│   └── utils/
+└── testing/
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Levantar en local
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Desde la raíz del monorepo:
 
 ```bash
-ng generate component component-name
+pnpm --dir apps/web exec ng serve --host 127.0.0.1 --port 4200 --no-open
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Abrí:
+
+```text
+http://127.0.0.1:4200
+```
+
+## Dependencia con backend
+
+La app espera backend disponible en `http://localhost:3000`.
+
+Además, hoy deriva la mock URL desde esa base local. Si cambiás host o puerto, revisá `src/app/shared/config/api.config.ts`.
+
+## Scripts útiles
 
 ```bash
-ng generate --help
+pnpm --dir apps/web start
+pnpm --dir apps/web build
+pnpm --dir apps/web test
+pnpm --dir apps/web exec tsc --project tsconfig.app.json --noEmit
+pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 ```
 
-## Building
+## Testing
 
-To build the project run:
+El proyecto usa `ng test` con Vitest como runner.
+
+Checks útiles:
 
 ```bash
-ng build
+pnpm exec eslint "apps/web/src/**/*.{ts,html}"
+pnpm --dir apps/web exec tsc --project tsconfig.app.json --noEmit
+pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
+pnpm --dir apps/web test --watch=false
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## CI
 
-## Running unit tests
+El workflow `CI` del repo corre un job dedicado **Frontend Validation** con:
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+- lint
+- typecheck de app
+- typecheck de specs
+- tests headless
 
-```bash
-ng test
-```
+## Convenciones relevantes
 
-## Running end-to-end tests
+- el frontend consume backend real mediante la capa `shared/http/`
+- `workspace-shell` coordina gran parte del estado de selección y navegación
+- el modal de proyecto se reutiliza tanto para crear como para editar
+- el harness `src/app/testing/angular-vitest.ts` es solo para tests; no forma parte del runtime de la app
 
-For end-to-end (e2e) testing, run:
+## Dónde tocar según el caso
 
-```bash
-ng e2e
-```
+- **HTTP/config**: `src/app/shared/http/`, `src/app/shared/config/`
+- **workspace**: `src/app/features/workspace-shell/`
+- **proyectos/dashboard**: `src/app/features/main-dashboard/`
+- **endpoints**: `src/app/features/endpoints/`
+- **UI reusable**: `src/app/shared/ui/`
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Limitaciones actuales
 
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- no hay build de producción dentro del gate inicial de CI
+- la URL del backend sigue acoplada a localhost en desarrollo
+- el flujo de IA todavía tiene deuda de alineación con backend real
