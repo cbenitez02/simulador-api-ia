@@ -32,6 +32,8 @@ lerna-debug.log*
 
 # IDE / editores
 .idea/
+.claude/
+.gga
 *.swp
 *.swo
 *~
