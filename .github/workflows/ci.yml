@@ -80,7 +80,7 @@ jobs:
         run: pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 
       - name: Frontend headless tests
-        run: pnpm --dir apps/web test -- --watch=false
+        run: pnpm --dir apps/web test --watch=false
 
   backend-db-integration:
     name: Backend DB Integration
