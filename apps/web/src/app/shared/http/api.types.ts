@@ -78,6 +78,7 @@ export interface AiEndpointScenarioDto {
 export interface AiEndpointDraftLocksDto {
   method: true;
   path: true;
+  scenarioType: true;
 }
 
 export interface AiEndpointPreviewDto {
@@ -138,13 +139,27 @@ export interface ApiLogDto {
   method: string;
   path: string;
   fullUrl: string;
+  origin: 'mock' | 'forced-error';
   statusCode: number;
   latencyMs: number;
-  scenarioType: string;
-  scenarioSelectionSource: string;
+  scenarioType: 'success' | 'error' | 'timeout' | 'empty' | 'forced-error' | 'default';
+  scenarioSelectionSource: 'weighted-random' | 'uniform-random' | 'direct-endpoint' | 'forced-error';
+  scenarioName: string | null;
+  hasScenario: boolean;
   requestHeaders: Record<string, string>;
   requestBody: unknown | null;
   responseHeaders: Record<string, string>;
   responseBody: unknown;
   createdAt: string;
+}
+
+export interface ApiLogCursorDto {
+  createdAt: string;
+  id: string;
+}
+
+export interface ApiLogListDto {
+  items: ApiLogDto[];
+  nextCursor: ApiLogCursorDto | null;
+  serverTime: string;
 }

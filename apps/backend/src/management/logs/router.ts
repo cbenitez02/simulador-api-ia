@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { projectParamsSchema } from './schema.js';
+import { listProjectLogsQuerySchema, projectParamsSchema } from './schema.js';
 import { clearProjectLogs, listProjectLogs } from './service.js';
 
 export const logsRouter = Router({ mergeParams: true });
@@ -7,7 +7,8 @@ export const logsRouter = Router({ mergeParams: true });
 logsRouter.get('/', async (req, res, next) => {
   try {
     const { projectId } = projectParamsSchema.parse(req.params);
-    const logs = await listProjectLogs(projectId);
+    const query = listProjectLogsQuerySchema.parse(req.query);
+    const logs = await listProjectLogs(projectId, query);
     res.status(200).json(logs);
   } catch (error) {
     next(error);

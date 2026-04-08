@@ -42,6 +42,7 @@ export const aiNormalizedScenarioSchema = z.object({
 export const aiDraftLocksSchema = z.object({
   method: z.literal(true),
   path: z.literal(true),
+  scenarioType: z.literal(true),
 });
 
 export const aiNormalizedDraftSchema = z.object({

@@ -1,9 +1,9 @@
 import { Injector, runInInjectionContext } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../../../testing/angular-vitest';
 import { ApiClient } from '../../../../shared/http/api-client';
 import { ApiError } from '../../../../shared/http/api-error.mapper';
 import type { EndpointPreview } from '../../../../shared/models/endpoint-preview.model';
+import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../../../testing/angular-vitest';
 import { EndpointsRepository } from '../../data-access/endpoints.repository';
 import type { EndpointDraft } from '../../models/endpoint-draft.model';
 import { EndpointAiGeneratorService } from '../../services/endpoint-ai-generator.service';
@@ -262,7 +262,7 @@ describe('CreateEndpointPageComponent integration', () => {
           description: 'Create user',
           statusCode: 201,
           responseBody: { id: 'u1' },
-          locks: { method: true, path: true },
+          locks: { method: true, path: true, scenarioType: true },
           scenarios: [
             {
               name: 'Success',
@@ -357,7 +357,7 @@ describe('CreateEndpointPageComponent integration', () => {
     expect(savedEmit).toHaveBeenCalledWith(expect.objectContaining({ id: 'e1', path: '/users' }));
   });
 
-  it('keeps the wizard on prompt, shows actionable error copy, and allows retry after preview failure', async () => {
+  it('keeps the wizard on prompt when backend reports AI_TIMEOUT by code, then allows retry', async () => {
     api.post
       .mockRejectedValueOnce(new ApiError(504, 'AI request timed out', undefined, 'AI_TIMEOUT', true))
       .mockResolvedValueOnce({
@@ -366,7 +366,7 @@ describe('CreateEndpointPageComponent integration', () => {
         description: 'List users',
         statusCode: 200,
         responseBody: [{ id: 'u1' }],
-        locks: { method: true, path: true },
+        locks: { method: true, path: true, scenarioType: true },
         scenarios: [
           {
             name: 'Success',
@@ -386,7 +386,9 @@ describe('CreateEndpointPageComponent integration', () => {
     await component.onGenerateRequested();
 
     expect(component.step()).toBe('prompt');
-    expect(component.generationError()).toContain('AI timed out');
+    expect(component.generationError()).toBe(
+      'AI timed out before it could return a valid draft. Retry or continue manually.',
+    );
     expect(component.generating()).toBe(false);
 
     await component.onGenerateRequested();
@@ -394,6 +396,25 @@ describe('CreateEndpointPageComponent integration', () => {
     expect(component.step()).toBe('review');
     expect(component.generationError()).toBeNull();
     expect(component.draft()?.route).toBe('/users');
+  });
+
+  it('keeps the wizard on prompt when backend reports AI_INVALID_OUTPUT by code', async () => {
+    api.post.mockRejectedValueOnce(
+      new ApiError(422, 'AI returned invalid output', undefined, 'AI_INVALID_OUTPUT', true),
+    );
+
+    const component = createComponent();
+    component.projectId = () => 'p1';
+    component.promptText.set('Generate a malformed draft to validate runtime handling');
+
+    await component.onGenerateRequested();
+
+    expect(component.step()).toBe('prompt');
+    expect(component.generationError()).toBe(
+      'AI returned an invalid draft. Retry with a more explicit prompt or continue manually.',
+    );
+    expect(component.generating()).toBe(false);
+    expect(component.draft()).toBeNull();
   });
 
   it('shows unavailable-now fallback copy when backend reports missing OpenAI config', async () => {
@@ -436,7 +457,7 @@ describe('CreateEndpointPageComponent integration', () => {
       description: 'Create user',
       statusCode: 201,
       responseBody: { id: 'u1' },
-      locks: { method: true, path: true },
+      locks: { method: true, path: true, scenarioType: true },
       scenarios: [
         {
           name: 'Success',

@@ -6,22 +6,45 @@
         <p class="logs__sub">Monitor and inspect all requests made to your mock API</p>
       </div>
       <div class="logs__actions">
-        <button
-          type="button"
-          class="logs__btn logs__btn--live"
-          [class.logs__btn--live-off]="!live()"
-          [disabled]="loading()"
-          (click)="toggleLive()"
-          [attr.aria-pressed]="live()"
-        >
-          <svg lucideRadio [size]="16" strokeWidth="2" [class.logs__live-icon--pulse]="live()" aria-hidden="true"></svg>
-          {{ live() ? 'Live' : 'Paused' }}
+        @if (liveStatus() === 'off') {
+          <button type="button" class="logs__btn logs__btn--live" [disabled]="loading()" (click)="startLive()">
+            <svg lucideRadio [size]="16" strokeWidth="2" class="logs__live-icon--pulse" aria-hidden="true"></svg>
+            Live
+          </button>
+        } @else if (liveStatus() === 'live') {
+          <button type="button" class="logs__btn logs__btn--live" [disabled]="loading()" (click)="pauseLive()">
+            <svg lucidePause [size]="16" strokeWidth="2" aria-hidden="true"></svg>
+            Pause
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="logs__btn logs__btn--live logs__btn--live-off"
+            [disabled]="loading()"
+            (click)="resumeLive()"
+          >
+            <svg lucidePlay [size]="16" strokeWidth="2" aria-hidden="true"></svg>
+            Resume
+          </button>
+        }
+        <button type="button" class="logs__btn logs__btn--ghost" [disabled]="loading()" (click)="refreshLogs()">
+          <svg lucideRefreshCw [size]="16" strokeWidth="2" aria-hidden="true"></svg>
+          Refresh
         </button>
-        <button type="button" class="logs__btn logs__btn--ghost" [disabled]="loading()" (click)="clearLogs()">
+        <button type="button" class="logs__btn logs__btn--ghost" [disabled]="loading()" (click)="requestClearLogs()">
           <svg lucideTrash2 [size]="16" strokeWidth="2" aria-hidden="true"></svg>
           Clear logs
         </button>
       </div>
+    </div>
+    <div class="logs__status-row">
+      <span class="logs__status-pill">{{
+        liveStatus() === 'live' ? 'Live active' : liveStatus() === 'paused' ? 'Live paused' : 'Live off'
+      }}</span>
+      <span class="logs__status-copy">
+        Last successful update:
+        {{ lastSuccessfulUpdate() ?? 'Not synced yet' }}
+      </span>
     </div>
   </header>
 
@@ -76,15 +99,33 @@
     </div>
 
     <div class="logs__list-wrap">
+      @if (clearConfirmOpen()) {
+        <div class="logs__confirm-card" role="alertdialog" aria-label="Confirm clear logs">
+          <p class="logs__confirm-copy">Clear all logs for this project? This cannot be undone.</p>
+          <div class="logs__confirm-actions">
+            <button type="button" class="logs__btn logs__btn--ghost" [disabled]="loading()" (click)="cancelClearLogs()">
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="logs__btn logs__btn--danger"
+              [disabled]="loading()"
+              (click)="confirmClearLogs()"
+            >
+              Confirm clear
+            </button>
+          </div>
+        </div>
+      }
       @if (loading()) {
         <p class="logs__empty-state">Loading logs...</p>
-      } @else if (errorMessage(); as errorMessage) {
+      } @else if (requestErrorMessage(); as errorMessage) {
         <div class="logs__empty-state">
           <p>{{ errorMessage }}</p>
           <button type="button" class="logs__btn logs__btn--ghost" (click)="retry()">Retry</button>
         </div>
       } @else if (filteredEntries().length === 0) {
-        <p class="logs__empty-state">No logs yet for this project.</p>
+        <p class="logs__empty-state">{{ emptyStateMessage() }}</p>
       } @else {
         <app-logs-list [entries]="filteredEntries()" [selectedId]="selectedId()" (entrySelect)="selectEntry($event)" />
       }

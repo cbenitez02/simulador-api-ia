@@ -1,23 +1,46 @@
 import type { HttpMethod } from '../../../shared/models/endpoint-preview.model';
 
-export type LogScenarioKind = 'success' | 'error' | 'empty';
+export type LogOrigin = 'mock' | 'forced-error';
+
+export type LogScenarioKind = 'success' | 'error' | 'timeout' | 'empty' | 'forced-error' | 'default';
 
 /** How the mock resolver picked the scenario (drives execution summary copy). */
-export type ScenarioSelectionSource = 'default' | 'weighted' | 'alternate';
+export type ScenarioSelectionSource = 'weighted-random' | 'uniform-random' | 'direct-endpoint' | 'forced-error';
+
+export interface ApiLogCursor {
+  createdAt: string;
+  id: string;
+}
 
 export interface ApiLogEntry {
   id: string;
   method: HttpMethod;
   path: string;
   fullUrl: string;
+  origin: LogOrigin;
   statusCode: number;
   latencyMs: number;
   scenario: LogScenarioKind;
   /** Simulation rule that produced this scenario — used for the execution summary. */
   scenarioSelectionSource: ScenarioSelectionSource;
+  scenarioName: string | null;
+  hasScenario: boolean;
+  createdAt: string;
   timeLabel: string;
   requestHeaders: Record<string, string>;
   requestBody: unknown | null;
   responseHeaders: Record<string, string>;
   responseBody: unknown;
+}
+
+export interface ApiLogListResult {
+  items: ApiLogEntry[];
+  nextCursor: ApiLogCursor | null;
+  serverTime: string;
+}
+
+export interface ListLogsQuery {
+  limit?: number;
+  cursorCreatedAt?: string;
+  cursorId?: string;
 }

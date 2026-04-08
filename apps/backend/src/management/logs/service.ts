@@ -1,5 +1,37 @@
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
+import type { ListProjectLogsQuery } from './schema.js';
+
+export interface ApiLogCursor {
+  createdAt: string;
+  id: string;
+}
+
+export interface ProjectLogItem {
+  id: string;
+  projectId: string;
+  method: string;
+  path: string;
+  fullUrl: string;
+  origin: string;
+  statusCode: number;
+  latencyMs: number;
+  scenarioType: string;
+  scenarioSelectionSource: string;
+  scenarioName: string | null;
+  hasScenario: boolean;
+  requestHeaders: unknown;
+  requestBody: unknown;
+  responseHeaders: unknown;
+  responseBody: unknown;
+  createdAt: string;
+}
+
+export interface ProjectLogListResult {
+  items: ProjectLogItem[];
+  nextCursor: ApiLogCursor | null;
+  serverTime: string;
+}
 
 async function assertProjectExists(projectId: string): Promise<void> {
   const project = await prisma.project.findUnique({
@@ -12,14 +44,96 @@ async function assertProjectExists(projectId: string): Promise<void> {
   }
 }
 
-export async function listProjectLogs(projectId: string) {
+function buildCursorFilter(query: ListProjectLogsQuery) {
+  if (!query.cursorCreatedAt || !query.cursorId) {
+    return { OR: undefined };
+  }
+
+  const cursorDate = new Date(query.cursorCreatedAt);
+
+  return {
+    OR: [
+      { createdAt: { gt: cursorDate } },
+      {
+        createdAt: cursorDate,
+        id: { gt: query.cursorId },
+      },
+    ],
+  };
+}
+
+function toCursor(log: { createdAt: Date; id: string } | null): ApiLogCursor | null {
+  if (!log) {
+    return null;
+  }
+
+  return {
+    createdAt: log.createdAt.toISOString(),
+    id: log.id,
+  };
+}
+
+function toProjectLogItem(log: {
+  id: string;
+  projectId: string;
+  method: string;
+  path: string;
+  fullUrl: string;
+  origin: string;
+  statusCode: number;
+  latencyMs: number;
+  scenarioType: string;
+  scenarioSelectionSource: string;
+  scenarioName: string | null;
+  requestHeaders: unknown;
+  requestBody: unknown;
+  responseHeaders: unknown;
+  responseBody: unknown;
+  createdAt: Date;
+}): ProjectLogItem {
+  return {
+    id: log.id,
+    projectId: log.projectId,
+    method: log.method,
+    path: log.path,
+    fullUrl: log.fullUrl,
+    origin: log.origin,
+    statusCode: log.statusCode,
+    latencyMs: log.latencyMs,
+    scenarioType: log.scenarioType,
+    scenarioSelectionSource: log.scenarioSelectionSource,
+    scenarioName: log.scenarioName,
+    hasScenario: log.scenarioName !== null,
+    requestHeaders: log.requestHeaders,
+    requestBody: log.requestBody,
+    responseHeaders: log.responseHeaders,
+    responseBody: log.responseBody,
+    createdAt: log.createdAt.toISOString(),
+  };
+}
+
+export async function listProjectLogs(
+  projectId: string,
+  query: ListProjectLogsQuery
+): Promise<ProjectLogListResult> {
   await assertProjectExists(projectId);
 
-  return prisma.apiLog.findMany({
-    where: { projectId },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
+  const cursorFilter = buildCursorFilter(query);
+
+  const items = await prisma.apiLog.findMany({
+    where: {
+      projectId,
+      ...(cursorFilter.OR ? { OR: cursorFilter.OR } : {}),
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: query.limit,
   });
+
+  return {
+    items: items.map(toProjectLogItem),
+    nextCursor: toCursor(items[0] ?? null),
+    serverTime: new Date().toISOString(),
+  };
 }
 
 export async function clearProjectLogs(projectId: string): Promise<void> {
