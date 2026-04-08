@@ -12,6 +12,7 @@ import type {
   EditProjectModalPayload,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
 import type { ApiLogEntry } from '../logs/models/api-log.model';
+import type { CreateProjectAiFlowState } from './models/workspace-shell.model';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 
 setupAngularVitest();
@@ -36,6 +37,10 @@ type WorkspaceShellTestApi = {
   globalConfigLoading: () => boolean;
   globalConfigSaving: () => boolean;
   createEndpointFlowOpen: WritableSignalLike<boolean>;
+  createProjectModalOpen: WritableSignalLike<boolean>;
+  createProjectModalLoading: () => boolean;
+  createProjectError: () => string | null;
+  createProjectPartialState: WritableSignalLike<CreateProjectAiFlowState | null>;
   editProjectModalOpen: WritableSignalLike<boolean>;
   editProjectModalLoading: () => boolean;
   editProjectError: () => string | null;
@@ -51,6 +56,8 @@ type WorkspaceShellTestApi = {
   confirmDeleteProject(): void;
   onGlobalConfigSaved(config: GlobalConfig): void;
   onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void;
+  retryCreateProjectEndpointGeneration(): void;
+  continueCreateProjectManually(): void;
 };
 
 function flushAsyncWork(cycles = 4): Promise<void> {
@@ -134,6 +141,7 @@ describe('WorkspaceShellComponent', () => {
 
   const endpointsRepository = {
     saveEndpoint: vi.fn(),
+    generateAiEndpoint: vi.fn(),
     deleteEndpoint: vi.fn(),
   };
 
@@ -161,6 +169,7 @@ describe('WorkspaceShellComponent', () => {
     projectsRepository.updateProject.mockReset();
     projectsRepository.deleteProject.mockReset();
     endpointsRepository.saveEndpoint.mockReset();
+    endpointsRepository.generateAiEndpoint.mockReset();
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
@@ -219,7 +228,7 @@ describe('WorkspaceShellComponent', () => {
     expect(component.globalConfigError()).toBe('Validation failed: latency max must be greater than latency min.');
   });
 
-  it('creates a project and manual endpoint prompt without requiring any AI dependency', async () => {
+  it('creates a project and generates the first endpoint through the AI backend flow', async () => {
     const createdProject: DashboardProject = {
       ...projectFixture,
       id: 'project-2',
@@ -229,7 +238,7 @@ describe('WorkspaceShellComponent', () => {
 
     projectsRepository.listProjects.mockResolvedValueOnce([]).mockResolvedValueOnce([createdProject]);
     projectsRepository.createProject.mockResolvedValue(createdProject);
-    endpointsRepository.saveEndpoint.mockResolvedValue(endpointFixture);
+    endpointsRepository.generateAiEndpoint.mockResolvedValue(endpointFixture);
 
     const component = createComponent();
     await flushAsyncWork();
@@ -245,18 +254,82 @@ describe('WorkspaceShellComponent', () => {
     expect(projectsRepository.createProject).toHaveBeenCalledWith({
       name: 'Manual API',
       description: 'Created manually',
-      endpointPrompt: 'POST /orders',
     });
-    expect(endpointsRepository.saveEndpoint).toHaveBeenCalledWith(
-      'project-2',
-      expect.objectContaining({
-        method: 'POST',
-        route: '/orders',
-        description: 'POST /orders',
-      }),
-    );
+    expect(endpointsRepository.generateAiEndpoint).toHaveBeenCalledWith('project-2', 'POST /orders');
     expect(projectsRepository.listProjects).toHaveBeenCalledTimes(2);
     expect(component.selectedProjectId()).toBe('project-2');
+  });
+
+  it('prevents duplicate create-project submissions while the AI generation flow is still pending', async () => {
+    let resolveCreate!: (value: DashboardProject) => void;
+    let resolveGenerate!: (value: EndpointPreview) => void;
+
+    const createPromise = new Promise<DashboardProject>((resolve) => {
+      resolveCreate = resolve;
+    });
+    const generatePromise = new Promise<EndpointPreview>((resolve) => {
+      resolveGenerate = resolve;
+    });
+
+    const createdProject: DashboardProject = {
+      ...projectFixture,
+      id: 'project-2',
+      name: 'Async API',
+      endpoints: [],
+    };
+
+    projectsRepository.listProjects.mockResolvedValueOnce([]).mockResolvedValueOnce([createdProject]);
+    projectsRepository.createProject.mockReturnValue(createPromise);
+    endpointsRepository.generateAiEndpoint.mockReturnValue(generatePromise);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.onCreateProjectModalWithEndpoint({
+      name: 'Async API',
+      description: 'Pending flow',
+      endpointPrompt: 'POST /orders',
+    });
+    component.onCreateProjectModalWithEndpoint({
+      name: 'Async API duplicate',
+      description: 'Second click',
+      endpointPrompt: 'POST /orders',
+    });
+
+    expect(projectsRepository.createProject).toHaveBeenCalledTimes(1);
+    expect(component.createProjectModalLoading()).toBe(true);
+
+    resolveCreate(createdProject);
+    await flushAsyncWork();
+    expect(endpointsRepository.generateAiEndpoint).toHaveBeenCalledTimes(1);
+
+    resolveGenerate(endpointFixture);
+    await flushAsyncWork(6);
+
+    expect(component.createProjectModalLoading()).toBe(false);
+  });
+
+  it('allows continuing manually after partial success without clearing the created project', async () => {
+    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.createProjectModalOpen.set(true);
+    component.createProjectPartialState.set({
+      createdProjectId: 'project-1',
+      projectName: 'Workspace project',
+      endpointPrompt: 'Create users endpoint',
+      message: 'Project created, endpoint missing.',
+      retryable: true,
+    });
+
+    component.continueCreateProjectManually();
+
+    expect(component.selectedProjectId()).toBe('project-1');
+    expect(component.createProjectModalOpen()).toBe(false);
+    expect(component.createProjectPartialState()).toBe(null);
+    expect(component.activeNav()).toBe('dashboard');
   });
 
   it('updates the active project and keeps it selected after a successful edit', async () => {

@@ -2,6 +2,7 @@ import { Injector, runInInjectionContext } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupAngularVitest } from '../../testing/angular-vitest';
 import { ApiClient } from '../../shared/http/api-client';
+import { ApiError } from '../../shared/http/api-error.mapper';
 import type { ApiLogEntry } from '../logs/models/api-log.model';
 import { LogsRepository } from '../logs/data-access/logs.repository';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
@@ -18,6 +19,10 @@ type WorkspaceShellHarness = WorkspaceShellComponent & {
     set(value: 'dashboard' | 'logs' | 'endpoints' | 'settings'): void;
   };
   selectedProjectId: () => string;
+  selectedEndpointId: () => string | null;
+  createProjectModalOpen: () => boolean;
+  createProjectError: () => string | null;
+  createProjectPartialState: () => { createdProjectId: string; endpointPrompt: string } | null;
   selectedLog: { (): ApiLogEntry | null; set(value: ApiLogEntry | null): void };
   selectNav(value: 'dashboard' | 'logs' | 'endpoints' | 'settings'): void;
   activeProject: () => {
@@ -27,6 +32,8 @@ type WorkspaceShellHarness = WorkspaceShellComponent & {
     endpoints: Array<{ path: string }>;
   } | null;
   hasProjects: () => boolean;
+  onCreateProjectModalWithEndpoint(payload: { name: string; description: string; endpointPrompt: string }): void;
+  retryCreateProjectEndpointGeneration(): void;
 };
 
 async function flushAsyncWork(cycles = 6): Promise<void> {
@@ -79,6 +86,7 @@ describe('WorkspaceShellComponent integration', () => {
 
   const endpointsRepository = {
     saveEndpoint: vi.fn(),
+    generateAiEndpoint: vi.fn(),
     deleteEndpoint: vi.fn(),
   };
 
@@ -94,6 +102,7 @@ describe('WorkspaceShellComponent integration', () => {
     api.patch.mockReset();
     api.delete.mockReset();
     endpointsRepository.saveEndpoint.mockReset();
+    endpointsRepository.generateAiEndpoint.mockReset();
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
@@ -269,5 +278,212 @@ describe('WorkspaceShellComponent integration', () => {
     component.selectNav('logs');
     const content = await renderSnapshot(component, logsRepository);
     expect(content).toContain('No logs yet for this project.');
+  });
+
+  it('creates the project first, generates the first endpoint, and opens it on full success', async () => {
+    api.get
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'p1',
+          name: 'Generated project',
+          slug: 'generated-project',
+          description: 'AI assisted workspace',
+          updatedAt: new Date().toISOString(),
+          _count: { endpoints: 1 },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'e1',
+          projectId: 'p1',
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          statusCode: 201,
+          responseBody: { id: 'u1' },
+          endpointConfig: null,
+          scenarios: [],
+        },
+      ]);
+    api.post.mockResolvedValueOnce({
+      id: 'p1',
+      name: 'Generated project',
+      slug: 'generated-project',
+      description: 'AI assisted workspace',
+      updatedAt: new Date().toISOString(),
+      _count: { endpoints: 0 },
+    });
+    endpointsRepository.generateAiEndpoint.mockResolvedValue({
+      id: 'e1',
+      method: 'POST',
+      path: '/users',
+      description: 'Create user',
+      latencyMs: 120,
+      statusCode: 201,
+      responseBody: { id: 'u1' },
+    });
+
+    const { component } = createComponent();
+    await flushAsyncWork();
+
+    component.onCreateProjectModalWithEndpoint({
+      name: 'Generated project',
+      description: 'AI assisted workspace',
+      endpointPrompt: 'Create a users endpoint',
+    });
+
+    await flushAsyncWork(14);
+
+    expect(api.post).toHaveBeenCalledWith('/projects', {
+      name: 'Generated project',
+      description: 'AI assisted workspace',
+    });
+    expect(endpointsRepository.generateAiEndpoint).toHaveBeenCalledWith('p1', 'Create a users endpoint');
+    expect(component.selectedProjectId()).toBe('p1');
+    expect(component.selectedEndpointId()).toBe('e1');
+    expect(component.activeNav()).toBe('endpoints');
+    expect(component.createProjectModalOpen()).toBe(false);
+    expect(component.createProjectPartialState()).toBeNull();
+  });
+
+  it('keeps the created project usable after partial success and retries generation without duplicating the project', async () => {
+    api.get
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'p1',
+          name: 'Generated project',
+          slug: 'generated-project',
+          description: 'AI assisted workspace',
+          updatedAt: new Date().toISOString(),
+          _count: { endpoints: 0 },
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'p1',
+          name: 'Generated project',
+          slug: 'generated-project',
+          description: 'AI assisted workspace',
+          updatedAt: new Date().toISOString(),
+          _count: { endpoints: 1 },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'e1',
+          projectId: 'p1',
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          statusCode: 201,
+          responseBody: { id: 'u1' },
+          endpointConfig: null,
+          scenarios: [],
+        },
+      ]);
+    api.post.mockResolvedValueOnce({
+      id: 'p1',
+      name: 'Generated project',
+      slug: 'generated-project',
+      description: 'AI assisted workspace',
+      updatedAt: new Date().toISOString(),
+      _count: { endpoints: 0 },
+    });
+    endpointsRepository.generateAiEndpoint
+      .mockRejectedValueOnce(new Error('AI request timed out'))
+      .mockResolvedValueOnce({
+        id: 'e1',
+        method: 'POST',
+        path: '/users',
+        description: 'Create user',
+        latencyMs: 120,
+        statusCode: 201,
+        responseBody: { id: 'u1' },
+      });
+
+    const { component } = createComponent();
+    await flushAsyncWork();
+
+    component.onCreateProjectModalWithEndpoint({
+      name: 'Generated project',
+      description: 'AI assisted workspace',
+      endpointPrompt: 'Create a users endpoint',
+    });
+
+    await flushAsyncWork(14);
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(component.selectedProjectId()).toBe('p1');
+    expect(component.createProjectModalOpen()).toBe(true);
+    expect(component.createProjectError()).toContain('first endpoint was not created');
+    expect(component.createProjectPartialState()).toMatchObject({
+      createdProjectId: 'p1',
+      endpointPrompt: 'Create a users endpoint',
+    });
+
+    component.retryCreateProjectEndpointGeneration();
+    await flushAsyncWork(14);
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(endpointsRepository.generateAiEndpoint).toHaveBeenCalledTimes(2);
+    expect(endpointsRepository.generateAiEndpoint).toHaveBeenNthCalledWith(1, 'p1', 'Create a users endpoint');
+    expect(endpointsRepository.generateAiEndpoint).toHaveBeenNthCalledWith(2, 'p1', 'Create a users endpoint');
+    expect(component.selectedEndpointId()).toBe('e1');
+    expect(component.createProjectModalOpen()).toBe(false);
+    expect(component.createProjectPartialState()).toBeNull();
+  });
+
+  it('surfaces unavailable-now fallback copy when create-project generation fails due to missing OpenAI config', async () => {
+    api.get
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'p1',
+          name: 'Generated project',
+          slug: 'generated-project',
+          description: 'AI assisted workspace',
+          updatedAt: new Date().toISOString(),
+          _count: { endpoints: 0 },
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    api.post.mockResolvedValueOnce({
+      id: 'p1',
+      name: 'Generated project',
+      slug: 'generated-project',
+      description: 'AI assisted workspace',
+      updatedAt: new Date().toISOString(),
+      _count: { endpoints: 0 },
+    });
+    endpointsRepository.generateAiEndpoint.mockRejectedValueOnce(
+      new ApiError(503, 'AI is unavailable right now', 'OPENAI_API_KEY is not configured', 'AI_UNAVAILABLE', false),
+    );
+
+    const { component } = createComponent();
+    await flushAsyncWork();
+
+    component.onCreateProjectModalWithEndpoint({
+      name: 'Generated project',
+      description: 'AI assisted workspace',
+      endpointPrompt: 'Create a users endpoint',
+    });
+
+    await flushAsyncWork(14);
+
+    expect(component.selectedProjectId()).toBe('p1');
+    expect(component.createProjectModalOpen()).toBe(true);
+    expect(component.createProjectError()).toBe(
+      'Your project is ready, but AI is unavailable right now. Retry generation or continue manually.',
+    );
+    expect(component.createProjectPartialState()).toMatchObject({
+      createdProjectId: 'p1',
+      message: 'Your project is ready, but AI is unavailable right now. Retry generation or continue manually.',
+    });
   });
 });

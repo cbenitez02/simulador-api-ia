@@ -321,4 +321,145 @@ describe('app integration', () => {
     expect(response.body.id).toBe('e-ai-1');
     expect(openaiCreateMock).toHaveBeenCalledTimes(1);
   });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview devuelve draft normalizado sin persistir', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    openaiCreateMock.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              method: 'post',
+              path: ' users ',
+              description: 'Create user',
+              statusCode: 201,
+              responseBody: { id: 'u1' },
+              scenarios: [
+                {
+                  name: 'edge case empty',
+                  type: 'edge-case',
+                  statusCode: 204,
+                  body: [],
+                  delayMs: 0,
+                  weight: 1,
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .send({ prompt: 'Generate a user creation endpoint preview with one empty edge case' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      method: 'POST',
+      path: '/users',
+      description: 'Create user',
+      locks: { method: true, path: true },
+      scenarios: [
+        {
+          name: 'edge case empty',
+          type: 'empty',
+          statusCode: 204,
+        },
+      ],
+    });
+    expect(prismaMock.endpoint.create).not.toHaveBeenCalled();
+    expect(prismaMock.endpointConfig.create).not.toHaveBeenCalled();
+    expect(prismaMock.scenario.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_UNAVAILABLE cuando OpenAI falla', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    openaiCreateMock.mockRejectedValueOnce(new Error('upstream unavailable'));
+
+    const response = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .send({ prompt: 'Generate a user listing endpoint preview with retryable failure' });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({
+      error: 'AI is unavailable right now',
+      code: 'AI_UNAVAILABLE',
+      retryable: true,
+    });
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_UNAVAILABLE cuando falta OPENAI_API_KEY', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    const { env } = await import('../config/env.js');
+    const originalApiKey = env.OPENAI_API_KEY;
+    env.OPENAI_API_KEY = undefined;
+
+    try {
+      const response = await request(app)
+        .post('/api/v1/projects/p1/endpoints/ai-preview')
+        .send({ prompt: 'Generate a users endpoint preview without configured OpenAI key' });
+
+      expect(response.status).toBe(503);
+      expect(response.body).toMatchObject({
+        error: 'AI is unavailable right now',
+        code: 'AI_UNAVAILABLE',
+        retryable: false,
+        details: 'OPENAI_API_KEY is not configured',
+      });
+      expect(openaiCreateMock).not.toHaveBeenCalled();
+    } finally {
+      env.OPENAI_API_KEY = originalApiKey;
+    }
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_TIMEOUT cuando OpenAI agota el tiempo', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    openaiCreateMock.mockRejectedValueOnce(
+      Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })
+    );
+
+    const response = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .send({ prompt: 'Generate a slow endpoint preview that should timeout upstream' });
+
+    expect(response.status).toBe(504);
+    expect(response.body).toMatchObject({
+      error: 'AI request timed out',
+      code: 'AI_TIMEOUT',
+      retryable: true,
+    });
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_INVALID_OUTPUT cuando la salida no se puede normalizar', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    openaiCreateMock.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              method: 'GET',
+              path: '/users',
+              description: 'Broken payload',
+              statusCode: 200,
+              responseBody: [],
+              scenarios: [],
+            }),
+          },
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .send({ prompt: 'Generate a users endpoint preview with malformed AI output' });
+
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      error: 'AI returned invalid output',
+      code: 'AI_INVALID_OUTPUT',
+      retryable: true,
+    });
+  });
 });

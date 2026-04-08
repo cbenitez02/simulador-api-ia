@@ -134,6 +134,7 @@ export class CreateEndpointEditorStepComponent {
   }
 
   protected onMethodChange(v: string): void {
+    if (this.draft().locks.method) return;
     const method = v as HttpMethod;
     const d = this.draft();
     const statusCode = statusCodeForMethod(method);
@@ -147,6 +148,7 @@ export class CreateEndpointEditorStepComponent {
   }
 
   protected onRouteInput(event: Event): void {
+    if (this.draft().locks.path) return;
     const route = (event.target as HTMLInputElement).value;
     this.emit({ ...this.draft(), route });
   }
@@ -217,6 +219,7 @@ export class CreateEndpointEditorStepComponent {
   }
 
   protected onScenarioType(i: number, v: string): void {
+    if (this.draft().locks.scenarioType) return;
     this.patchScenario(i, { type: v as EndpointScenario['type'] });
   }
 
@@ -249,6 +252,7 @@ export class CreateEndpointEditorStepComponent {
   }
 
   protected addScenario(): void {
+    if (this.draft().locks.scenarioType) return;
     const d = this.draft();
     const row: EndpointScenario = {
       id: newScenarioId(),
@@ -263,6 +267,7 @@ export class CreateEndpointEditorStepComponent {
   }
 
   protected addPreset(kind: 'empty' | 'error' | 'timeout' | 'unauthorized'): void {
+    if (this.draft().locks.scenarioType && kind === 'unauthorized') return;
     const d = this.draft();
     let row: EndpointScenario;
     switch (kind) {
@@ -376,5 +381,9 @@ export class CreateEndpointEditorStepComponent {
 
   protected isSuccessScenario(s: EndpointScenario): boolean {
     return s.type === 'success';
+  }
+
+  protected scenarioTypeLocked(): boolean {
+    return this.draft().locks.scenarioType;
   }
 }

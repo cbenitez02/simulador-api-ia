@@ -7,7 +7,7 @@ import type {
   EndpointDraft,
   EndpointScenario,
 } from '../models/endpoint-draft.model';
-import { defaultEndpointBehavior, newScenarioId } from '../models/endpoint-draft.model';
+import { defaultEndpointBehavior, newScenarioId, unlockedEndpointDraftLocks } from '../models/endpoint-draft.model';
 
 function normalizeRoute(raw: string): string {
   const t = raw.trim();
@@ -125,6 +125,8 @@ export function endpointPreviewToDraft(ep: EndpointPreview): EndpointDraft {
     responseBody: ep.responseBody,
     scenarios,
     behavior,
+    locks: unlockedEndpointDraftLocks(),
+    source: 'existing',
   };
 }
 
@@ -174,5 +176,7 @@ export function aiShapeToDraft(shape: AiGeneratedEndpointShape): EndpointDraft {
     responseBody: shape.responseBody,
     scenarios: shape.scenarios.map((s) => ({ ...s })),
     behavior: defaultEndpointBehavior(),
+    locks: unlockedEndpointDraftLocks(),
+    source: 'manual',
   };
 }

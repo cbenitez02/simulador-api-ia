@@ -14,6 +14,7 @@ import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
 import { ToggleSwitchComponent } from '../toggle-switch/toggle-switch.component';
 import type {
   CreateProjectModalPayload,
+  CreateProjectPartialSuccessState,
   CreateProjectWithEndpointPayload,
   EditProjectModalPayload,
   ProjectModalInitialValues,
@@ -37,11 +38,14 @@ export class CreateProjectModalComponent {
   /** When true, primary action shows “Generating…” and all controls are disabled. */
   readonly loading = input(false);
   readonly errorMessage = input<string | null>(null);
+  readonly partialSuccessState = input<CreateProjectPartialSuccessState | null>(null);
 
   readonly cancelled = output<void>();
   readonly createProjectOnly = output<CreateProjectModalPayload>();
   readonly createProjectAndEndpoint = output<CreateProjectWithEndpointPayload>();
   readonly saveProject = output<EditProjectModalPayload>();
+  readonly retryEndpointGeneration = output<CreateProjectPartialSuccessState>();
+  readonly continueManually = output<string>();
 
   private readonly instanceId = ++createProjectModalUid;
   protected readonly titleDomId = `cnp-modal-title-${this.instanceId}`;
@@ -56,11 +60,13 @@ export class CreateProjectModalComponent {
   protected readonly prompt = signal('');
 
   protected readonly isEditMode = computed(() => this.mode() === 'edit');
+  protected readonly isPartialSuccess = computed(() => this.partialSuccessState() !== null);
 
-  protected readonly actionsDisabled = computed(() => this.loading());
+  protected readonly actionsDisabled = computed(() => this.loading() || this.isPartialSuccess());
 
   protected readonly primaryDisabled = computed(() => {
     if (this.loading()) return true;
+    if (this.isPartialSuccess()) return !(this.partialSuccessState()?.retryable ?? false);
     const name = this.projectName().trim();
     if (!name) return true;
     if (!this.isEditMode() && this.aiEnabled() && !this.prompt().trim()) return true;
@@ -68,15 +74,20 @@ export class CreateProjectModalComponent {
   });
 
   protected readonly createOnlyDisabled = computed(
-    () => this.loading() || this.isEditMode() || !this.projectName().trim(),
+    () => this.loading() || this.isEditMode() || this.isPartialSuccess() || !this.projectName().trim(),
   );
 
-  protected readonly modalTitle = computed(() => (this.isEditMode() ? 'Edit project' : 'Create new project'));
+  protected readonly modalTitle = computed(() => {
+    if (this.isPartialSuccess()) return 'Project created — finish first endpoint';
+    return this.isEditMode() ? 'Edit project' : 'Create new project';
+  });
 
   protected readonly modalSubtitle = computed(() =>
-    this.isEditMode()
-      ? 'Update the project name and description. The stable mock URL stays exactly the same.'
-      : 'Name your project and optionally generate your first mock endpoint with AI.',
+    this.isPartialSuccess()
+      ? 'Your project is ready. Retry generation or continue manually without creating a duplicate project.'
+      : this.isEditMode()
+        ? 'Update the project name and description. The stable mock URL stays exactly the same.'
+        : 'Name your project and optionally generate your first mock endpoint with AI.',
   );
 
   protected readonly stableUrlMessage = computed(() => 'Renaming this project does not change its slug or mock URL.');
@@ -84,6 +95,7 @@ export class CreateProjectModalComponent {
   protected readonly primaryLabel = computed(() => {
     if (this.loading())
       return this.isEditMode() ? 'Saving changes...' : this.aiEnabled() ? 'Generating...' : 'Creating project...';
+    if (this.isPartialSuccess()) return 'Retry generation';
     if (this.isEditMode()) return 'Save changes';
     return this.aiEnabled() ? 'Create project & endpoint' : 'Create project';
   });
@@ -146,6 +158,10 @@ export class CreateProjectModalComponent {
 
   protected onPrimaryClick(): void {
     if (this.primaryDisabled()) return;
+    if (this.isPartialSuccess()) {
+      this.retryEndpointGeneration.emit(this.partialSuccessState()!);
+      return;
+    }
     const name = this.projectName().trim();
     const description = this.description().trim();
     if (this.isEditMode()) {
@@ -162,5 +178,11 @@ export class CreateProjectModalComponent {
     } else {
       this.createProjectOnly.emit({ name, description });
     }
+  }
+
+  protected onContinueManuallyClick(): void {
+    const state = this.partialSuccessState();
+    if (!state || this.loading()) return;
+    this.continueManually.emit(state.createdProjectId);
   }
 }

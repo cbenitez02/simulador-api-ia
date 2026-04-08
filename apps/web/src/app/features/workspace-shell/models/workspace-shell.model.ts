@@ -7,3 +7,11 @@ export interface SidebarProjectRow {
   mockUrl: string;
   endpointCount: number;
 }
+
+export interface CreateProjectAiFlowState {
+  createdProjectId: string;
+  projectName: string;
+  endpointPrompt: string;
+  message: string;
+  retryable: boolean;
+}

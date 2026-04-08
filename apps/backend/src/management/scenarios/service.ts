@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { toPrismaJson } from '../../lib/prisma-json.js';
 import { AppError } from '../../middleware/error-handler.js';
 import type { CreateScenarioInput, UpdateScenarioInput } from './schema.js';
 
@@ -31,7 +32,7 @@ export async function createScenario(endpointId: string, input: CreateScenarioIn
       name: input.name,
       type: input.type,
       statusCode: input.statusCode,
-      body: input.body,
+      body: toPrismaJson(input.body),
       delayMs: input.delayMs,
       weight: input.weight,
     },
@@ -55,12 +56,12 @@ export async function updateScenario(
   return prisma.scenario.update({
     where: { id: scenarioId },
     data: {
-      name: input.name,
-      type: input.type,
-      statusCode: input.statusCode,
-      body: input.body,
-      delayMs: input.delayMs,
-      weight: input.weight,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.type !== undefined ? { type: input.type } : {}),
+      ...(input.statusCode !== undefined ? { statusCode: input.statusCode } : {}),
+      ...(input.body !== undefined ? { body: toPrismaJson(input.body) } : {}),
+      ...(input.delayMs !== undefined ? { delayMs: input.delayMs } : {}),
+      ...(input.weight !== undefined ? { weight: input.weight } : {}),
     },
   });
 }

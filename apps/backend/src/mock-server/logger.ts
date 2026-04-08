@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { toNullablePrismaJson, toPrismaJson } from '../lib/prisma-json.js';
 
 export interface MockLogInput {
   projectId: string;
@@ -27,9 +28,9 @@ export async function logRequest(input: MockLogInput): Promise<void> {
       scenarioType: input.scenarioType,
       scenarioSelectionSource: input.scenarioSelectionSource,
       requestHeaders: input.requestHeaders,
-      requestBody: input.requestBody,
+      requestBody: toNullablePrismaJson(input.requestBody),
       responseHeaders: input.responseHeaders,
-      responseBody: input.responseBody,
+      responseBody: toPrismaJson(input.responseBody),
     },
   });
 }

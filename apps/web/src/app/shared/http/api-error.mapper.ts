@@ -3,6 +3,8 @@ export class ApiError extends Error {
     public readonly status: number,
     message: string,
     public readonly details?: unknown,
+    public readonly code?: string,
+    public readonly retryable?: boolean,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -20,6 +22,8 @@ export function mapApiError(error: unknown): ApiError {
       error.status,
       extractMessage(payload) ?? error.message ?? 'Request failed',
       extractDetails(payload),
+      extractCode(payload),
+      extractRetryable(payload),
     );
   }
 
@@ -55,4 +59,14 @@ function extractDetails(payload: unknown): unknown {
   if ('details' in payload) return payload.details;
   if ('fields' in payload) return payload.fields;
   return undefined;
+}
+
+function extractCode(payload: unknown): string | undefined {
+  if (typeof payload !== 'object' || payload === null) return undefined;
+  return 'code' in payload && typeof payload.code === 'string' ? payload.code : undefined;
+}
+
+function extractRetryable(payload: unknown): boolean | undefined {
+  if (typeof payload !== 'object' || payload === null) return undefined;
+  return 'retryable' in payload && typeof payload.retryable === 'boolean' ? payload.retryable : undefined;
 }

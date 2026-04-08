@@ -36,13 +36,18 @@ function parseErrorCodes(input: unknown): number[] {
 }
 
 function pickRandom<T>(items: T[]): T {
+  if (items.length === 0) {
+    throw new Error('pickRandom requires at least one item');
+  }
+
   const index = Math.floor(Math.random() * items.length);
-  return items[index] ?? items[0];
+  return items[index] as T;
 }
 
 async function resolveMockRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const projectSlug = req.params.projectSlug;
+    const projectSlugParam = req.params.projectSlug;
+    const projectSlug = Array.isArray(projectSlugParam) ? projectSlugParam[0] : projectSlugParam;
 
     if (!projectSlug) {
       res.status(404).json({ error: 'Project not found' });
@@ -56,7 +61,7 @@ async function resolveMockRequest(req: Request, res: Response, next: NextFunctio
 
     const project = await prisma.project.findUnique({
       where: { slug: projectSlug },
-      select: {
+      include: {
         id: true,
         globalConfig: true,
       },

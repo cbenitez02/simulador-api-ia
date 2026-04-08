@@ -9,22 +9,26 @@
     <div class="cep-review__field">
       <div class="cep-review__label-row">
         <label class="cep-review__label" for="cep-review-method-trigger">Method</label>
-        <span class="cep-review__badge">Inferred</span>
+        <span class="cep-review__badge">{{ methodLocked() ? 'Locked by AI preview' : 'Inferred' }}</span>
       </div>
-      <app-select-menu
-        class="cep-review__select"
-        [options]="methodOptions()"
-        [value]="method()"
-        (valueChange)="onMethodChange($event)"
-        triggerId="cep-review-method-trigger"
-        listboxId="cep-review-method-listbox"
-      />
+      @if (methodLocked()) {
+        <div class="cep-review__input cep-review__input--mono">{{ method() }}</div>
+      } @else {
+        <app-select-menu
+          class="cep-review__select"
+          [options]="methodOptions()"
+          [value]="method()"
+          (valueChange)="onMethodChange($event)"
+          triggerId="cep-review-method-trigger"
+          listboxId="cep-review-method-listbox"
+        />
+      }
     </div>
 
     <div class="cep-review__field">
       <div class="cep-review__label-row">
         <label class="cep-review__label" for="cep-review-route">Route</label>
-        <span class="cep-review__badge">Inferred</span>
+        <span class="cep-review__badge">{{ routeLocked() ? 'Locked by AI preview' : 'Inferred' }}</span>
       </div>
       <input
         id="cep-review-route"
@@ -33,6 +37,7 @@
         autocomplete="off"
         placeholder="/orders"
         [value]="route()"
+        [readOnly]="routeLocked()"
         (input)="onRouteInput($event)"
       />
     </div>

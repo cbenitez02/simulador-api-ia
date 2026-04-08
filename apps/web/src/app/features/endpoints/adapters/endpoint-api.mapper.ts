@@ -1,12 +1,14 @@
 import type { EndpointPreview, HttpMethod } from '../../../shared/models/endpoint-preview.model';
 import type { EndpointConfig } from '../../../shared/models/endpoint-config.model';
 import type {
+  AiEndpointPreviewDto,
   CreateEndpointDto,
   EndpointConfigDto,
   EndpointDto,
   UpdateEndpointDto,
 } from '../../../shared/http/api.types';
 import type { EndpointDraft, EndpointScenario } from '../models/endpoint-draft.model';
+import { newScenarioId, unlockedEndpointDraftLocks } from '../models/endpoint-draft.model';
 
 const HTTP_METHODS = new Set<HttpMethod>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -84,6 +86,34 @@ export function mapEndpointDraftFromApi(endpoint: EndpointDto): EndpointDraft {
       errorRate: Math.round((config?.errorRate ?? 0) * 100),
       useScenarioWeights: config?.useScenarioWeights ?? true,
     },
+    locks: unlockedEndpointDraftLocks(),
+    source: 'existing',
+  };
+}
+
+export function mapAiDraftFromApi(draft: AiEndpointPreviewDto): EndpointDraft {
+  return {
+    method: draft.method,
+    route: draft.path,
+    description: draft.description,
+    statusCode: draft.statusCode,
+    responseBody: draft.responseBody,
+    scenarios: draft.scenarios.map((scenario) => ({
+      id: newScenarioId(),
+      name: scenario.name,
+      type: scenario.type,
+      statusCode: scenario.statusCode,
+      body: scenario.body,
+      delayMs: scenario.delayMs,
+      weight: scenario.weight,
+    })),
+    behavior: defaultBehaviorFromAiDraft(draft),
+    locks: {
+      method: draft.locks.method,
+      path: draft.locks.path,
+      scenarioType: true,
+    },
+    source: 'ai-preview',
   };
 }
 
@@ -116,6 +146,19 @@ function fallbackSuccessScenario(endpoint: EndpointDto): EndpointScenario {
     body: endpoint.responseBody,
     delayMs: endpoint.endpointConfig?.fixedDelayMs ?? 0,
     weight: 100,
+  };
+}
+
+function defaultBehaviorFromAiDraft(draft: AiEndpointPreviewDto): EndpointDraft['behavior'] {
+  const highestDelay = draft.scenarios.reduce((max, scenario) => Math.max(max, scenario.delayMs), 0);
+
+  return {
+    latencyMode: 'fixed',
+    fixedDelayMs: highestDelay,
+    minDelayMs: 0,
+    maxDelayMs: Math.max(highestDelay, 500),
+    errorRate: 0,
+    useScenarioWeights: true,
   };
 }
 
