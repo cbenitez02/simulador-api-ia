@@ -142,8 +142,8 @@ export interface ApiLogDto {
   origin: 'mock' | 'forced-error';
   statusCode: number;
   latencyMs: number;
-  scenarioType: 'success' | 'error' | 'timeout' | 'empty' | 'forced-error' | 'default';
-  scenarioSelectionSource: 'weighted-random' | 'uniform-random' | 'direct-endpoint' | 'forced-error';
+  scenarioType: 'success' | 'error' | 'timeout' | 'empty' | 'forced-error' | 'default' | 'rate-limit-block';
+  scenarioSelectionSource: 'weighted-random' | 'uniform-random' | 'direct-endpoint' | 'forced-error' | 'rate-limit';
   scenarioName: string | null;
   hasScenario: boolean;
   requestHeaders: Record<string, string>;

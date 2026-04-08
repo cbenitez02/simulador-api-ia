@@ -110,6 +110,7 @@ export class LogsDetailSidebarComponent {
         return 'detail__scenario-hero--success';
       case 'error':
       case 'forced-error':
+      case 'rate-limit-block':
       case 'timeout':
         return 'detail__scenario-hero--error';
       default:
@@ -126,6 +127,8 @@ export class LogsDetailSidebarComponent {
         return `Scenario ${label} selected from uniform random rules.`;
       case 'forced-error':
         return 'Response forced by global error simulation.';
+      case 'rate-limit':
+        return 'Response blocked by project-wide runtime rate limiting.';
       default:
         return log.hasScenario
           ? `Scenario ${label} selected directly from endpoint configuration.`

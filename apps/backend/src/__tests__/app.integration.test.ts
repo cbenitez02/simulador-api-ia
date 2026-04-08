@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Express } from 'express';
+import { resetRateLimitStoreForTests } from '../mock-server/rate-limit.js';
 
 const openaiCreateMock = vi.fn();
 
@@ -64,6 +65,55 @@ vi.mock('openai', () => ({
 
 let app: Express;
 
+function buildMockProject(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'p1',
+    slug: 'demo',
+    globalConfig: {
+      latencyEnabled: false,
+      latencyMode: 'fixed',
+      latencyMinMs: 0,
+      latencyMaxMs: 0,
+      scope: 'all',
+      errorSimulationEnabled: false,
+      errorSimulationRate: 0,
+      errorSimulationCodes: [500],
+      rateLimitingEnabled: false,
+      rateLimitingRpm: 60,
+      loggingLevel: 'basic',
+    },
+    ...overrides,
+  };
+}
+
+function buildRateLimitedProject(overrides: Record<string, unknown> = {}) {
+  return buildMockProject({
+    globalConfig: {
+      ...buildMockProject().globalConfig,
+      rateLimitingEnabled: true,
+      rateLimitingRpm: 2,
+      ...overrides,
+    },
+  });
+}
+
+function buildMockEndpoint(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'e1',
+    endpointConfig: {
+      latencyMode: 'fixed',
+      fixedDelayMs: 0,
+      minDelayMs: 0,
+      maxDelayMs: 0,
+      useScenarioWeights: true,
+    },
+    scenarios: [],
+    statusCode: 200,
+    responseBody: { ok: true },
+    ...overrides,
+  };
+}
+
 describe('app integration', () => {
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgresql://user:password@localhost:5432/simulador_api_ia_test';
@@ -74,7 +124,9 @@ describe('app integration', () => {
   });
 
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
+    resetRateLimitStoreForTests();
   });
 
   it('GET /api/v1/projects responde lista', async () => {
@@ -202,33 +254,9 @@ describe('app integration', () => {
   });
 
   it('GET /mock/:projectSlug/:path responde y loguea fire-and-forget', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({
-      id: 'p1',
-      globalConfig: {
-        latencyEnabled: false,
-        latencyMode: 'fixed',
-        latencyMinMs: 0,
-        latencyMaxMs: 0,
-        scope: 'all',
-        errorSimulationEnabled: false,
-        errorSimulationRate: 0,
-        errorSimulationCodes: [500],
-      },
-    });
+    prismaMock.project.findUnique.mockResolvedValueOnce(buildMockProject());
 
-    prismaMock.endpoint.findFirst.mockResolvedValueOnce({
-      id: 'e1',
-      endpointConfig: {
-        latencyMode: 'fixed',
-        fixedDelayMs: 0,
-        minDelayMs: 0,
-        maxDelayMs: 0,
-        useScenarioWeights: true,
-      },
-      scenarios: [],
-      statusCode: 200,
-      responseBody: { ok: true },
-    });
+    prismaMock.endpoint.findFirst.mockResolvedValueOnce(buildMockEndpoint());
 
     prismaMock.apiLog.create.mockResolvedValueOnce({ id: 'l1' });
 
@@ -238,6 +266,136 @@ describe('app integration', () => {
     expect(response.body).toEqual({ ok: true });
     expect(response.headers['x-simulador-scenario']).toBe('direct');
     expect(prismaMock.apiLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('GET /mock/:projectSlug/:path aplica rate limiting habilitado y expone headers de cuota', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(65_000);
+    prismaMock.project.findUnique.mockResolvedValue(buildRateLimitedProject());
+    prismaMock.endpoint.findFirst.mockResolvedValue(buildMockEndpoint());
+    prismaMock.apiLog.create.mockResolvedValue({ id: 'l1' });
+
+    const first = await request(app).get('/mock/demo/users');
+    const second = await request(app).get('/mock/demo/users');
+
+    expect(first.status).toBe(200);
+    expect(first.headers['x-ratelimit-limit']).toBe('2');
+    expect(first.headers['x-ratelimit-remaining']).toBe('1');
+    expect(first.headers['x-ratelimit-reset']).toBe('120');
+    expect(first.headers['retry-after']).toBeUndefined();
+
+    expect(second.status).toBe(200);
+    expect(second.headers['x-ratelimit-limit']).toBe('2');
+    expect(second.headers['x-ratelimit-remaining']).toBe('0');
+    expect(second.headers['x-ratelimit-reset']).toBe('120');
+  });
+
+  it('GET /mock/:projectSlug/:path bloquea el request N+1 con 429, retry-after y logging', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(65_000);
+    prismaMock.project.findUnique.mockResolvedValue(buildRateLimitedProject());
+    prismaMock.endpoint.findFirst.mockResolvedValue(buildMockEndpoint());
+    prismaMock.apiLog.create.mockResolvedValue({ id: 'l1' });
+
+    await request(app).get('/mock/demo/users');
+    await request(app).get('/mock/demo/users');
+    const blocked = await request(app).get('/mock/demo/users');
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.body).toEqual({ error: 'Rate limit exceeded' });
+    expect(blocked.headers['x-ratelimit-limit']).toBe('2');
+    expect(blocked.headers['x-ratelimit-remaining']).toBe('0');
+    expect(blocked.headers['x-ratelimit-reset']).toBe('120');
+    expect(blocked.headers['retry-after']).toBe('55');
+    expect(blocked.headers['x-simulador-scenario']).toBeUndefined();
+    expect(blocked.headers['x-simulador-latency']).toBeUndefined();
+
+    expect(prismaMock.apiLog.create).toHaveBeenLastCalledWith({
+      data: expect.objectContaining({
+        projectId: 'p1',
+        origin: 'mock',
+        statusCode: 429,
+        latencyMs: 0,
+        scenarioType: 'rate-limit-block',
+        scenarioSelectionSource: 'rate-limit',
+        scenarioName: null,
+        responseHeaders: {
+          'X-RateLimit-Limit': '2',
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': '120',
+          'Retry-After': '55',
+          'Content-Type': 'application/json',
+        },
+      }),
+    });
+  });
+
+  it('GET /mock/:projectSlug/:path resetea la cuota cuando entra una nueva ventana', async () => {
+    vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(65_000)
+      .mockReturnValueOnce(65_000)
+      .mockReturnValueOnce(121_000);
+    prismaMock.project.findUnique.mockResolvedValue(
+      buildRateLimitedProject({ rateLimitingRpm: 1 })
+    );
+    prismaMock.endpoint.findFirst.mockResolvedValue(buildMockEndpoint());
+    prismaMock.apiLog.create.mockResolvedValue({ id: 'l1' });
+
+    const first = await request(app).get('/mock/demo/users');
+    const blocked = await request(app).get('/mock/demo/users');
+    const reset = await request(app).get('/mock/demo/users');
+
+    expect(first.status).toBe(200);
+    expect(blocked.status).toBe(429);
+    expect(reset.status).toBe(200);
+    expect(reset.headers['x-ratelimit-limit']).toBe('1');
+    expect(reset.headers['x-ratelimit-remaining']).toBe('0');
+    expect(reset.headers['x-ratelimit-reset']).toBe('180');
+  });
+
+  it('GET /mock/:projectSlug/:path bypasses limiter and omits rate-limit headers when disabled', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(65_000);
+    prismaMock.project.findUnique.mockResolvedValue(
+      buildMockProject({
+        globalConfig: {
+          ...buildMockProject().globalConfig,
+          rateLimitingEnabled: false,
+          rateLimitingRpm: 1,
+        },
+      })
+    );
+    prismaMock.endpoint.findFirst.mockResolvedValue(buildMockEndpoint());
+    prismaMock.apiLog.create.mockResolvedValue({ id: 'l1' });
+
+    const first = await request(app).get('/mock/demo/users');
+    const second = await request(app).get('/mock/demo/users');
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.headers['x-ratelimit-limit']).toBeUndefined();
+    expect(first.headers['x-ratelimit-remaining']).toBeUndefined();
+    expect(first.headers['x-ratelimit-reset']).toBeUndefined();
+    expect(second.headers['x-ratelimit-limit']).toBeUndefined();
+    expect(second.headers['retry-after']).toBeUndefined();
+  });
+
+  it('GET /mock/:projectSlug/:path ignores scope for MVP and keeps project-wide enforcement', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(65_000);
+    prismaMock.project.findUnique.mockResolvedValue(
+      buildRateLimitedProject({
+        rateLimitingRpm: 1,
+        scope: 'unset',
+      })
+    );
+    prismaMock.endpoint.findFirst.mockResolvedValue(buildMockEndpoint());
+    prismaMock.apiLog.create.mockResolvedValue({ id: 'l1' });
+
+    const first = await request(app).get('/mock/demo/users');
+    const blocked = await request(app).get('/mock/demo/users');
+
+    expect(first.status).toBe(200);
+    expect(first.headers['x-ratelimit-limit']).toBe('1');
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers['x-ratelimit-limit']).toBe('1');
+    expect(blocked.headers['retry-after']).toBe('55');
   });
 
   it('GET /api/v1/projects/:projectId/logs devuelve últimos logs', async () => {

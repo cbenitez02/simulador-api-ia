@@ -30,6 +30,26 @@ const noScenarioLogFixture: ApiLogEntry = {
   responseBody: { ok: true },
 };
 
+const rateLimitLogFixture: ApiLogEntry = {
+  id: 'log-rate-limit',
+  method: 'GET',
+  path: '/users',
+  fullUrl: 'https://mock.example.com/users',
+  origin: 'mock',
+  statusCode: 429,
+  latencyMs: 0,
+  scenario: 'rate-limit-block',
+  scenarioSelectionSource: 'rate-limit',
+  scenarioName: null,
+  hasScenario: false,
+  createdAt: '2026-04-08T10:00:02.000Z',
+  timeLabel: '10:00:02',
+  requestHeaders: {},
+  requestBody: null,
+  responseHeaders: { 'Retry-After': '55' },
+  responseBody: { error: 'Rate limit exceeded' },
+};
+
 describe('LogsDetailSidebarComponent', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -44,6 +64,18 @@ describe('LogsDetailSidebarComponent', () => {
 
     expect(component.executionSummary(noScenarioLogFixture)).toBe(
       'No scenario matched. Response came from the endpoint default payload.',
+    );
+  });
+
+  it('reports dedicated summary for rate-limit blocks', () => {
+    const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
+    const component = runInInjectionContext(
+      injector,
+      () => new LogsDetailSidebarComponent(),
+    ) as unknown as LogsDetailSidebarHarness;
+
+    expect(component.executionSummary(rateLimitLogFixture)).toBe(
+      'Response blocked by project-wide runtime rate limiting.',
     );
   });
 });
