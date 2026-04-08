@@ -2,19 +2,24 @@
   <div class="cep-editor__meta">
     <div class="cep-editor__meta-left">
       <app-http-method-badge [method]="draft().method" appearance="emphasis" />
-      <app-select-menu
-        class="cep-editor__method-select"
-        [options]="methodOptions"
-        [value]="draft().method"
-        (valueChange)="onMethodChange($event)"
-        triggerId="cep-editor-method-trigger"
-        listboxId="cep-editor-method-listbox"
-      ></app-select-menu>
+      @if (draft().locks.method) {
+        <div class="cep-editor__method-select">{{ draft().method }} · locked</div>
+      } @else {
+        <app-select-menu
+          class="cep-editor__method-select"
+          [options]="methodOptions"
+          [value]="draft().method"
+          (valueChange)="onMethodChange($event)"
+          triggerId="cep-editor-method-trigger"
+          listboxId="cep-editor-method-listbox"
+        ></app-select-menu>
+      }
       <input
         type="text"
         class="cep-editor__path"
         aria-label="Route"
         [value]="draft().route"
+        [readOnly]="draft().locks.path"
         (input)="onRouteInput($event)"
       />
     </div>
@@ -74,10 +79,19 @@
               <button type="button" class="cep-editor__chip" (click)="addPreset('empty')">+ empty</button>
               <button type="button" class="cep-editor__chip" (click)="addPreset('error')">+ error</button>
               <button type="button" class="cep-editor__chip" (click)="addPreset('timeout')">+ timeout</button>
-              <button type="button" class="cep-editor__chip" (click)="addPreset('unauthorized')">+ unauthorized</button>
-              <button type="button" class="cep-editor__chip" (click)="addScenario()">+ custom</button>
+              @if (!scenarioTypeLocked()) {
+                <button type="button" class="cep-editor__chip" (click)="addPreset('unauthorized')">
+                  + unauthorized
+                </button>
+                <button type="button" class="cep-editor__chip" (click)="addScenario()">+ custom</button>
+              }
             </div>
           </app-panel-header>
+          @if (scenarioTypeLocked()) {
+            <app-inline-alert
+              [message]="'AI preview drafts in this MVP lock custom scenario types so the saved contract stays consistent.'"
+            />
+          }
           @for (s of draft().scenarios; track s.id; let i = $index) {
             <div class="cep-editor__scenario">
               <div class="cep-editor__scenario-head">
@@ -136,14 +150,18 @@
                   </div>
                   <div class="cep-editor__scenario-grid-span">
                     <label class="cep-editor__mini-label" [attr.for]="'cep-st-trigger-' + i">Type</label>
-                    <app-select-menu
-                      class="cep-editor__scenario-select"
-                      [options]="scenarioTypeOptions"
-                      [value]="s.type"
-                      (valueChange)="onScenarioType(i, $event)"
-                      [triggerId]="'cep-st-trigger-' + i"
-                      [listboxId]="'cep-st-list-' + i"
-                    />
+                    @if (scenarioTypeLocked()) {
+                      <div class="cep-editor__input">{{ s.type }}</div>
+                    } @else {
+                      <app-select-menu
+                        class="cep-editor__scenario-select"
+                        [options]="scenarioTypeOptions"
+                        [value]="s.type"
+                        (valueChange)="onScenarioType(i, $event)"
+                        [triggerId]="'cep-st-trigger-' + i"
+                        [listboxId]="'cep-st-list-' + i"
+                      />
+                    }
                   </div>
                 }
               </div>

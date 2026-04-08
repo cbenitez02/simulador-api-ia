@@ -91,8 +91,8 @@ export async function updateProject(projectId: string, input: UpdateProjectInput
   return prisma.project.update({
     where: { id: projectId },
     data: {
-      name: input.name,
-      description: input.description,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
     },
     include: {
       globalConfig: true,

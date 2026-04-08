@@ -60,6 +60,8 @@
           <app-create-endpoint-review-step
             [method]="reviewMethod()"
             [route]="reviewRoute()"
+            [methodLocked]="draft()?.locks?.method ?? false"
+            [routeLocked]="draft()?.locks?.path ?? false"
             [methodOptions]="methodOptions"
             (methodChange)="onReviewMethodChange($event)"
             (routeChange)="onReviewRouteChange($event)"

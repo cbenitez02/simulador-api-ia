@@ -1,9 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { ApiClient } from '../../../shared/http/api-client';
-import type { CreateScenarioDto, EndpointDto, ScenarioDto } from '../../../shared/http/api.types';
+import type { AiEndpointPreviewDto, CreateScenarioDto, EndpointDto, ScenarioDto } from '../../../shared/http/api.types';
 import type { EndpointPreview } from '../../../shared/models/endpoint-preview.model';
 import type { EndpointDraft } from '../models/endpoint-draft.model';
 import {
+  mapAiDraftFromApi,
   mapEndpointConfigRequestFromDraft,
   mapEndpointCreateRequestFromDraft,
   mapEndpointDraftFromApi,
@@ -14,6 +15,24 @@ import {
 @Injectable({ providedIn: 'root' })
 export class EndpointsRepository {
   private readonly api = inject(ApiClient);
+
+  async previewAiDraft(projectId: string, prompt: string): Promise<EndpointDraft> {
+    const draft = await this.api.post<AiEndpointPreviewDto, { prompt: string }>(
+      `/projects/${projectId}/endpoints/ai-preview`,
+      { prompt },
+    );
+
+    return mapAiDraftFromApi(draft);
+  }
+
+  async generateAiEndpoint(projectId: string, prompt: string): Promise<EndpointPreview> {
+    const endpoint = await this.api.post<EndpointDto, { prompt: string }>(
+      `/projects/${projectId}/endpoints/ai-generate`,
+      { prompt },
+    );
+
+    return mapEndpointSummaryFromApi(endpoint);
+  }
 
   async loadDraft(projectId: string, endpointId: string): Promise<EndpointDraft> {
     const endpoint = await this.api.get<EndpointDto>(`/projects/${projectId}/endpoints/${endpointId}`);

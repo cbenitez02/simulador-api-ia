@@ -153,9 +153,12 @@
   [initialValues]="projectModalInitialValues()"
   [loading]="projectModalLoading()"
   [errorMessage]="projectModalError()"
+  [partialSuccessState]="createProjectPartialState()"
   (cancelled)="onProjectModalDismiss()"
   (createProjectOnly)="onCreateProjectModalProjectOnly($event)"
   (createProjectAndEndpoint)="onCreateProjectModalWithEndpoint($event)"
+  (retryEndpointGeneration)="retryCreateProjectEndpointGeneration()"
+  (continueManually)="continueCreateProjectManually()"
   (saveProject)="onEditProjectModalSave($event)"
 />
 

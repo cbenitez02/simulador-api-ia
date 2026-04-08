@@ -16,16 +16,20 @@ export class CreateEndpointReviewStepComponent {
   protected readonly displayRoute = displayRoute;
   readonly method = input.required<HttpMethod>();
   readonly route = input('');
+  readonly methodLocked = input(false);
+  readonly routeLocked = input(false);
   readonly methodOptions = input.required<readonly SelectMenuOption[]>();
 
   readonly methodChange = output<HttpMethod>();
   readonly routeChange = output<string>();
 
   protected onMethodChange(v: string): void {
+    if (this.methodLocked()) return;
     this.methodChange.emit(v as HttpMethod);
   }
 
   protected onRouteInput(event: Event): void {
+    if (this.routeLocked()) return;
     this.routeChange.emit((event.target as HTMLInputElement).value);
   }
 }

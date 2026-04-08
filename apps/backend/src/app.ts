@@ -27,7 +27,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/v1/projects', projectsRouter);
 app.use('/api/v1/projects/:projectId/endpoints', endpointsRouter);
-app.use('/api/v1/projects/:projectId/endpoints/ai-generate', aiRouter);
+app.use('/api/v1/projects/:projectId/endpoints', aiRouter);
 app.use('/api/v1/endpoints/:endpointId/scenarios', scenariosRouter);
 app.use('/api/v1/endpoints/:endpointId/config', endpointConfigRouter);
 app.use('/api/v1/projects/:projectId/config', globalConfigRouter);

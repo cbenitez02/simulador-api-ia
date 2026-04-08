@@ -10,11 +10,12 @@ import {
   untracked,
 } from '@angular/core';
 import { LucideArrowLeft, LucideArrowRight, LucideCircleCheck, LucideRoute } from '@lucide/angular';
+import { ApiError } from '../../../../shared/http/api-error.mapper';
 import type { EndpointPreview, HttpMethod } from '../../../../shared/models/endpoint-preview.model';
 import { HTTP_METHOD_SELECT_OPTIONS } from '../../../../shared/constants/http-method-select-options';
 import type { CreateEndpointStep, EndpointDraft } from '../../models/endpoint-draft.model';
 import { EndpointAiGeneratorService } from '../../services/endpoint-ai-generator.service';
-import { aiShapeToDraft, endpointPreviewToDraft, statusCodeForMethod } from '../../services/endpoint-draft.mapper';
+import { endpointPreviewToDraft, statusCodeForMethod } from '../../services/endpoint-draft.mapper';
 import { CreateEndpointEditorStepComponent } from '../create-endpoint-editor-step/create-endpoint-editor-step.component';
 import { CreateEndpointPromptStepComponent } from '../create-endpoint-prompt-step/create-endpoint-prompt-step.component';
 import { CreateEndpointReviewStepComponent } from '../create-endpoint-review-step/create-endpoint-review-step.component';
@@ -48,6 +49,7 @@ function normalizeReviewRoute(raw: string): string {
 export class CreateEndpointPageComponent {
   private readonly ai = inject(EndpointAiGeneratorService);
   private readonly endpointsRepository = inject(EndpointsRepository);
+  private generationRequestId = 0;
 
   readonly open = input(false);
   readonly projectId = input<string | null>(null);
@@ -159,26 +161,43 @@ export class CreateEndpointPageComponent {
   }
 
   protected async onGenerateRequested(): Promise<void> {
+    if (this.generating()) return;
     this.generationError.set(null);
     this.promptError.set(null);
+    const projectId = this.projectId();
     const text = this.promptText().trim();
     if (!text) {
       this.promptError.set('Describe your endpoint in a sentence or two so we can infer method, route, and JSON.');
       return;
     }
+    if (!projectId) {
+      this.generationError.set('Select a project before generating an AI endpoint preview.');
+      return;
+    }
+
+    const requestId = ++this.generationRequestId;
     this.generating.set(true);
     try {
-      const shape = await this.ai.generateFromPrompt(text);
-      const d = aiShapeToDraft(shape);
+      const d = await this.ai.generateFromPrompt(projectId, text);
+      if (requestId !== this.generationRequestId) {
+        return;
+      }
+
       this.draft.set(d);
       this.reviewMethod.set(d.method);
       this.reviewRoute.set(d.route);
       this.sourcePrompt.set(text);
       this.step.set('review');
-    } catch {
-      this.generationError.set('Something went wrong while generating. Try again or add an explicit path like /users.');
+    } catch (error) {
+      if (requestId !== this.generationRequestId) {
+        return;
+      }
+
+      this.generationError.set(this.mapGenerationError(error));
     } finally {
-      this.generating.set(false);
+      if (requestId === this.generationRequestId) {
+        this.generating.set(false);
+      }
     }
   }
 
@@ -206,9 +225,9 @@ export class CreateEndpointPageComponent {
     const method = this.reviewMethod();
     this.draft.set({
       ...base,
-      method,
-      route,
-      statusCode: statusCodeForMethod(method),
+      method: base.locks.method ? base.method : method,
+      route: base.locks.path ? base.route : route,
+      statusCode: base.locks.method ? base.statusCode : statusCodeForMethod(method),
     });
     this.step.set('editor');
   }
@@ -250,6 +269,13 @@ export class CreateEndpointPageComponent {
 
   protected cancel(): void {
     if (this.saving()) return;
+
+    if (this.generating()) {
+      this.generationRequestId += 1;
+      this.generating.set(false);
+      this.resetCreateFlow();
+    }
+
     this.cancelled.emit();
   }
 
@@ -276,5 +302,23 @@ export class CreateEndpointPageComponent {
     } finally {
       this.loadingDraft.set(false);
     }
+  }
+
+  private mapGenerationError(error: unknown): string {
+    if (error instanceof ApiError) {
+      if (error.code === 'AI_TIMEOUT' || error.status === 504) {
+        return 'AI timed out before it could return a valid draft. Retry or continue manually.';
+      }
+
+      if (error.code === 'AI_UNAVAILABLE' || error.status === 503) {
+        return 'AI is unavailable right now. Retry in a moment or continue manually.';
+      }
+
+      if (error.code === 'AI_INVALID_OUTPUT' || error.status === 422) {
+        return 'AI returned an invalid draft. Retry with a more explicit prompt or continue manually.';
+      }
+    }
+
+    return 'Something went wrong while generating. Try again or add an explicit path like /users.';
   }
 }

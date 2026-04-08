@@ -1,10 +1,16 @@
 import OpenAI from 'openai';
 import { env } from '../../config/env.js';
+import { toPrismaJson } from '../../lib/prisma-json.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
-import { aiGeneratedEndpointSchema, type AiGeneratedEndpointInput } from './schema.js';
-
-const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+import {
+  aiNormalizedDraftSchema,
+  aiPreviewResponseSchema,
+  aiRawGeneratedEndpointSchema,
+  type AiNormalizedDraftInput,
+  type AiPreviewResponseInput,
+  type AiRawGeneratedEndpointInput,
+} from './schema.js';
 
 const SYSTEM_PROMPT = `You generate API endpoint mocks.
 Return ONLY valid JSON.
@@ -40,6 +46,48 @@ class AiShapeValidationError extends Error {
   }
 }
 
+const AI_TIMEOUT_CODE = 'AI_TIMEOUT';
+const AI_UNAVAILABLE_CODE = 'AI_UNAVAILABLE';
+const AI_INVALID_OUTPUT_CODE = 'AI_INVALID_OUTPUT';
+const AI_MISSING_CONFIG_CODE = 'AI_UNAVAILABLE';
+
+function createAiTimeoutError(): AppError {
+  return new AppError(504, 'AI request timed out', {
+    code: AI_TIMEOUT_CODE,
+    retryable: true,
+  });
+}
+
+function createAiUnavailableError(): AppError {
+  return new AppError(503, 'AI is unavailable right now', {
+    code: AI_UNAVAILABLE_CODE,
+    retryable: true,
+  });
+}
+
+function createAiMissingConfigError(): AppError {
+  return new AppError(503, 'AI is unavailable right now', {
+    code: AI_MISSING_CONFIG_CODE,
+    retryable: false,
+    details: 'OPENAI_API_KEY is not configured',
+  });
+}
+
+function getOpenAiClient(): OpenAI {
+  if (!env.OPENAI_API_KEY) {
+    throw createAiMissingConfigError();
+  }
+
+  return new OpenAI({ apiKey: env.OPENAI_API_KEY });
+}
+
+function createAiInvalidOutputError(): AppError {
+  return new AppError(422, 'AI returned invalid output', {
+    code: AI_INVALID_OUTPUT_CODE,
+    retryable: true,
+  });
+}
+
 async function assertProjectExists(projectId: string): Promise<void> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -60,8 +108,82 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-async function createAiCompletion(prompt: string): Promise<AiGeneratedEndpointInput> {
-  const completionPromise = openai.chat.completions.create({
+function normalizePath(path: string): string {
+  const trimmed = path.trim();
+  const withSlashes = trimmed.replace(/\\+/g, '/').replace(/\/+/g, '/');
+  const withoutLeading = withSlashes.replace(/^\/+/, '');
+
+  return `/${withoutLeading}`;
+}
+
+function isEmptyBody(body: unknown): boolean {
+  if (body == null) {
+    return true;
+  }
+
+  if (Array.isArray(body)) {
+    return body.length === 0;
+  }
+
+  if (typeof body === 'object') {
+    return Object.keys(body as Record<string, unknown>).length === 0;
+  }
+
+  return false;
+}
+
+function normalizeScenarioType(
+  type: string,
+  statusCode: number,
+  body: unknown
+): 'success' | 'error' | 'timeout' | 'empty' {
+  const normalizedType = type.trim().toLowerCase();
+
+  if (normalizedType === 'success') return 'success';
+  if (normalizedType === 'error') return 'error';
+  if (normalizedType === 'timeout') return 'timeout';
+  if (normalizedType === 'empty') return 'empty';
+  if (normalizedType === 'edge-case') {
+    if (statusCode === 204 || isEmptyBody(body)) {
+      return 'empty';
+    }
+
+    return statusCode >= 400 ? 'error' : 'success';
+  }
+
+  if (statusCode === 204 || isEmptyBody(body)) {
+    return 'empty';
+  }
+
+  return statusCode >= 400 ? 'error' : 'success';
+}
+
+export function normalizeAiDraft(rawDraft: AiRawGeneratedEndpointInput): AiPreviewResponseInput {
+  const draft = aiPreviewResponseSchema.parse({
+    method: rawDraft.method.trim().toUpperCase(),
+    path: normalizePath(rawDraft.path),
+    description: rawDraft.description.trim(),
+    statusCode: rawDraft.statusCode,
+    responseBody: rawDraft.responseBody,
+    scenarios: rawDraft.scenarios.map((scenario) => ({
+      name: scenario.name.trim(),
+      type: normalizeScenarioType(scenario.type, scenario.statusCode, scenario.body),
+      statusCode: scenario.statusCode,
+      body: scenario.body,
+      delayMs: scenario.delayMs,
+      weight: scenario.weight,
+    })),
+    locks: {
+      method: true,
+      path: true,
+    },
+  });
+
+  return draft;
+}
+
+async function createAiCompletion(prompt: string): Promise<AiRawGeneratedEndpointInput> {
+  const completionPromise = getOpenAiClient().chat.completions.create({
     model: env.OPENAI_MODEL,
     temperature: 0.2,
     response_format: { type: 'json_object' },
@@ -73,19 +195,46 @@ async function createAiCompletion(prompt: string): Promise<AiGeneratedEndpointIn
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
-      reject(new AppError(504, 'AI service timeout'));
+      reject(createAiTimeoutError());
     }, 30_000);
   });
 
-  const completion = await Promise.race([completionPromise, timeoutPromise]);
+  let completion;
+
+  try {
+    completion = await Promise.race([completionPromise, timeoutPromise]);
+  } catch (error) {
+    const errorCode =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    if (errorCode === 'ETIMEDOUT') {
+      throw createAiTimeoutError();
+    }
+
+    throw createAiUnavailableError();
+  }
+
   const rawContent = completion.choices[0]?.message?.content;
 
   if (!rawContent) {
     throw new AiShapeValidationError('AI returned empty content');
   }
 
-  const parsedJson = JSON.parse(extractJson(rawContent));
-  const parsed = aiGeneratedEndpointSchema.safeParse(parsedJson);
+  let parsedJson: unknown;
+
+  try {
+    parsedJson = JSON.parse(extractJson(rawContent));
+  } catch {
+    throw new AiShapeValidationError('AI returned invalid JSON');
+  }
+
+  const parsed = aiRawGeneratedEndpointSchema.safeParse(parsedJson);
 
   if (!parsed.success) {
     throw new AiShapeValidationError(parsed.error.message);
@@ -94,7 +243,18 @@ async function createAiCompletion(prompt: string): Promise<AiGeneratedEndpointIn
   return parsed.data;
 }
 
-async function persistGeneratedEndpoint(projectId: string, generated: AiGeneratedEndpointInput) {
+function toPersistedDraft(previewDraft: AiPreviewResponseInput): AiNormalizedDraftInput {
+  return aiNormalizedDraftSchema.parse({
+    method: previewDraft.method,
+    path: previewDraft.path,
+    description: previewDraft.description,
+    statusCode: previewDraft.statusCode,
+    responseBody: previewDraft.responseBody,
+    scenarios: previewDraft.scenarios,
+  });
+}
+
+async function persistGeneratedEndpoint(projectId: string, generated: AiNormalizedDraftInput) {
   const duplicate = await prisma.endpoint.findFirst({
     where: {
       projectId,
@@ -116,7 +276,7 @@ async function persistGeneratedEndpoint(projectId: string, generated: AiGenerate
         path: generated.path,
         description: generated.description,
         statusCode: generated.statusCode,
-        responseBody: generated.responseBody,
+        responseBody: toPrismaJson(generated.responseBody),
       },
     });
 
@@ -132,7 +292,7 @@ async function persistGeneratedEndpoint(projectId: string, generated: AiGenerate
         name: scenario.name,
         type: scenario.type,
         statusCode: scenario.statusCode,
-        body: scenario.body,
+        body: toPrismaJson(scenario.body),
         delayMs: scenario.delayMs,
         weight: scenario.weight,
       })),
@@ -148,15 +308,13 @@ async function persistGeneratedEndpoint(projectId: string, generated: AiGenerate
   });
 }
 
-export async function generateEndpointWithAi(projectId: string, prompt: string) {
-  await assertProjectExists(projectId);
-
+async function generateNormalizedDraft(prompt: string): Promise<AiPreviewResponseInput> {
   let lastValidationError: string | null = null;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const generated = await createAiCompletion(prompt);
-      return await persistGeneratedEndpoint(projectId, generated);
+      return normalizeAiDraft(generated);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -164,22 +322,31 @@ export async function generateEndpointWithAi(projectId: string, prompt: string) 
 
       if (error instanceof AiShapeValidationError) {
         lastValidationError = error.message;
+
         if (attempt === 1) {
           break;
         }
+
         continue;
       }
 
-      if (attempt === 1) {
-        throw new AppError(422, 'AI could not generate valid endpoint');
-      }
+      throw createAiUnavailableError();
     }
   }
 
-  throw new AppError(
-    422,
-    lastValidationError
-      ? `AI could not generate valid endpoint: ${lastValidationError}`
-      : 'AI could not generate valid endpoint'
-  );
+  void lastValidationError;
+  throw createAiInvalidOutputError();
+}
+
+export async function generateEndpointPreview(projectId: string, prompt: string) {
+  await assertProjectExists(projectId);
+
+  return generateNormalizedDraft(prompt);
+}
+
+export async function generateEndpointWithAi(projectId: string, prompt: string) {
+  await assertProjectExists(projectId);
+
+  const previewDraft = await generateNormalizedDraft(prompt);
+  return persistGeneratedEndpoint(projectId, toPersistedDraft(previewDraft));
 }

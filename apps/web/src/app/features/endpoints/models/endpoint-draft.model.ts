@@ -3,6 +3,14 @@ import type { HttpMethod } from '../../../shared/models/endpoint-preview.model';
 /** High-level scenario kind for mock simulation UX. */
 export type EndpointScenarioKind = 'success' | 'empty' | 'error' | 'timeout' | 'custom';
 
+export type EndpointDraftSource = 'manual' | 'ai-preview' | 'existing';
+
+export interface EndpointDraftLocks {
+  method: boolean;
+  path: boolean;
+  scenarioType: boolean;
+}
+
 export type LatencyMode = 'fixed' | 'range';
 
 export interface EndpointScenario {
@@ -36,6 +44,8 @@ export interface EndpointDraft {
   responseBody: unknown;
   scenarios: EndpointScenario[];
   behavior: EndpointBehaviorConfig;
+  locks: EndpointDraftLocks;
+  source: EndpointDraftSource;
 }
 
 export type CreateEndpointStep = 'prompt' | 'review' | 'editor';
@@ -55,6 +65,14 @@ export function newScenarioId(): string {
   const c = globalThis.crypto;
   if (c?.randomUUID) return c.randomUUID();
   return `sc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function unlockedEndpointDraftLocks(): EndpointDraftLocks {
+  return {
+    method: false,
+    path: false,
+    scenarioType: false,
+  };
 }
 
 /** Result of the mock AI generator before merging into `EndpointDraft`. */

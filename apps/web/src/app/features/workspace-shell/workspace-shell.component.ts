@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { CreateEndpointPageComponent } from '../endpoints/components/create-endpoint-page/create-endpoint-page.component';
 import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
 import { EndpointsPageComponent } from '../endpoints/endpoints-page.component';
-import { endpointPreviewToDraft } from '../endpoints/services/endpoint-draft.mapper';
 import { LogsComponent } from '../logs/logs.component';
 import { LogsDetailSidebarComponent } from '../logs/components/logs-detail-sidebar/logs-detail-sidebar.component';
 import { DashboardEmptyStateComponent } from '../main-dashboard/components/dashboard-empty-state/dashboard-empty-state.component';
@@ -14,6 +13,7 @@ import { createDefaultGlobalConfig, type GlobalConfig } from '../global-config/m
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
 import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
+import { ApiError } from '../../shared/http/api-error.mapper';
 import type {
   CreateProjectModalPayload,
   CreateProjectWithEndpointPayload,
@@ -22,7 +22,7 @@ import type {
   ProjectModalMode,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
-import type { SidebarProjectRow, WorkspaceNavId } from './models/workspace-shell.model';
+import type { CreateProjectAiFlowState, SidebarProjectRow, WorkspaceNavId } from './models/workspace-shell.model';
 import type { ApiLogEntry } from '../logs/models/api-log.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
@@ -95,6 +95,7 @@ export class WorkspaceShellComponent {
   protected readonly createProjectModalOpen = signal(false);
   protected readonly createProjectModalLoading = signal(false);
   protected readonly createProjectError = signal<string | null>(null);
+  protected readonly createProjectPartialState = signal<CreateProjectAiFlowState | null>(null);
 
   protected readonly editProjectModalOpen = signal(false);
   protected readonly editProjectModalLoading = signal(false);
@@ -149,6 +150,7 @@ export class WorkspaceShellComponent {
 
   protected openCreateProjectModal(): void {
     this.createProjectError.set(null);
+    this.createProjectPartialState.set(null);
     this.createProjectModalOpen.set(true);
   }
 
@@ -179,14 +181,33 @@ export class WorkspaceShellComponent {
     if (this.createProjectModalLoading()) return;
     this.createProjectModalOpen.set(false);
     this.createProjectError.set(null);
+    this.createProjectPartialState.set(null);
   }
 
   protected onCreateProjectModalProjectOnly(payload: CreateProjectModalPayload): void {
+    this.createProjectModalOpen.set(true);
     void this.createProject(payload);
   }
 
   protected onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void {
-    void this.createProject(payload, payload.endpointPrompt);
+    this.createProjectModalOpen.set(true);
+    void this.createProject({ name: payload.name, description: payload.description }, payload.endpointPrompt);
+  }
+
+  protected retryCreateProjectEndpointGeneration(): void {
+    const partial = this.createProjectPartialState();
+    if (!partial || this.createProjectModalLoading()) return;
+    void this.generateFirstEndpointForProject(partial.createdProjectId, partial.projectName, partial.endpointPrompt);
+  }
+
+  protected continueCreateProjectManually(): void {
+    const partial = this.createProjectPartialState();
+    if (!partial || this.createProjectModalLoading()) return;
+    this.selectedProjectId.set(partial.createdProjectId);
+    this.createProjectModalOpen.set(false);
+    this.createProjectError.set(null);
+    this.createProjectPartialState.set(null);
+    this.activeNav.set('dashboard');
   }
 
   protected onEditProjectModalSave(payload: EditProjectModalPayload): void {
@@ -384,24 +405,83 @@ export class WorkspaceShellComponent {
   }
 
   private async createProject(payload: CreateProjectModalPayload, endpointPrompt?: string): Promise<void> {
+    if (this.createProjectModalLoading()) return;
     this.createProjectModalLoading.set(true);
     this.createProjectError.set(null);
+    this.createProjectPartialState.set(null);
     try {
       const createdProject = await this.projectsRepository.createProject(payload);
-      if (endpointPrompt?.trim()) {
-        const preview = this.buildStubEndpointFromPrompt(endpointPrompt);
-        await this.endpointsRepository.saveEndpoint(createdProject.id, endpointPreviewToDraft(preview));
+      this.upsertProject(createdProject);
+      this.selectedProjectId.set(createdProject.id);
+      this.selectedLog.set(null);
+
+      const normalizedPrompt = endpointPrompt?.trim();
+      if (normalizedPrompt) {
+        await this.generateFirstEndpointForProject(createdProject.id, createdProject.name, normalizedPrompt);
+        return;
       }
 
       await this.reloadProjects(createdProject.id);
       this.createProjectModalOpen.set(false);
-      this.selectedLog.set(null);
       this.closeCreateEndpointWizard(true);
     } catch (error) {
       this.createProjectError.set(error instanceof Error ? error.message : 'Could not create project.');
     } finally {
       this.createProjectModalLoading.set(false);
     }
+  }
+
+  private async generateFirstEndpointForProject(
+    projectId: string,
+    projectName: string,
+    endpointPrompt: string,
+  ): Promise<void> {
+    this.createProjectModalLoading.set(true);
+    this.createProjectError.set(null);
+
+    try {
+      const endpoint = await this.endpointsRepository.generateAiEndpoint(projectId, endpointPrompt);
+      await this.reloadProjects(projectId);
+      this.selectedProjectId.set(projectId);
+      this.selectedEndpointId.set(endpoint.id);
+      this.activeNav.set('endpoints');
+      this.createProjectModalOpen.set(false);
+      this.createProjectPartialState.set(null);
+      this.selectedLog.set(null);
+      this.closeCreateEndpointWizard(true);
+    } catch (error) {
+      this.selectedProjectId.set(projectId);
+      await this.reloadProjects(projectId);
+      this.createProjectPartialState.set({
+        createdProjectId: projectId,
+        projectName,
+        endpointPrompt,
+        message: this.mapCreateProjectGenerationError(error),
+        retryable: true,
+      });
+      this.createProjectModalOpen.set(true);
+      this.activeNav.set('dashboard');
+      this.createProjectError.set(this.mapCreateProjectGenerationError(error));
+    } finally {
+      this.createProjectModalLoading.set(false);
+    }
+  }
+
+  private mapCreateProjectGenerationError(error: unknown): string {
+    if (error instanceof ApiError && (error.code === 'AI_UNAVAILABLE' || error.status === 503)) {
+      return 'Your project is ready, but AI is unavailable right now. Retry generation or continue manually.';
+    }
+
+    if (error instanceof ApiError && (error.code === 'AI_TIMEOUT' || error.status === 504)) {
+      return 'Your project is ready, but AI timed out before creating the first endpoint. Retry generation or continue manually.';
+    }
+
+    if (error instanceof ApiError && (error.code === 'AI_INVALID_OUTPUT' || error.status === 422)) {
+      return 'Your project is ready, but AI returned an invalid first endpoint draft. Retry generation or continue manually.';
+    }
+
+    const details = error instanceof Error ? error.message : 'Unknown AI error';
+    return `The project was created, but the first endpoint was not created: ${details}`;
   }
 
   private async updateProject(projectId: string, payload: EditProjectModalPayload): Promise<void> {
@@ -424,28 +504,15 @@ export class WorkspaceShellComponent {
     }
   }
 
-  private buildStubEndpointFromPrompt(prompt: string): EndpointPreview {
-    const trimmed = prompt.trim();
-    const match = trimmed.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(\S+)/i);
-    const method = (match?.[1]?.toUpperCase() as EndpointPreview['method']) || 'GET';
-    let path = (match?.[2] ?? '/generated').replace(/['"`]/g, '');
-    if (!path.startsWith('/')) path = `/${path}`;
+  private upsertProject(project: DashboardProject): void {
+    this.projects.update((projects) => {
+      const existingIndex = projects.findIndex((current) => current.id === project.id);
+      if (existingIndex === -1) {
+        return [...projects, project];
+      }
 
-    return {
-      id: `ep-${Date.now().toString(36)}`,
-      method,
-      path,
-      description: trimmed.length > 140 ? `${trimmed.slice(0, 137)}...` : trimmed || 'Generated endpoint',
-      latencyMs: 120,
-      statusCode: 200,
-      responseBody: { _mock: true, note: 'Placeholder response — replace in editor.' },
-      responseHeaders: { 'content-type': 'application/json' },
-      config: {
-        latencyMs: 120,
-        errorRatePct: 0,
-        scenarios: { success: true, empty: false, error: false, timeout: false },
-      },
-    };
+      return projects.map((current) => (current.id === project.id ? project : current));
+    });
   }
 
   private async deleteEndpointRemote(projectId: string, endpointId: string): Promise<void> {

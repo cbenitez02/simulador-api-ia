@@ -100,6 +100,8 @@ describe('EndpointsRepository', () => {
           weight: 100,
         },
       ],
+      locks: { method: false, path: false, scenarioType: false },
+      source: 'manual',
     });
 
     expect(api.post).toHaveBeenCalledWith('/projects/p1/endpoints', expect.any(Object));
@@ -239,6 +241,8 @@ describe('EndpointsRepository', () => {
             weight: 30,
           },
         ],
+        locks: { method: false, path: false, scenarioType: false },
+        source: 'existing',
       },
       'e1',
     );
@@ -303,6 +307,8 @@ describe('EndpointsRepository', () => {
           useScenarioWeights: true,
         },
         scenarios: [],
+        locks: { method: false, path: false, scenarioType: false },
+        source: 'manual',
       }),
     ).rejects.toThrow('Config persistence failed');
 
@@ -347,5 +353,50 @@ describe('EndpointsRepository', () => {
       delayMs: 0,
       weight: 100,
     });
+  });
+
+  it('requests ai preview drafts with the shared backend contract', async () => {
+    const api = {
+      post: vi.fn(async (path: string, body: unknown) => {
+        if (path !== '/projects/p1/endpoints/ai-preview') {
+          throw new Error(`Unexpected POST ${path}`);
+        }
+
+        expect(body).toEqual({ prompt: 'Create a user endpoint with success and empty scenarios' });
+
+        return {
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          statusCode: 201,
+          responseBody: { id: 'u1' },
+          locks: { method: true, path: true },
+          scenarios: [
+            {
+              name: 'Success',
+              type: 'success',
+              statusCode: 201,
+              body: { id: 'u1' },
+              delayMs: 120,
+              weight: 80,
+            },
+          ],
+        };
+      }),
+      get: vi.fn(),
+      put: vi.fn(),
+      patch: vi.fn(),
+      delete: vi.fn(),
+    };
+
+    const repository = createRepository(api);
+    const draft = await repository.previewAiDraft('p1', 'Create a user endpoint with success and empty scenarios');
+
+    expect(api.post).toHaveBeenCalledWith('/projects/p1/endpoints/ai-preview', {
+      prompt: 'Create a user endpoint with success and empty scenarios',
+    });
+    expect(draft.route).toBe('/users');
+    expect(draft.locks).toEqual({ method: true, path: true, scenarioType: true });
+    expect(draft.source).toBe('ai-preview');
   });
 });

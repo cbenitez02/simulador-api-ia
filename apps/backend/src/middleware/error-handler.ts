@@ -4,7 +4,12 @@ import { ZodError } from 'zod';
 export class AppError extends Error {
   constructor(
     public readonly statusCode: number,
-    message: string
+    message: string,
+    public readonly options?: {
+      code?: string;
+      retryable?: boolean;
+      details?: unknown;
+    }
   ) {
     super(message);
     this.name = 'AppError';
@@ -33,7 +38,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
 
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({ error: err.message });
+    res.status(err.statusCode).json({
+      error: err.message,
+      ...(err.options?.code ? { code: err.options.code } : {}),
+      ...(typeof err.options?.retryable === 'boolean' ? { retryable: err.options.retryable } : {}),
+      ...(err.options?.details !== undefined ? { details: err.options.details } : {}),
+    });
     return;
   }
 

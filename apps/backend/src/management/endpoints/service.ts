@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { toPrismaJson } from '../../lib/prisma-json.js';
 import { AppError } from '../../middleware/error-handler.js';
 import type { CreateEndpointInput, UpdateEndpointInput } from './schema.js';
 
@@ -67,7 +68,7 @@ export async function createEndpoint(projectId: string, input: CreateEndpointInp
         path: input.path,
         description: input.description ?? '',
         statusCode: input.statusCode,
-        responseBody: input.responseBody,
+        responseBody: toPrismaJson(input.responseBody),
       },
     });
 
@@ -104,9 +105,11 @@ export async function updateEndpoint(
   return prisma.endpoint.update({
     where: { id: endpointId },
     data: {
-      description: input.description,
-      statusCode: input.statusCode,
-      responseBody: input.responseBody,
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.statusCode !== undefined ? { statusCode: input.statusCode } : {}),
+      ...(input.responseBody !== undefined
+        ? { responseBody: toPrismaJson(input.responseBody) }
+        : {}),
     },
     include: {
       endpointConfig: true,

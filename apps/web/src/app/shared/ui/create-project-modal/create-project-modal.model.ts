@@ -11,4 +11,12 @@ export interface CreateProjectWithEndpointPayload extends CreateProjectModalPayl
   endpointPrompt: string;
 }
 
+export interface CreateProjectPartialSuccessState {
+  createdProjectId: string;
+  projectName: string;
+  endpointPrompt: string;
+  message: string;
+  retryable: boolean;
+}
+
 export type EditProjectModalPayload = ProjectModalInitialValues;

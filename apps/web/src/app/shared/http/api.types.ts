@@ -3,6 +3,13 @@ export interface ApiValidationIssueDto {
   message: string;
 }
 
+export interface ApiErrorDto {
+  error: string;
+  code?: string;
+  retryable?: boolean;
+  details?: unknown;
+}
+
 export interface ProjectDto {
   id: string;
   name: string;
@@ -55,6 +62,32 @@ export interface EndpointDto {
   endpointConfig?: EndpointConfigDto | null;
   scenarios?: ScenarioDto[];
   _count?: { scenarios: number };
+}
+
+export type AiScenarioTypeDto = 'success' | 'error' | 'timeout' | 'empty';
+
+export interface AiEndpointScenarioDto {
+  name: string;
+  type: AiScenarioTypeDto;
+  statusCode: number;
+  body: unknown;
+  delayMs: number;
+  weight: number;
+}
+
+export interface AiEndpointDraftLocksDto {
+  method: true;
+  path: true;
+}
+
+export interface AiEndpointPreviewDto {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  description: string;
+  statusCode: number;
+  responseBody: unknown;
+  scenarios: AiEndpointScenarioDto[];
+  locks: AiEndpointDraftLocksDto;
 }
 
 export interface CreateEndpointDto {

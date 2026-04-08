@@ -8,6 +8,9 @@
       </header>
 
       <app-inline-alert [message]="errorMessage()" />
+      @if (partialSuccessState(); as partialState) {
+        <app-inline-alert [message]="partialState.message" />
+      }
 
       <div class="cnp-modal__body">
         <section class="cnp-modal__section" aria-labelledby="cnp-section-project">
@@ -24,6 +27,7 @@
               autocomplete="off"
               [value]="projectName()"
               [disabled]="actionsDisabled()"
+              [readOnly]="isPartialSuccess()"
               (input)="onProjectNameInput($event)"
             />
           </div>
@@ -37,6 +41,7 @@
               rows="2"
               placeholder="Mock API for user management"
               [disabled]="actionsDisabled()"
+              [readOnly]="isPartialSuccess()"
               [value]="description()"
               (input)="onDescriptionInput($event)"
             ></textarea>
@@ -81,6 +86,7 @@
                     rows="4"
                     placeholder="GET /users with name, email and orders. Some users without orders. 20% error rate."
                     [disabled]="actionsDisabled()"
+                    [readOnly]="isPartialSuccess()"
                     [value]="prompt()"
                     (input)="onPromptInput($event)"
                   ></textarea>
@@ -101,7 +107,16 @@
         >
           Cancel
         </button>
-        @if (!isEditMode() && aiEnabled()) {
+        @if (isPartialSuccess()) {
+          <button
+            type="button"
+            class="cnp-modal__btn cnp-modal__btn--secondary"
+            [disabled]="loading()"
+            (click)="onContinueManuallyClick()"
+          >
+            Continue manually
+          </button>
+        } @else if (!isEditMode() && aiEnabled()) {
           <button
             type="button"
             class="cnp-modal__btn cnp-modal__btn--secondary"
