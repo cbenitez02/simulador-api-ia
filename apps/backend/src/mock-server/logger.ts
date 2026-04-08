@@ -1,16 +1,32 @@
 import { prisma } from '../lib/prisma.js';
 import { toNullablePrismaJson, toPrismaJson } from '../lib/prisma-json.js';
 
+export type MockLogOrigin = 'mock' | 'forced-error';
+export type MockLogScenarioType =
+  | 'success'
+  | 'error'
+  | 'timeout'
+  | 'empty'
+  | 'forced-error'
+  | 'default'
+  | 'rate-limit-block';
+export type MockLogScenarioSelectionSource =
+  | 'weighted-random'
+  | 'uniform-random'
+  | 'direct-endpoint'
+  | 'forced-error'
+  | 'rate-limit';
+
 export interface MockLogInput {
   projectId: string;
   method: string;
   path: string;
   fullUrl: string;
-  origin: 'mock' | 'forced-error';
+  origin: MockLogOrigin;
   statusCode: number;
   latencyMs: number;
-  scenarioType: string;
-  scenarioSelectionSource: string;
+  scenarioType: MockLogScenarioType;
+  scenarioSelectionSource: MockLogScenarioSelectionSource;
   scenarioName: string | null;
   requestHeaders: Record<string, string>;
   requestBody: unknown;

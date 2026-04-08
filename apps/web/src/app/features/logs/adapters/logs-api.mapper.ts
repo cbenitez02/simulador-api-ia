@@ -10,13 +10,14 @@ function normalizeScenario(value: string): LogScenarioKind {
     value === 'error' ||
     value === 'timeout' ||
     value === 'empty' ||
-    value === 'forced-error'
+    value === 'forced-error' ||
+    value === 'rate-limit-block'
     ? value
     : 'default';
 }
 
 function normalizeSelectionSource(value: string): ScenarioSelectionSource {
-  return value === 'weighted-random' || value === 'uniform-random' || value === 'forced-error'
+  return value === 'weighted-random' || value === 'uniform-random' || value === 'forced-error' || value === 'rate-limit'
     ? value
     : 'direct-endpoint';
 }

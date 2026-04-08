@@ -2,10 +2,22 @@ import type { HttpMethod } from '../../../shared/models/endpoint-preview.model';
 
 export type LogOrigin = 'mock' | 'forced-error';
 
-export type LogScenarioKind = 'success' | 'error' | 'timeout' | 'empty' | 'forced-error' | 'default';
+export type LogScenarioKind =
+  | 'success'
+  | 'error'
+  | 'timeout'
+  | 'empty'
+  | 'forced-error'
+  | 'default'
+  | 'rate-limit-block';
 
 /** How the mock resolver picked the scenario (drives execution summary copy). */
-export type ScenarioSelectionSource = 'weighted-random' | 'uniform-random' | 'direct-endpoint' | 'forced-error';
+export type ScenarioSelectionSource =
+  | 'weighted-random'
+  | 'uniform-random'
+  | 'direct-endpoint'
+  | 'forced-error'
+  | 'rate-limit';
 
 export interface ApiLogCursor {
   createdAt: string;

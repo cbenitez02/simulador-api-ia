@@ -1,10 +1,12 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { applyLatency, calculateLatency } from './latency.js';
-import { logRequest, type LoggingLevel } from './logger.js';
+import { logRequest, type LoggingLevel, type MockLogInput } from './logger.js';
+import { createRuntimeRateLimiter } from './rate-limit.js';
 import { selectScenario } from './scenario-selector.js';
 
 export const mockRouter = Router();
+const runtimeRateLimiter = createRuntimeRateLimiter();
 
 function toStringHeaders(headers: Record<string, unknown>): Record<string, string> {
   const normalizedEntries = Object.entries(headers).map(([key, value]) => {
@@ -20,6 +22,12 @@ function toStringHeaders(headers: Record<string, unknown>): Record<string, strin
   });
 
   return Object.fromEntries(normalizedEntries);
+}
+
+function setHeaders(res: Response, headers: Record<string, string>): void {
+  for (const [key, value] of Object.entries(headers)) {
+    res.setHeader(key, value);
+  }
 }
 
 function parseErrorCodes(input: unknown): number[] {
@@ -52,6 +60,12 @@ function toAbsoluteUrl(req: Request): string {
   const host = req.get('host');
   const base = host ? `${req.protocol}://${host}` : 'http://localhost';
   return new URL(req.originalUrl, base).toString();
+}
+
+function toMockScenarioType(value: string | null | undefined): MockLogInput['scenarioType'] {
+  return value === 'success' || value === 'error' || value === 'timeout' || value === 'empty'
+    ? value
+    : 'default';
 }
 
 async function resolveMockRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -120,6 +134,44 @@ async function resolveMockRequest(req: Request, res: Response, next: NextFunctio
       Math.random() < project.globalConfig.errorSimulationRate;
     const loggingLevel = resolveLoggingLevel(project.globalConfig?.loggingLevel);
     const fullUrl = toAbsoluteUrl(req);
+    const isRateLimitEnabled = project.globalConfig?.rateLimitingEnabled === true;
+    const rateLimitResult = isRateLimitEnabled
+      ? runtimeRateLimiter.evaluate(project.id, project.globalConfig?.rateLimitingRpm ?? 60)
+      : null;
+
+    if (rateLimitResult && !rateLimitResult.allowed) {
+      const responseBody = { error: 'Rate limit exceeded' };
+      const responseHeaders = {
+        ...rateLimitResult.headers,
+        'Retry-After': String(rateLimitResult.retryAfterSeconds),
+        'Content-Type': 'application/json',
+      };
+
+      setHeaders(res, responseHeaders);
+      res.status(429).json(responseBody);
+
+      logRequest(
+        {
+          projectId: project.id,
+          method,
+          path: requestedPath,
+          fullUrl,
+          origin: 'mock',
+          statusCode: 429,
+          latencyMs: 0,
+          scenarioType: 'rate-limit-block',
+          scenarioSelectionSource: 'rate-limit',
+          scenarioName: null,
+          requestHeaders: toStringHeaders(req.headers as Record<string, unknown>),
+          requestBody: req.body ?? null,
+          responseHeaders,
+          responseBody,
+        },
+        loggingLevel
+      ).catch(() => {});
+
+      return;
+    }
 
     if (shouldForceError) {
       const forcedLatencyMs = calculateLatency(0, endpointLatencyConfig, globalLatencyConfig);
@@ -127,6 +179,7 @@ async function resolveMockRequest(req: Request, res: Response, next: NextFunctio
       const forcedStatusCode = pickRandom(forcedCodes);
       const forcedBody = {};
       const responseHeaders = {
+        ...(rateLimitResult?.headers ?? {}),
         'X-Simulador-Scenario': 'forced-error',
         'X-Simulador-Latency': String(forcedLatencyMs),
         'Content-Type': 'application/json',
@@ -134,9 +187,7 @@ async function resolveMockRequest(req: Request, res: Response, next: NextFunctio
 
       await applyLatency(forcedLatencyMs);
 
-      res.setHeader('X-Simulador-Scenario', responseHeaders['X-Simulador-Scenario']);
-      res.setHeader('X-Simulador-Latency', responseHeaders['X-Simulador-Latency']);
-      res.setHeader('Content-Type', responseHeaders['Content-Type']);
+      setHeaders(res, responseHeaders);
       res.status(forcedStatusCode).json(forcedBody);
 
       logRequest(
@@ -219,17 +270,16 @@ async function resolveMockRequest(req: Request, res: Response, next: NextFunctio
     const responseBody = selectedScenario?.body ?? endpoint.responseBody;
     const scenarioName = selectedScenario?.name ?? null;
     const scenarioHeader = scenarioName ?? 'direct';
-    const scenarioType = selectedScenario?.type ?? 'default';
+    const scenarioType = toMockScenarioType(selectedScenario?.type);
 
     const responseHeaders = {
+      ...(rateLimitResult?.headers ?? {}),
       'X-Simulador-Scenario': scenarioHeader,
       'X-Simulador-Latency': String(latencyMs),
       'Content-Type': 'application/json',
     };
 
-    res.setHeader('X-Simulador-Scenario', responseHeaders['X-Simulador-Scenario']);
-    res.setHeader('X-Simulador-Latency', responseHeaders['X-Simulador-Latency']);
-    res.setHeader('Content-Type', responseHeaders['Content-Type']);
+    setHeaders(res, responseHeaders);
     res.status(statusCode).json(responseBody);
 
     logRequest(

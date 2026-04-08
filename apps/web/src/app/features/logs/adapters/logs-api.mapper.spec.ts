@@ -63,4 +63,29 @@ describe('logs-api.mapper', () => {
     expect(result.nextCursor).toEqual({ createdAt: '2026-04-04T10:11:12.000Z', id: 'l1' });
     expect(result.serverTime).toBe('2026-04-04T10:11:30.000Z');
   });
+
+  it('preserves rate-limit block metadata for runtime logs', () => {
+    const result = mapLogFromApi({
+      id: 'l-rl',
+      projectId: 'p1',
+      method: 'GET',
+      path: '/users',
+      fullUrl: 'https://mock.example.com/users',
+      origin: 'mock',
+      statusCode: 429,
+      latencyMs: 0,
+      scenarioType: 'rate-limit-block',
+      scenarioSelectionSource: 'rate-limit',
+      scenarioName: null,
+      hasScenario: false,
+      requestHeaders: {},
+      requestBody: null,
+      responseHeaders: { 'retry-after': '55' },
+      responseBody: { error: 'Rate limit exceeded' },
+      createdAt: '2026-04-08T12:00:00.000Z',
+    });
+
+    expect(result.scenario).toBe('rate-limit-block');
+    expect(result.scenarioSelectionSource).toBe('rate-limit');
+  });
 });
