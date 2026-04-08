@@ -72,7 +72,7 @@ describe('endpoint-api.mapper', () => {
       description: 'Create user',
       statusCode: 201,
       responseBody: { id: 'u1' },
-      locks: { method: true, path: true },
+      locks: { method: true, path: true, scenarioType: true },
       scenarios: [
         {
           name: 'Success',

@@ -23,7 +23,7 @@ describe('normalizeAiDraft', () => {
 
     expect(draft.method).toBe('POST');
     expect(draft.path).toBe('/users/:id');
-    expect(draft.locks).toEqual({ method: true, path: true });
+    expect(draft.locks).toEqual({ method: true, path: true, scenarioType: true });
     expect(draft.scenarios).toEqual([
       {
         name: 'primary success',

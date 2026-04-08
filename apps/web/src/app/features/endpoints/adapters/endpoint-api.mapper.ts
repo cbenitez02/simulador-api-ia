@@ -111,7 +111,7 @@ export function mapAiDraftFromApi(draft: AiEndpointPreviewDto): EndpointDraft {
     locks: {
       method: draft.locks.method,
       path: draft.locks.path,
-      scenarioType: true,
+      scenarioType: draft.locks.scenarioType,
     },
     source: 'ai-preview',
   };

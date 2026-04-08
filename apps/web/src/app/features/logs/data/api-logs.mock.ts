@@ -1,11 +1,18 @@
 import type { ApiLogEntry } from '../models/api-log.model';
 
+type LegacyApiLogEntry = Omit<
+  ApiLogEntry,
+  'origin' | 'scenarioName' | 'hasScenario' | 'createdAt' | 'scenarioSelectionSource'
+> & {
+  scenarioSelectionSource: ApiLogEntry['scenarioSelectionSource'] | 'default' | 'weighted' | 'alternate';
+};
+
 const ECOMMERCE_BASE = 'https://mock.api.simulator/ecommerce';
 const AUTH_BASE = 'https://mock.api.simulator/auth';
 const PAYMENTS_BASE = 'https://mock.api.simulator/payments';
 const DEMO_USERS_BASE = 'https://mock.api.simulator/demo-users';
 
-const MOCK_API_LOGS_ECOMMERCE: ApiLogEntry[] = [
+const MOCK_API_LOGS_ECOMMERCE: LegacyApiLogEntry[] = [
   {
     id: 'eco-1',
     method: 'GET',
@@ -90,7 +97,7 @@ const MOCK_API_LOGS_ECOMMERCE: ApiLogEntry[] = [
   },
 ];
 
-const MOCK_API_LOGS_AUTH: ApiLogEntry[] = [
+const MOCK_API_LOGS_AUTH: LegacyApiLogEntry[] = [
   {
     id: 'auth-1',
     method: 'POST',
@@ -157,7 +164,7 @@ const MOCK_API_LOGS_AUTH: ApiLogEntry[] = [
   },
 ];
 
-const MOCK_API_LOGS_PAYMENTS: ApiLogEntry[] = [
+const MOCK_API_LOGS_PAYMENTS: LegacyApiLogEntry[] = [
   {
     id: 'pay-1',
     method: 'GET',
@@ -209,7 +216,7 @@ const MOCK_API_LOGS_PAYMENTS: ApiLogEntry[] = [
   },
 ];
 
-const MOCK_API_LOGS_DEMO_USERS: ApiLogEntry[] = [
+const MOCK_API_LOGS_DEMO_USERS: LegacyApiLogEntry[] = [
   {
     id: 'demo-1',
     method: 'GET',
@@ -232,7 +239,7 @@ const MOCK_API_LOGS_DEMO_USERS: ApiLogEntry[] = [
   },
 ];
 
-const BY_PROJECT: Record<string, ApiLogEntry[]> = {
+const BY_PROJECT: Record<string, LegacyApiLogEntry[]> = {
   ecommerce: MOCK_API_LOGS_ECOMMERCE,
   auth: MOCK_API_LOGS_AUTH,
   payments: MOCK_API_LOGS_PAYMENTS,
@@ -241,5 +248,5 @@ const BY_PROJECT: Record<string, ApiLogEntry[]> = {
 
 /** Mock request log lines aligned with `MOCK_DASHBOARD_PROJECTS` ids and base URLs. */
 export function mockApiLogsForProject(projectId: string): ApiLogEntry[] {
-  return BY_PROJECT[projectId] ?? MOCK_API_LOGS_ECOMMERCE;
+  return (BY_PROJECT[projectId] ?? MOCK_API_LOGS_ECOMMERCE) as ApiLogEntry[];
 }

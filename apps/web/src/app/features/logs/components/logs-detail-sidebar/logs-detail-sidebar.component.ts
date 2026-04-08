@@ -109,6 +109,8 @@ export class LogsDetailSidebarComponent {
       case 'success':
         return 'detail__scenario-hero--success';
       case 'error':
+      case 'forced-error':
+      case 'timeout':
         return 'detail__scenario-hero--error';
       default:
         return 'detail__scenario-hero--empty';
@@ -116,14 +118,18 @@ export class LogsDetailSidebarComponent {
   }
 
   protected executionSummary(log: ApiLogEntry): string {
-    const label = `'${log.scenario}'`;
+    const label = log.scenarioName ? `'${log.scenarioName}'` : `'${log.scenario}'`;
     switch (log.scenarioSelectionSource) {
-      case 'weighted':
+      case 'weighted-random':
         return `Scenario ${label} selected from weighted probability rules.`;
-      case 'alternate':
-        return `Scenario ${label} selected as alternate response.`;
+      case 'uniform-random':
+        return `Scenario ${label} selected from uniform random rules.`;
+      case 'forced-error':
+        return 'Response forced by global error simulation.';
       default:
-        return `Scenario ${label} selected with default configuration.`;
+        return log.hasScenario
+          ? `Scenario ${label} selected directly from endpoint configuration.`
+          : 'No scenario matched. Response came from the endpoint default payload.';
     }
   }
 }

@@ -1,10 +1,11 @@
 import { Injector, runInInjectionContext } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { setupAngularVitest } from '../../testing/angular-vitest';
+import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../testing/angular-vitest';
 import { ApiClient } from '../../shared/http/api-client';
 import { ApiError } from '../../shared/http/api-error.mapper';
 import type { ApiLogEntry } from '../logs/models/api-log.model';
 import { LogsRepository } from '../logs/data-access/logs.repository';
+import { LogsComponent } from '../logs/logs.component';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
@@ -55,10 +56,10 @@ async function renderSnapshot(component: WorkspaceShellHarness, logsRepository: 
     content.push('Logs');
     const logs = await logsRepository.listLogs(component.selectedProjectId());
 
-    if (logs.length === 0) {
+    if (logs.items.length === 0) {
       content.push('No logs yet for this project.');
     } else {
-      for (const entry of logs) content.push(entry.path, String(entry.statusCode));
+      for (const entry of logs.items) content.push(entry.path, String(entry.statusCode));
     }
   }
 
@@ -211,24 +212,31 @@ describe('WorkspaceShellComponent integration', () => {
       if (path === '/projects/p1/endpoints') return [];
 
       if (path === '/projects/p1/logs') {
-        return [
-          {
-            id: 'log-1',
-            projectId: 'p1',
-            method: 'POST',
-            path: '/users',
-            fullUrl: 'https://mock.example.com/users',
-            statusCode: 201,
-            latencyMs: 84,
-            scenarioType: 'success',
-            scenarioSelectionSource: 'weighted',
-            requestHeaders: { 'content-type': 'application/json' },
-            requestBody: { name: 'Ada' },
-            responseHeaders: { 'x-mock': 'true' },
-            responseBody: { ok: true },
-            createdAt: '2026-04-04T10:11:12.000Z',
-          },
-        ];
+        return {
+          items: [
+            {
+              id: 'log-1',
+              projectId: 'p1',
+              method: 'POST',
+              path: '/users',
+              fullUrl: 'https://mock.example.com/users',
+              origin: 'mock',
+              statusCode: 201,
+              latencyMs: 84,
+              scenarioType: 'success',
+              scenarioSelectionSource: 'weighted-random',
+              scenarioName: 'create-user',
+              hasScenario: true,
+              requestHeaders: { 'content-type': 'application/json' },
+              requestBody: { name: 'Ada' },
+              responseHeaders: { 'x-mock': 'true' },
+              responseBody: { ok: true },
+              createdAt: '2026-04-04T10:11:12.000Z',
+            },
+          ],
+          nextCursor: { createdAt: '2026-04-04T10:11:12.000Z', id: 'log-1' },
+          serverTime: '2026-04-04T10:11:30.000Z',
+        };
       }
 
       throw new Error(`Unexpected GET ${path}`);
@@ -239,7 +247,7 @@ describe('WorkspaceShellComponent integration', () => {
 
     component.selectNav('logs');
     const logs = await logsRepository.listLogs(component.selectedProjectId());
-    component.selectedLog.set(logs[0] ?? null);
+    component.selectedLog.set(logs.items[0] ?? null);
 
     const content = await renderSnapshot(component, logsRepository);
     expect(content).toContain('Logs');
@@ -247,7 +255,7 @@ describe('WorkspaceShellComponent integration', () => {
     expect(content).toContain('201');
     expect(content).toContain('Inspector');
     expect(content).toContain('https://mock.example.com/users');
-    expect(content).toContain("Scenario 'success' selected from weighted probability rules.");
+    expect(content).toContain("Scenario 'success' selected from weighted-random probability rules.");
     expect(content).toContain('x-mock');
   });
 
@@ -267,7 +275,7 @@ describe('WorkspaceShellComponent integration', () => {
       }
 
       if (path === '/projects/p1/endpoints') return [];
-      if (path === '/projects/p1/logs') return [];
+      if (path === '/projects/p1/logs') return { items: [], nextCursor: null, serverTime: '2026-04-04T10:11:30.000Z' };
 
       throw new Error(`Unexpected GET ${path}`);
     });
@@ -485,5 +493,294 @@ describe('WorkspaceShellComponent integration', () => {
       createdProjectId: 'p1',
       message: 'Your project is ready, but AI is unavailable right now. Retry generation or continue manually.',
     });
+  });
+});
+
+type LogsComponentHarness = {
+  entries: { (): ApiLogEntry[]; set(value: ApiLogEntry[]): void };
+  searchQuery: { (): string; set(value: string): void };
+  methodFilter: {
+    (): 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    set(value: 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'): void;
+  };
+  statusFilter: { (): 'all' | '2xx' | '4xx' | '5xx'; set(value: 'all' | '2xx' | '4xx' | '5xx'): void };
+  endpointFilter: { (): string; set(value: string): void };
+  selectedLog: { (): ApiLogEntry | null; set(value: ApiLogEntry | null): void };
+  liveStatus: () => 'off' | 'live' | 'paused';
+  lastSuccessfulUpdate: () => string | null;
+  requestErrorMessage: () => string | null;
+  startLive(): void;
+  pauseLive(): void;
+  resumeLive(): void;
+  refreshLogs(): void;
+  requestClearLogs(): void;
+  confirmClearLogs(): void;
+  cancelClearLogs(): void;
+  clearConfirmOpen: () => boolean;
+  projectId: () => string;
+  loadProject(projectId: string): Promise<void>;
+};
+
+describe('LogsComponent integration', () => {
+  const listLogs = vi.fn();
+  const clearLogs = vi.fn();
+
+  async function createLogsComponent() {
+    const injector = Injector.create({
+      providers: [
+        ...provideAngularReactiveSchedulers(),
+        {
+          provide: LogsRepository,
+          useValue: {
+            listLogs,
+            clearLogs,
+          },
+        },
+      ],
+    });
+
+    const component = runInInjectionContext(injector, () => new LogsComponent()) as unknown as LogsComponentHarness;
+
+    component.projectId = () => 'p1';
+    await component.loadProject('p1');
+    await flushAsyncWork();
+
+    return {
+      component,
+    };
+  }
+
+  beforeEach(() => {
+    listLogs.mockReset();
+    clearLogs.mockReset();
+    vi.useRealTimers();
+  });
+
+  it('starts live polling, pauses/resumes with cursor-aware dedupe, and advances last-updated on empty polls', async () => {
+    vi.useFakeTimers();
+    listLogs
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'log-2',
+            method: 'GET',
+            path: '/users',
+            fullUrl: 'https://mock.example.com/users',
+            origin: 'mock',
+            statusCode: 200,
+            latencyMs: 12,
+            scenario: 'success',
+            scenarioSelectionSource: 'direct-endpoint',
+            scenarioName: null,
+            hasScenario: false,
+            createdAt: '2026-04-08T10:00:02.000Z',
+            timeLabel: '10:00:02',
+            requestHeaders: {},
+            requestBody: null,
+            responseHeaders: {},
+            responseBody: { ok: true },
+          },
+          {
+            id: 'log-1',
+            method: 'GET',
+            path: '/users',
+            fullUrl: 'https://mock.example.com/users',
+            origin: 'mock',
+            statusCode: 200,
+            latencyMs: 10,
+            scenario: 'success',
+            scenarioSelectionSource: 'direct-endpoint',
+            scenarioName: null,
+            hasScenario: false,
+            createdAt: '2026-04-08T10:00:01.000Z',
+            timeLabel: '10:00:01',
+            requestHeaders: {},
+            requestBody: null,
+            responseHeaders: {},
+            responseBody: { ok: true },
+          },
+        ],
+        nextCursor: { createdAt: '2026-04-08T10:00:02.000Z', id: 'log-2' },
+        serverTime: '2026-04-08T10:00:03.000Z',
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'log-3',
+            method: 'POST',
+            path: '/users',
+            fullUrl: 'https://mock.example.com/users',
+            origin: 'mock',
+            statusCode: 201,
+            latencyMs: 16,
+            scenario: 'success',
+            scenarioSelectionSource: 'weighted-random',
+            scenarioName: 'create-user',
+            hasScenario: true,
+            createdAt: '2026-04-08T10:00:04.000Z',
+            timeLabel: '10:00:04',
+            requestHeaders: {},
+            requestBody: { name: 'Ada' },
+            responseHeaders: {},
+            responseBody: { ok: true },
+          },
+          {
+            id: 'log-2',
+            method: 'GET',
+            path: '/users',
+            fullUrl: 'https://mock.example.com/users',
+            origin: 'mock',
+            statusCode: 200,
+            latencyMs: 12,
+            scenario: 'success',
+            scenarioSelectionSource: 'direct-endpoint',
+            scenarioName: null,
+            hasScenario: false,
+            createdAt: '2026-04-08T10:00:02.000Z',
+            timeLabel: '10:00:02',
+            requestHeaders: {},
+            requestBody: null,
+            responseHeaders: {},
+            responseBody: { ok: true },
+          },
+        ],
+        nextCursor: { createdAt: '2026-04-08T10:00:04.000Z', id: 'log-3' },
+        serverTime: '2026-04-08T10:00:05.000Z',
+      })
+      .mockResolvedValueOnce({
+        items: [],
+        nextCursor: null,
+        serverTime: '2026-04-08T10:00:08.000Z',
+      });
+
+    const { component } = await createLogsComponent();
+
+    expect(component.liveStatus()).toBe('off');
+
+    component.startLive();
+    await vi.advanceTimersByTimeAsync(5000);
+    await flushAsyncWork();
+
+    expect(listLogs).toHaveBeenNthCalledWith(2, 'p1', {
+      cursorCreatedAt: '2026-04-08T10:00:02.000Z',
+      cursorId: 'log-2',
+    });
+    expect(component.entries().map((entry) => entry.id)).toEqual(['log-3', 'log-2', 'log-1']);
+
+    component.pauseLive();
+    await vi.advanceTimersByTimeAsync(5000);
+    await flushAsyncWork();
+    expect(listLogs).toHaveBeenCalledTimes(2);
+
+    component.resumeLive();
+    await vi.advanceTimersByTimeAsync(5000);
+    await flushAsyncWork();
+
+    expect(listLogs).toHaveBeenNthCalledWith(3, 'p1', {
+      cursorCreatedAt: '2026-04-08T10:00:04.000Z',
+      cursorId: 'log-3',
+    });
+    expect(component.lastSuccessfulUpdate()).toBe('2026-04-08T10:00:08.000Z');
+  });
+
+  it('refreshes without losing filters or selection and only clears after explicit confirm + success', async () => {
+    listLogs
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'log-2',
+            method: 'POST',
+            path: '/users',
+            fullUrl: 'https://mock.example.com/users',
+            origin: 'mock',
+            statusCode: 201,
+            latencyMs: 20,
+            scenario: 'success',
+            scenarioSelectionSource: 'weighted-random',
+            scenarioName: 'create-user',
+            hasScenario: true,
+            createdAt: '2026-04-08T10:00:02.000Z',
+            timeLabel: '10:00:02',
+            requestHeaders: {},
+            requestBody: { name: 'Ada' },
+            responseHeaders: {},
+            responseBody: { ok: true },
+          },
+          {
+            id: 'log-1',
+            method: 'GET',
+            path: '/health',
+            fullUrl: 'https://mock.example.com/health',
+            origin: 'mock',
+            statusCode: 200,
+            latencyMs: 9,
+            scenario: 'default',
+            scenarioSelectionSource: 'direct-endpoint',
+            scenarioName: null,
+            hasScenario: false,
+            createdAt: '2026-04-08T10:00:01.000Z',
+            timeLabel: '10:00:01',
+            requestHeaders: {},
+            requestBody: null,
+            responseHeaders: {},
+            responseBody: { ok: true },
+          },
+        ],
+        nextCursor: { createdAt: '2026-04-08T10:00:02.000Z', id: 'log-2' },
+        serverTime: '2026-04-08T10:00:03.000Z',
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'log-2',
+            method: 'POST',
+            path: '/users',
+            fullUrl: 'https://mock.example.com/users',
+            origin: 'mock',
+            statusCode: 201,
+            latencyMs: 21,
+            scenario: 'success',
+            scenarioSelectionSource: 'weighted-random',
+            scenarioName: 'create-user',
+            hasScenario: true,
+            createdAt: '2026-04-08T10:00:02.000Z',
+            timeLabel: '10:00:02',
+            requestHeaders: {},
+            requestBody: { name: 'Ada' },
+            responseHeaders: {},
+            responseBody: { ok: true },
+          },
+        ],
+        nextCursor: { createdAt: '2026-04-08T10:00:02.000Z', id: 'log-2' },
+        serverTime: '2026-04-08T10:00:04.000Z',
+      });
+    clearLogs.mockResolvedValueOnce(undefined);
+
+    const { component } = await createLogsComponent();
+    component.searchQuery.set('users');
+    component.methodFilter.set('POST');
+    component.statusFilter.set('2xx');
+    component.endpointFilter.set('/users');
+    component.selectedLog.set(component.entries()[0] ?? null);
+
+    component.refreshLogs();
+    await flushAsyncWork();
+
+    expect(component.searchQuery()).toBe('users');
+    expect(component.methodFilter()).toBe('POST');
+    expect(component.statusFilter()).toBe('2xx');
+    expect(component.endpointFilter()).toBe('/users');
+    expect(component.selectedLog()?.id).toBe('log-2');
+
+    component.requestClearLogs();
+    expect(component.clearConfirmOpen()).toBe(true);
+    expect(clearLogs).not.toHaveBeenCalled();
+
+    component.confirmClearLogs();
+    await flushAsyncWork();
+
+    expect(clearLogs).toHaveBeenCalledWith('p1');
+    expect(component.entries()).toEqual([]);
+    expect(component.selectedLog()).toBeNull();
   });
 });

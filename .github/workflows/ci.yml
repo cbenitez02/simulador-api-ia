@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   backend-lint-test:
-    name: Backend Lint & Test
+    name: Backend Lint & Coverage
     runs-on: ubuntu-latest
 
     steps:
@@ -42,11 +42,22 @@ jobs:
       - name: Lint
         run: pnpm --dir apps/backend lint
 
-      - name: Unit + integration (mocked DB) tests
+      - name: Unit + integration coverage
         env:
           OPENAI_API_KEY: test-key
           OPENAI_MODEL: gpt-4.1-mini
-        run: pnpm --dir apps/backend test
+        run: pnpm --dir apps/backend test:coverage
+
+      - name: Backend coverage summary
+        run: cat apps/backend/coverage/coverage-summary.json
+
+      - name: Upload backend coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            apps/backend/coverage/lcov.info
+            apps/backend/coverage/coverage-summary.json
 
   frontend-validation:
     name: Frontend Validation
@@ -79,8 +90,19 @@ jobs:
       - name: Frontend spec typecheck
         run: pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 
-      - name: Frontend headless tests
-        run: pnpm --dir apps/web test --watch=false
+      - name: Frontend headless coverage
+        run: pnpm --dir apps/web test:coverage
+
+      - name: Frontend coverage summary
+        run: cat apps/web/coverage/coverage-summary.json
+
+      - name: Upload frontend coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: |
+            apps/web/coverage/lcov.info
+            apps/web/coverage/coverage-summary.json
 
   backend-db-integration:
     name: Backend DB Integration

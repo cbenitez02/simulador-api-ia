@@ -9,41 +9,87 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { LucideRadio, LucideSearch, LucideTrash2 } from '@lucide/angular';
+import { LucidePause, LucidePlay, LucideRadio, LucideRefreshCw, LucideSearch, LucideTrash2 } from '@lucide/angular';
 import { LogsListComponent } from './components/logs-list/logs-list.component';
-import type { ApiLogEntry } from './models/api-log.model';
+import type { ApiLogCursor, ApiLogEntry } from './models/api-log.model';
 import type { HttpMethod } from '../../shared/models/endpoint-preview.model';
 import { LogsRepository } from './data-access/logs.repository';
 
 type MethodFilter = 'all' | HttpMethod;
 type StatusBand = 'all' | '2xx' | '4xx' | '5xx';
+type LiveStatus = 'off' | 'live' | 'paused';
+
+const LIVE_POLL_INTERVAL_MS = 5000;
+
+function compareEntries(left: ApiLogEntry, right: ApiLogEntry): number {
+  const timeDelta = new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+
+  if (timeDelta !== 0) {
+    return timeDelta;
+  }
+
+  return right.id.localeCompare(left.id);
+}
+
+function mergeEntries(current: ApiLogEntry[], incoming: ApiLogEntry[]): ApiLogEntry[] {
+  const byId = new Map(current.map((entry) => [entry.id, entry]));
+
+  for (const entry of incoming) {
+    byId.set(entry.id, entry);
+  }
+
+  return [...byId.values()].sort(compareEntries);
+}
+
+function reconcileSelection(selected: ApiLogEntry | null, entries: ApiLogEntry[]): ApiLogEntry | null {
+  if (!selected) {
+    return null;
+  }
+
+  return entries.find((entry) => entry.id === selected.id) ?? null;
+}
 
 @Component({
   selector: 'app-logs',
   templateUrl: './logs.component.html',
   styleUrls: ['./logs.component.css'],
   standalone: true,
-  imports: [LogsListComponent, LucideRadio, LucideSearch, LucideTrash2],
+  imports: [LogsListComponent, LucidePause, LucidePlay, LucideRadio, LucideRefreshCw, LucideSearch, LucideTrash2],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LogsComponent {
   private readonly logsRepository = inject(LogsRepository);
+  private liveIntervalId: ReturnType<typeof setInterval> | null = null;
+  private activeProjectId: string | null = null;
+  private pollInFlight = false;
+
   /** Workspace project; drives which mock log lines are shown. */
-  readonly projectId = input.required<string>();
+  readonly projectId = input('');
 
   /** Sincronizado con el panel derecho del dashboard (mismo patrón que endpoints). */
   readonly selectedLog = model<ApiLogEntry | null>(null);
 
   protected readonly entries = signal<ApiLogEntry[]>([]);
   protected readonly loading = signal(false);
-  protected readonly errorMessage = signal<string | null>(null);
+  protected readonly requestErrorMessage = signal<string | null>(null);
   protected readonly searchQuery = signal('');
   protected readonly methodFilter = signal<MethodFilter>('all');
   protected readonly statusFilter = signal<StatusBand>('all');
   protected readonly endpointFilter = signal<string>('all');
-  protected readonly live = signal(true);
+  protected readonly liveStatus = signal<LiveStatus>('off');
+  protected readonly lastSuccessfulUpdate = signal<string | null>(null);
+  protected readonly clearConfirmOpen = signal(false);
+  private readonly latestCursor = signal<ApiLogCursor | null>(null);
 
   protected readonly selectedId = computed(() => this.selectedLog()?.id ?? null);
+  protected readonly liveActive = computed(() => this.liveStatus() === 'live');
+  protected readonly hasActiveFilters = computed(
+    () =>
+      this.searchQuery().trim().length > 0 ||
+      this.methodFilter() !== 'all' ||
+      this.statusFilter() !== 'all' ||
+      this.endpointFilter() !== 'all',
+  );
 
   protected readonly endpointOptions = computed(() => {
     const paths = new Set(this.entries().map((e) => e.path));
@@ -77,7 +123,13 @@ export class LogsComponent {
   constructor() {
     effect(() => {
       const pid = this.projectId();
-      void untracked(async () => this.loadLogs(pid));
+
+      if (!pid || pid === this.activeProjectId) {
+        return;
+      }
+
+      this.activeProjectId = pid;
+      void untracked(async () => this.loadProject(pid));
     });
 
     effect(() => {
@@ -90,6 +142,14 @@ export class LogsComponent {
       });
     });
   }
+
+  protected readonly emptyStateMessage = computed(() => {
+    if (this.hasActiveFilters()) {
+      return 'No log entries match your current filters.';
+    }
+
+    return 'No logs yet for this project.';
+  });
 
   protected onSearchInput(ev: Event): void {
     const v = (ev.target as HTMLInputElement).value;
@@ -116,46 +176,153 @@ export class LogsComponent {
     this.selectedLog.set(entry);
   }
 
-  protected clearLogs(): void {
-    void this.clearRemoteLogs();
+  protected startLive(): void {
+    if (this.liveStatus() === 'live') {
+      return;
+    }
+
+    this.liveStatus.set('live');
+    this.startPolling();
   }
 
-  protected toggleLive(): void {
-    this.live.update((v) => !v);
+  protected pauseLive(): void {
+    this.liveStatus.set('paused');
+    this.stopPolling();
+  }
+
+  protected resumeLive(): void {
+    this.liveStatus.set('live');
+    this.startPolling();
+  }
+
+  protected refreshLogs(): void {
+    void this.refreshProjectLogs();
   }
 
   protected retry(): void {
-    void this.loadLogs(this.projectId());
+    void this.refreshProjectLogs();
   }
 
-  private async loadLogs(projectId: string): Promise<void> {
+  protected requestClearLogs(): void {
+    this.clearConfirmOpen.set(true);
+  }
+
+  protected cancelClearLogs(): void {
+    this.clearConfirmOpen.set(false);
+  }
+
+  protected confirmClearLogs(): void {
+    void this.clearRemoteLogs();
+  }
+
+  private async loadProject(projectId: string): Promise<void> {
+    this.stopPolling();
+    this.liveStatus.set('off');
+    this.clearConfirmOpen.set(false);
+    this.searchQuery.set('');
+    this.methodFilter.set('all');
+    this.statusFilter.set('all');
+    this.endpointFilter.set('all');
+    this.selectedLog.set(null);
+    this.entries.set([]);
+    this.latestCursor.set(null);
+    this.lastSuccessfulUpdate.set(null);
+    await this.loadLogs(projectId, false);
+  }
+
+  private async loadLogs(projectId: string, preserveContext: boolean): Promise<void> {
     this.loading.set(true);
-    this.errorMessage.set(null);
+    this.requestErrorMessage.set(null);
+
+    const previousSelection = preserveContext ? this.selectedLog() : null;
+
     try {
-      const entries = await this.logsRepository.listLogs(projectId);
-      this.entries.set(entries);
-      this.searchQuery.set('');
-      this.methodFilter.set('all');
-      this.statusFilter.set('all');
-      this.endpointFilter.set('all');
+      const response = await this.logsRepository.listLogs(projectId);
+      this.entries.set(response.items);
+      this.latestCursor.set(response.nextCursor);
+      this.lastSuccessfulUpdate.set(response.serverTime);
+
+      if (preserveContext) {
+        this.selectedLog.set(reconcileSelection(previousSelection, response.items));
+      }
     } catch (error) {
-      this.entries.set([]);
-      this.selectedLog.set(null);
-      this.errorMessage.set(error instanceof Error ? error.message : 'Could not load logs.');
+      if (!preserveContext) {
+        this.entries.set([]);
+        this.selectedLog.set(null);
+      }
+
+      this.requestErrorMessage.set(error instanceof Error ? error.message : 'Could not load logs.');
     } finally {
       this.loading.set(false);
     }
   }
 
+  private async refreshProjectLogs(): Promise<void> {
+    const projectId = this.projectId();
+
+    if (!projectId) {
+      return;
+    }
+
+    await this.loadLogs(projectId, true);
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
+
+    this.liveIntervalId = setInterval(() => {
+      void this.pollForNewLogs();
+    }, LIVE_POLL_INTERVAL_MS);
+  }
+
+  private stopPolling(): void {
+    if (this.liveIntervalId !== null) {
+      clearInterval(this.liveIntervalId);
+      this.liveIntervalId = null;
+    }
+  }
+
+  private async pollForNewLogs(): Promise<void> {
+    const projectId = this.projectId();
+    const cursor = this.latestCursor();
+
+    if (!projectId || this.liveStatus() !== 'live' || this.pollInFlight || !cursor) {
+      return;
+    }
+
+    this.pollInFlight = true;
+
+    try {
+      const response = await this.logsRepository.listLogs(projectId, {
+        cursorCreatedAt: cursor.createdAt,
+        cursorId: cursor.id,
+      });
+
+      const mergedEntries = mergeEntries(this.entries(), response.items);
+      this.entries.set(mergedEntries);
+      this.latestCursor.set(response.nextCursor ?? this.latestCursor());
+      this.lastSuccessfulUpdate.set(response.serverTime);
+      this.selectedLog.set(reconcileSelection(this.selectedLog(), mergedEntries));
+      this.requestErrorMessage.set(null);
+    } catch (error) {
+      this.requestErrorMessage.set(error instanceof Error ? error.message : 'Could not load logs.');
+    } finally {
+      this.pollInFlight = false;
+    }
+  }
+
   private async clearRemoteLogs(): Promise<void> {
     this.loading.set(true);
-    this.errorMessage.set(null);
+    this.requestErrorMessage.set(null);
     try {
       await this.logsRepository.clearLogs(this.projectId());
       this.entries.set([]);
       this.selectedLog.set(null);
+      this.latestCursor.set(null);
+      this.lastSuccessfulUpdate.set(new Date().toISOString());
+      this.clearConfirmOpen.set(false);
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : 'Could not clear logs.');
+      this.requestErrorMessage.set(error instanceof Error ? error.message : 'Could not clear logs.');
     } finally {
       this.loading.set(false);
     }

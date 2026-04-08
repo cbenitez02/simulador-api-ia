@@ -176,6 +176,7 @@ export function normalizeAiDraft(rawDraft: AiRawGeneratedEndpointInput): AiPrevi
     locks: {
       method: true,
       path: true,
+      scenarioType: true,
     },
   });
 

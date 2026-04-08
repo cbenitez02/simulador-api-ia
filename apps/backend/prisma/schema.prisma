@@ -92,10 +92,12 @@ model ApiLog {
   method                  String
   path                    String
   fullUrl                 String
+  origin                  String
   statusCode              Int
   latencyMs               Int
   scenarioType            String
   scenarioSelectionSource String
+  scenarioName            String?
   requestHeaders          Json
   requestBody             Json?
   responseHeaders         Json
@@ -104,5 +106,5 @@ model ApiLog {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([projectId, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc), id(sort: Desc)])
 }

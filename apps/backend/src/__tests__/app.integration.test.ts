@@ -243,14 +243,49 @@ describe('app integration', () => {
   it('GET /api/v1/projects/:projectId/logs devuelve últimos logs', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
     prismaMock.apiLog.findMany.mockResolvedValueOnce([
-      { id: 'l1', projectId: 'p1' },
-      { id: 'l2', projectId: 'p1' },
+      {
+        id: 'l2',
+        projectId: 'p1',
+        method: 'GET',
+        path: '/users',
+        fullUrl: 'https://mock.example.com/users',
+        origin: 'mock',
+        statusCode: 200,
+        latencyMs: 10,
+        scenarioType: 'default',
+        scenarioSelectionSource: 'direct-endpoint',
+        scenarioName: null,
+        requestHeaders: {},
+        requestBody: null,
+        responseHeaders: {},
+        responseBody: { ok: true },
+        createdAt: new Date('2026-04-08T10:00:02.000Z'),
+      },
+      {
+        id: 'l1',
+        projectId: 'p1',
+        method: 'GET',
+        path: '/health',
+        fullUrl: 'https://mock.example.com/health',
+        origin: 'mock',
+        statusCode: 200,
+        latencyMs: 9,
+        scenarioType: 'default',
+        scenarioSelectionSource: 'direct-endpoint',
+        scenarioName: null,
+        requestHeaders: {},
+        requestBody: null,
+        responseHeaders: {},
+        responseBody: { ok: true },
+        createdAt: new Date('2026-04-08T10:00:01.000Z'),
+      },
     ]);
 
     const response = await request(app).get('/api/v1/projects/p1/logs');
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveLength(2);
+    expect(response.body.items).toHaveLength(2);
+    expect(response.body.nextCursor).toEqual({ createdAt: '2026-04-08T10:00:02.000Z', id: 'l2' });
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-generate valida prompt corto', async () => {
@@ -300,7 +335,7 @@ describe('app integration', () => {
           method: 'GET',
           path: '/users',
           endpointConfig: { endpointId: 'e-ai-1' },
-          scenarios: [{ id: 's-ai-1' }],
+          scenarios: [{ id: 's-ai-1', type: 'success' }],
         }),
       },
       endpointConfig: {
@@ -319,7 +354,68 @@ describe('app integration', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.id).toBe('e-ai-1');
+    expect(response.body.scenarios).toEqual([
+      expect.objectContaining({ id: 's-ai-1', type: 'success' }),
+    ]);
+    expect(tx.scenario.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ type: 'success' })],
+      })
+    );
     expect(openaiCreateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-generate responde AI_TIMEOUT sin persistencia parcial', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    openaiCreateMock.mockRejectedValueOnce(
+      Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })
+    );
+
+    const response = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .send({ prompt: 'Generate a slow endpoint that times out before persistence' });
+
+    expect(response.status).toBe(504);
+    expect(response.body).toMatchObject({
+      code: 'AI_TIMEOUT',
+      retryable: true,
+    });
+    expect(prismaMock.endpoint.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.scenario.createMany).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-generate responde AI_INVALID_OUTPUT sin persistencia parcial', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    openaiCreateMock.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              method: 'GET',
+              path: '/users',
+              description: 'Broken payload',
+              statusCode: 200,
+              responseBody: [],
+              scenarios: [],
+            }),
+          },
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .send({ prompt: 'Generate an endpoint with malformed AI output for runtime validation' });
+
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      code: 'AI_INVALID_OUTPUT',
+      retryable: true,
+    });
+    expect(prismaMock.endpoint.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.scenario.createMany).not.toHaveBeenCalled();
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview devuelve draft normalizado sin persistir', async () => {
@@ -359,7 +455,7 @@ describe('app integration', () => {
       method: 'POST',
       path: '/users',
       description: 'Create user',
-      locks: { method: true, path: true },
+      locks: { method: true, path: true, scenarioType: true },
       scenarios: [
         {
           name: 'edge case empty',
