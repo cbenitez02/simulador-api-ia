@@ -1,10 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import { parseEnv } from './env.js';
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { parseEnv as parseEnvFn } from './env.js';
 
 const baseEnv = {
   DATABASE_URL: 'postgresql://postgres:postgres@localhost:54329/simulador_api?schema=public',
   NODE_ENV: 'test' as const,
 };
+
+let parseEnv: typeof parseEnvFn;
+
+beforeAll(async () => {
+  process.env.DATABASE_URL ??= baseEnv.DATABASE_URL;
+  ({ parseEnv } = await import('./env.js'));
+});
 
 describe('parseEnv', () => {
   it('permite boot sin credenciales de OpenAI y normaliza strings vacíos', () => {
