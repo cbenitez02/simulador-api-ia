@@ -82,27 +82,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Frontend lint
-        run: pnpm exec eslint "apps/web/src/**/*.{ts,html}"
+        run: pnpm lint:web
 
       - name: Frontend app typecheck
-        run: pnpm --dir apps/web exec tsc --project tsconfig.app.json --noEmit
+        run: pnpm typecheck:web:app
 
       - name: Frontend spec typecheck
-        run: pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
+        run: pnpm typecheck:web:spec
 
-      - name: Frontend headless coverage
-        run: pnpm --dir apps/web test:coverage
-
-      - name: Frontend coverage summary
-        run: cat apps/web/coverage/coverage-summary.json
-
-      - name: Upload frontend coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-coverage
-          path: |
-            apps/web/coverage/lcov.info
-            apps/web/coverage/coverage-summary.json
+      - name: Frontend headless tests
+        run: pnpm test:web
 
   backend-db-integration:
     name: Backend DB Integration
