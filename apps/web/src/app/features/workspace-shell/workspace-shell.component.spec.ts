@@ -164,7 +164,7 @@ const normalizedConfigFixture: GlobalConfig = {
   errorSimulation: { enabled: true, rate: 15, statusCodes: [400, 500] },
   rateLimiting: { enabled: false, requestsPerMinute: 100 },
   logging: { level: 'none' },
-  scope: 'without-overrides',
+  scope: 'all',
 };
 
 describe('WorkspaceShellComponent', () => {
@@ -335,7 +335,7 @@ describe('WorkspaceShellComponent', () => {
     expect(component.globalConfigLoading()).toBe(false);
     expect(component.globalConfig()).toEqual(normalizedConfigFixture);
     expect(component.globalConfig().logging.level).toBe('none');
-    expect(component.globalConfig().scope).toBe('without-overrides');
+    expect(component.globalConfig().scope).toBe('all');
   });
 
   it('keeps the config drawer open and surfaces actionable feedback when save fails validation', async () => {

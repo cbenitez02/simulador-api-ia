@@ -22,7 +22,7 @@ const projectFixture: DashboardProject = {
   name: 'Users API',
   slug: 'users-api',
   status: 'attention',
-  mockUrl: 'http://localhost:3000/mock/users-api',
+  mockUrl: 'https://mock.example.com/users-api',
   description: 'Real dashboard project',
   lastUpdatedRelative: 'just now',
   metrics: {

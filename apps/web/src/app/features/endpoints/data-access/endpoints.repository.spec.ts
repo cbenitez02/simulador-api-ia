@@ -248,6 +248,7 @@ describe('EndpointsRepository', () => {
     );
 
     expect(api.patch).toHaveBeenCalledWith('/projects/p1/endpoints/e1', expect.any(Object));
+    expect(api.put).toHaveBeenCalledWith('/endpoints/e1/config', expect.objectContaining({ errorRate: 0 }));
     expect(api.patch).toHaveBeenCalledWith(
       '/endpoints/e1/scenarios/s1',
       expect.objectContaining({ name: 'Existing success' }),
@@ -255,7 +256,7 @@ describe('EndpointsRepository', () => {
     expect(api.post).toHaveBeenCalledWith('/endpoints/e1/scenarios', expect.objectContaining({ name: 'Timeout' }));
     expect(api.delete).toHaveBeenCalledWith('/endpoints/e1/scenarios/s-obsolete');
     expect(result.id).toBe('e1');
-    expect(result.config?.errorRatePct).toBe(15);
+    expect(result.config?.errorRatePct).toBe(0);
   });
 
   it('surfaces partial failures without refreshing endpoint detail', async () => {

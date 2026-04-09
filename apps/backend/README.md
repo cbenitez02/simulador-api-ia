@@ -16,7 +16,7 @@ API backend y runtime de mocks del simulador. Maneja proyectos, endpoints, escen
 - persistir proyectos y recursos asociados
 - servir el mock runtime por proyecto
 - registrar logs de requests
-- generar estructuras de endpoints vía IA
+- generar borradores de endpoints vía IA (`ai-preview`) y persistir endpoints asistidos (`ai-generate`)
 
 ## Estructura principal
 
@@ -142,6 +142,9 @@ Podés overridear con `DATABASE_URL_TEST`.
 
 ## Consideraciones actuales
 
-- el mock runtime todavía tiene deuda entre config expuesta y comportamiento real en algunas opciones avanzadas
-- el flujo de IA existe en backend, pero sin `OPENAI_API_KEY` real las rutas asistidas van a responder como no disponibles
+- el MVP canoniza opciones todavía no soportadas: `GlobalConfig.scope` siempre se persiste como `all` y `EndpointConfig.errorRate` siempre vuelve en `0`
+- cuando la latencia global está habilitada, aplica a todo el runtime del proyecto aunque existan valores legacy de `scope`
+- la UI mantiene esos controles visibles pero deshabilitados y marcados como `Próximamente` para no prometer soporte inexistente
+- el backend expone dos rutas asistidas por IA: `POST /api/v1/projects/:projectId/endpoints/ai-preview` devuelve un draft normalizado sin persistir y `POST /api/v1/projects/:projectId/endpoints/ai-generate` crea el endpoint completo
+- sin `OPENAI_API_KEY` real, ambas rutas asistidas van a responder como no disponibles
 - la CI del repo valida lint, tests e integración DB del backend

@@ -21,7 +21,7 @@ export function mapGlobalConfigFromApi(config: GlobalConfigDto): GlobalConfig {
     logging: {
       level: config.loggingLevel === 'full' ? 'verbose' : config.loggingLevel === 'off' ? 'none' : 'basic',
     },
-    scope: config.scope === 'unset' ? 'without-overrides' : 'all',
+    scope: 'all',
   };
 }
 
@@ -37,6 +37,6 @@ export function mapGlobalConfigToApi(config: GlobalConfig): SaveGlobalConfigDto 
     rateLimitingEnabled: config.rateLimiting.enabled,
     rateLimitingRpm: config.rateLimiting.requestsPerMinute,
     loggingLevel: config.logging.level === 'verbose' ? 'full' : config.logging.level === 'none' ? 'off' : 'basic',
-    scope: config.scope === 'without-overrides' ? 'unset' : 'all',
+    scope: 'all',
   };
 }

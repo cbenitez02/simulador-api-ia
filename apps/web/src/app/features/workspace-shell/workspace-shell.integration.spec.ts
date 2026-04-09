@@ -129,7 +129,7 @@ describe('WorkspaceShellComponent integration', () => {
         name: 'Generated project',
         slug: 'generated-project',
         description: 'AI assisted workspace',
-        mockUrl: 'http://localhost:3000/mock/generated-project',
+        mockUrl: 'https://mock.example.com/generated-project',
         updatedAt: new Date().toISOString(),
         status: hasEndpoint ? 'running' : 'empty',
       },
@@ -213,7 +213,7 @@ describe('WorkspaceShellComponent integration', () => {
             name: 'Workspace project',
             slug: 'workspace-project',
             description: 'Live backend project',
-            mockUrl: 'http://localhost:3000/mock/workspace-project',
+            mockUrl: 'https://mock.example.com/workspace-project',
             updatedAt: new Date().toISOString(),
             status: 'running',
           },
@@ -301,7 +301,7 @@ describe('WorkspaceShellComponent integration', () => {
     expect(api.get).toHaveBeenCalledWith('/projects/p1/dashboard-summary');
     expect(content).toContain('Workspace project');
     expect(content).toContain('Live backend project');
-    expect(content).toContain('http://localhost:3000/mock/workspace-project');
+    expect(content).toContain('https://mock.example.com/workspace-project');
     expect(content).toContain('1 endpoints');
     expect(content).toContain('/users');
   });

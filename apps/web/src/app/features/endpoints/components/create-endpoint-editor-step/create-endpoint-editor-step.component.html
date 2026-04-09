@@ -229,9 +229,13 @@
             [min]="0"
             [max]="100"
             [step]="1"
+            [disabled]="true"
             (valueChange)="onErrorRateValue($event)"
           />
-          <p class="cep-editor__help">Percentage of requests that will randomly return an error scenario</p>
+          <p class="cep-editor__help">
+            Próximamente: el MVP todavía no soporta errores aleatorios por endpoint, así que este valor queda fijo en
+            0%.
+          </p>
           <div class="cep-editor__weight-row">
             <div>
               <span class="cep-editor__panel-title" style="margin: 0">Use scenario weights</span>

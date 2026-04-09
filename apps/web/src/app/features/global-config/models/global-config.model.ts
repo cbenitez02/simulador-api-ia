@@ -50,7 +50,7 @@ export function createDefaultGlobalConfig(): GlobalConfig {
     logging: {
       level: 'verbose',
     },
-    scope: 'without-overrides',
+    scope: 'all',
   };
 }
 

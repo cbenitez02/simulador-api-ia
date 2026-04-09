@@ -22,3 +22,8 @@
   accent-color: var(--cp-accent-primary);
   height: 0.35rem;
 }
+
+.cp-labeled-range__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

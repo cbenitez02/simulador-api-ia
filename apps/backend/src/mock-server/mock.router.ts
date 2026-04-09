@@ -125,7 +125,6 @@ async function resolveMockRequest(req: Request, res: Response, next: NextFunctio
           latencyMode: project.globalConfig.latencyMode,
           latencyMinMs: project.globalConfig.latencyMinMs,
           latencyMaxMs: project.globalConfig.latencyMaxMs,
-          scope: project.globalConfig.scope,
         }
       : null;
 

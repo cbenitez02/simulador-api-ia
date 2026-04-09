@@ -42,8 +42,8 @@ describe('GlobalConfigRepository', () => {
       scope: 'without-overrides',
     });
 
-    expect(api.put).toHaveBeenCalled();
+    expect(api.put).toHaveBeenCalledWith('/projects/p1/config', expect.objectContaining({ scope: 'all' }));
     expect(result.logging.level).toBe('verbose');
-    expect(result.scope).toBe('without-overrides');
+    expect(result.scope).toBe('all');
   });
 });

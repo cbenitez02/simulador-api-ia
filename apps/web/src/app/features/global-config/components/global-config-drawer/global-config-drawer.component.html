@@ -259,7 +259,7 @@
                     name="gcfg-apply-scope"
                     value="all"
                     [checked]="state().scope === 'all'"
-                    (change)="setScope('all')"
+                    disabled
                   />
                   <span class="gcfg-radio__ui" aria-hidden="true"></span>
                   <span>All endpoints</span>
@@ -270,12 +270,15 @@
                     name="gcfg-apply-scope"
                     value="without-overrides"
                     [checked]="state().scope === 'without-overrides'"
-                    (change)="setScope('without-overrides')"
+                    disabled
                   />
                   <span class="gcfg-radio__ui" aria-hidden="true"></span>
                   <span>Only endpoints without custom configuration</span>
                 </label>
               </div>
+              <p class="gcfg-helper">
+                Próximamente: por ahora la configuración global siempre aplica a todo el proyecto.
+              </p>
             </div>
           </section>
         </div>

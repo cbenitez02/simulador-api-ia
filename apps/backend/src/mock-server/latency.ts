@@ -10,7 +10,6 @@ interface GlobalLatencyConfig {
   latencyMode: string;
   latencyMinMs: number;
   latencyMaxMs: number;
-  scope: string;
 }
 
 function randomInt(min: number, max: number): number {
@@ -29,7 +28,7 @@ export function calculateLatency(
   endpointConfig: EndpointLatencyConfig | null,
   globalConfig: GlobalLatencyConfig | null
 ): number {
-  if (globalConfig?.latencyEnabled && globalConfig.scope === 'all') {
+  if (globalConfig?.latencyEnabled) {
     if (globalConfig.latencyMode === 'range') {
       return Math.min(randomInt(globalConfig.latencyMinMs, globalConfig.latencyMaxMs), 30_000);
     }

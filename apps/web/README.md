@@ -14,6 +14,7 @@ Aplicación Angular 21 del simulador. Es la UI principal para gestionar proyecto
 - dashboard principal de proyectos
 - workspace del proyecto activo
 - gestión de endpoints manuales
+- flujo asistido por IA para previsualizar borradores de endpoints y generar el primer endpoint de un proyecto
 - edición y eliminación de proyectos
 - configuración global
 - visualización de logs
@@ -54,9 +55,23 @@ http://127.0.0.1:4200
 
 ## Dependencia con backend
 
-La app espera backend disponible en `http://localhost:3000`.
+La app lee su configuración runtime desde `public/app-config.js`.
 
-Además, hoy deriva la mock URL desde esa base local. Si cambiás host o puerto, revisá `src/app/shared/config/api.config.ts`.
+Por default usa:
+
+- API: `http://localhost:3000/api/v1`
+- Mock runtime: `http://localhost:3000/mock`
+
+Si cambiás host, puerto o dominio para un deploy, podés reemplazar ese archivo sin rebuild:
+
+```js
+window.__SIMULADOR_RUNTIME_CONFIG__ = {
+  apiBaseUrl: 'https://api.example.com/api/v1',
+  mockBaseUrl: 'https://api.example.com/mock',
+};
+```
+
+Si omitís `mockBaseUrl`, el frontend intenta derivarlo desde `apiBaseUrl` reemplazando `/api/v1` por `/mock`.
 
 ## Scripts útiles
 
@@ -108,5 +123,5 @@ El workflow `CI` del repo corre un job dedicado **Frontend Validation** con:
 ## Limitaciones actuales
 
 - no hay build de producción dentro del gate inicial de CI
-- la URL del backend sigue acoplada a localhost en desarrollo
-- el flujo de IA todavía tiene deuda de alineación con backend real
+- la configuración runtime depende de que el hosting publique `app-config.js`
+- la creación asistida usa dos recorridos distintos: el wizard de endpoints consume `ai-preview` para editar un draft antes de guardar y el modal de crear proyecto usa `ai-generate` para persistir el primer endpoint automáticamente

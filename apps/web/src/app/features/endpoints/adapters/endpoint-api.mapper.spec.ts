@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { mapAiDraftFromApi, mapEndpointDraftFromApi, mapEndpointSummaryFromApi } from './endpoint-api.mapper';
+import {
+  mapAiDraftFromApi,
+  mapEndpointConfigRequestFromDraft,
+  mapEndpointDraftFromApi,
+  mapEndpointSummaryFromApi,
+} from './endpoint-api.mapper';
 
 describe('endpoint-api.mapper', () => {
-  it('maps unsupported methods defensively and derives config percentages', () => {
+  it('maps unsupported methods defensively and zeroes unsupported endpoint error rate', () => {
     const result = mapEndpointSummaryFromApi({
       id: 'e1',
       projectId: 'p1',
@@ -25,7 +30,7 @@ describe('endpoint-api.mapper', () => {
 
     expect(result.method).toBe('GET');
     expect(result.config?.latencyMs).toBe(200);
-    expect(result.config?.errorRatePct).toBe(25);
+    expect(result.config?.errorRatePct).toBe(0);
   });
 
   it('hydrates edit draft using backend scenarios', () => {
@@ -61,8 +66,31 @@ describe('endpoint-api.mapper', () => {
     });
 
     expect(result.method).toBe('PATCH');
-    expect(result.behavior.errorRate).toBe(10);
+    expect(result.behavior.errorRate).toBe(0);
     expect(result.scenarios[0]?.id).toBe('s1');
+  });
+
+  it('forces endpoint config payloads to keep errorRate disabled in MVP', () => {
+    const result = mapEndpointConfigRequestFromDraft('e1', {
+      method: 'GET',
+      route: '/users',
+      description: 'List users',
+      statusCode: 200,
+      responseBody: { ok: true },
+      behavior: {
+        latencyMode: 'range',
+        fixedDelayMs: 0,
+        minDelayMs: 50,
+        maxDelayMs: 250,
+        errorRate: 35,
+        useScenarioWeights: true,
+      },
+      scenarios: [],
+      locks: { method: false, path: false, scenarioType: false },
+      source: 'manual',
+    });
+
+    expect(result.errorRate).toBe(0);
   });
 
   it('maps ai preview dto into a locked MVP draft without contract drift', () => {

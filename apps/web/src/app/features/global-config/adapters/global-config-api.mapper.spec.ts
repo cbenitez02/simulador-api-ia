@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mapGlobalConfigFromApi, mapGlobalConfigToApi } from './global-config-api.mapper';
 
 describe('global-config-api.mapper', () => {
-  it('normalizes backend enums into frontend values', () => {
+  it('normalizes backend enums into frontend values and canonical MVP scope', () => {
     const result = mapGlobalConfigFromApi({
       projectId: 'p1',
       latencyEnabled: true,
@@ -21,10 +21,10 @@ describe('global-config-api.mapper', () => {
     expect(result.latency.mode).toBe('random');
     expect(result.errorSimulation.rate).toBe(15);
     expect(result.logging.level).toBe('none');
-    expect(result.scope).toBe('without-overrides');
+    expect(result.scope).toBe('all');
   });
 
-  it('maps frontend values back to backend payloads', () => {
+  it('maps frontend values back to backend payloads with canonical scope', () => {
     const result = mapGlobalConfigToApi({
       latency: { enabled: true, minMs: 10, maxMs: 50, mode: 'random' },
       errorSimulation: { enabled: true, rate: 20, statusCodes: [500] },
@@ -36,6 +36,6 @@ describe('global-config-api.mapper', () => {
     expect(result.latencyMode).toBe('range');
     expect(result.errorSimulationRate).toBe(0.2);
     expect(result.loggingLevel).toBe('full');
-    expect(result.scope).toBe('unset');
+    expect(result.scope).toBe('all');
   });
 });
