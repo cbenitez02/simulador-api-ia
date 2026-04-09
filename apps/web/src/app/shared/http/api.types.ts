@@ -163,3 +163,72 @@ export interface ApiLogListDto {
   nextCursor: ApiLogCursorDto | null;
   serverTime: string;
 }
+
+export type DashboardProjectStatusDto = 'empty' | 'attention' | 'running';
+export type DashboardEndpointStatusDto = 'ready' | 'needs-attention';
+
+export interface DashboardSummaryDto {
+  project: {
+    id: string;
+    name: string;
+    description: string;
+    slug: string;
+    mockUrl: string;
+    updatedAt: string;
+    status: DashboardProjectStatusDto;
+  };
+  metrics: {
+    totalEndpoints: number;
+    totalScenarios: number;
+    avgLatencyMs: number;
+    errorRatePct: number;
+    totalRequests: number;
+  };
+  health: {
+    readyEndpoints: number;
+    needsAttentionEndpoints: number;
+    errorScenarioEndpoints: number;
+    emptyScenarioEndpoints: number;
+    timeoutScenarioEndpoints: number;
+  };
+  endpointRows: Array<{
+    endpointId: string;
+    method: string;
+    path: string;
+    description: string;
+    scenarioCount: number;
+    latencyMs: number;
+    errorRatePct: number;
+    status: DashboardEndpointStatusDto;
+  }>;
+  recentRequests: Array<{
+    id: string;
+    method: string;
+    path: string;
+    statusCode: number;
+    latencyMs: number;
+    scenarioType: string;
+    createdAt: string;
+  }>;
+  configSummary: {
+    latency: {
+      enabled: boolean;
+      mode: 'fixed' | 'range';
+      minMs: number;
+      maxMs: number;
+    };
+    errorSimulation: {
+      enabled: boolean;
+      ratePct: number;
+      codes: number[];
+    };
+    rateLimiting: {
+      enabled: boolean;
+      rpm: number;
+    };
+    logging: {
+      level: 'basic' | 'full' | 'off';
+    };
+    scope: 'all' | 'unset';
+  };
+}

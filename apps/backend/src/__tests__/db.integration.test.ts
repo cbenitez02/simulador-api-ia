@@ -1,13 +1,24 @@
 import request from 'supertest';
 import type { Express } from 'express';
-import { Prisma, type PrismaClient } from '../generated/prisma/client.js';
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from 'vitest';
 
 const runDbTests = process.env.RUN_DB_TESTS === 'true';
 const describeDb = runDbTests ? describe : describe.skip;
 
 let app: Express;
-let prisma: PrismaClient;
+let prisma: {
+  apiLog: { deleteMany: () => Promise<unknown>; createMany: (args: unknown) => Promise<unknown> };
+  scenario: { deleteMany: () => Promise<unknown> };
+  endpointConfig: { deleteMany: () => Promise<unknown> };
+  endpoint: { deleteMany: () => Promise<unknown> };
+  globalConfig: { deleteMany: () => Promise<unknown> };
+  project: {
+    deleteMany: () => Promise<unknown>;
+    findUnique: (args: unknown) => Promise<unknown>;
+  };
+  $disconnect: () => Promise<unknown>;
+};
+let prismaJsonNull: unknown;
 
 async function cleanDatabase() {
   await prisma.apiLog.deleteMany();
@@ -74,6 +85,9 @@ describeDb('db integration (real postgres)', () => {
 
     ({ app } = await import('../app.js'));
     ({ prisma } = await import('../lib/prisma.js'));
+    ({
+      Prisma: { JsonNull: prismaJsonNull },
+    } = await import('../generated/prisma/client.js'));
   });
 
   beforeEach(async () => {
@@ -161,7 +175,7 @@ describeDb('db integration (real postgres)', () => {
           scenarioSelectionSource: 'direct-endpoint',
           scenarioName: null,
           requestHeaders: {},
-          requestBody: Prisma.JsonNull,
+          requestBody: prismaJsonNull,
           responseHeaders: {},
           responseBody: { ok: true },
           createdAt: new Date('2026-04-08T12:00:00.000Z'),
@@ -179,7 +193,7 @@ describeDb('db integration (real postgres)', () => {
           scenarioSelectionSource: 'direct-endpoint',
           scenarioName: null,
           requestHeaders: {},
-          requestBody: Prisma.JsonNull,
+          requestBody: prismaJsonNull,
           responseHeaders: {},
           responseBody: { ok: 'a' },
           createdAt: new Date('2026-04-08T12:01:00.000Z'),
@@ -197,7 +211,7 @@ describeDb('db integration (real postgres)', () => {
           scenarioSelectionSource: 'direct-endpoint',
           scenarioName: null,
           requestHeaders: {},
-          requestBody: Prisma.JsonNull,
+          requestBody: prismaJsonNull,
           responseHeaders: {},
           responseBody: { ok: 'b' },
           createdAt: new Date('2026-04-08T12:01:00.000Z'),

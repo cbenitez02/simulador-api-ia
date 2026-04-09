@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import {
   LucideClock,
   LucideDownload,
@@ -10,17 +10,15 @@ import {
   LucideUpload,
 } from '@lucide/angular';
 
-export type ActivityVerbTone = 'create' | 'add' | 'update';
+import type { DashboardProject } from '../../models/dashboard-project.model';
 
-export type ActivityIconKind = 'branch' | 'layers' | 'settings';
-
-export interface UtilitySidebarActivityItem {
+export interface UtilitySidebarRequestItem {
   id: string;
-  verb: string;
-  verbTone: ActivityVerbTone;
-  target: string;
-  timeAgo: string;
-  icon: ActivityIconKind;
+  requestLabel: string;
+  statusCode: number;
+  latencyMs: number;
+  scenarioType: string;
+  timeLabel: string;
 }
 
 @Component({
@@ -41,7 +39,7 @@ export interface UtilitySidebarActivityItem {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardUtilitySidebarComponent {
-  private static readonly recentActivityLimit = 4;
+  readonly project = input.required<DashboardProject>();
 
   readonly createEndpoint = output<void>();
   readonly testAllEndpoints = output<void>();
@@ -76,61 +74,49 @@ export class MainDashboardUtilitySidebarComponent {
     },
   ];
 
-  private static readonly activitySeed: UtilitySidebarActivityItem[] = [
-    {
-      id: '1',
-      verb: 'created',
-      verbTone: 'create',
-      target: 'POST /auth/refresh',
-      timeAgo: '2 hours ago',
-      icon: 'branch',
-    },
-    {
-      id: '2',
-      verb: 'added',
-      verbTone: 'add',
-      target: '401 Unauthorized to /auth/me',
-      timeAgo: '3 hours ago',
-      icon: 'layers',
-    },
-    {
-      id: '3',
-      verb: 'updated',
-      verbTone: 'update',
-      target: 'Global latency settings',
-      timeAgo: '5 hours ago',
-      icon: 'settings',
-    },
-    {
-      id: '4',
-      verb: 'modified',
-      verbTone: 'update',
-      target: 'POST /auth/login',
-      timeAgo: '1 day ago',
-      icon: 'branch',
-    },
-    {
-      id: '5',
-      verb: 'added',
-      verbTone: 'add',
-      target: 'Rate limit to /auth/login',
-      timeAgo: '1 day ago',
-      icon: 'layers',
-    },
-  ];
+  protected readonly recentRequests = computed((): UtilitySidebarRequestItem[] =>
+    this.project().recentRequests.map((request) => ({
+      id: request.id,
+      requestLabel: `${request.method} ${request.path}`,
+      statusCode: request.statusCode,
+      latencyMs: request.latencyMs,
+      scenarioType: request.scenarioType,
+      timeLabel: request.timeLabel,
+    })),
+  );
 
-  protected readonly recentActivities: UtilitySidebarActivityItem[] = [
-    ...MainDashboardUtilitySidebarComponent.activitySeed.slice(
-      -MainDashboardUtilitySidebarComponent.recentActivityLimit,
-    ),
-  ].reverse();
+  protected readonly globalConfigRows = computed(() => {
+    const config = this.project().configSummary;
 
-  protected readonly globalConfigRows = [
-    { label: 'Default latency', badge: '50–200ms', tone: 'neutral' as const },
-    { label: 'Error simulation', badge: 'Enabled', tone: 'success' as const },
-    { label: 'Rate limiting', badge: '100 req/min', tone: 'neutral' as const },
-    { label: 'Logging', badge: 'Verbose', tone: 'neutral' as const },
-  ];
+    return [
+      {
+        label: 'Default latency',
+        badge: config.latency.enabled
+          ? config.latency.mode === 'range'
+            ? `${config.latency.minMs}–${config.latency.maxMs}ms`
+            : `${config.latency.maxMs}ms`
+          : 'Disabled',
+        tone: config.latency.enabled ? ('neutral' as const) : ('neutral' as const),
+      },
+      {
+        label: 'Error simulation',
+        badge: config.errorSimulation.enabled
+          ? `${config.errorSimulation.ratePct}% · ${config.errorSimulation.codes.join(', ')}`
+          : 'Disabled',
+        tone: config.errorSimulation.enabled ? ('success' as const) : ('neutral' as const),
+      },
+      {
+        label: 'Rate limiting',
+        badge: config.rateLimiting.enabled ? `${config.rateLimiting.rpm} req/min` : 'Disabled',
+        tone: 'neutral' as const,
+      },
+      {
+        label: 'Logging',
+        badge: config.logging.level === 'full' ? 'Full' : config.logging.level === 'off' ? 'Off' : 'Basic',
+        tone: 'neutral' as const,
+      },
+    ];
+  });
 
   protected onQuickAction(id: string): void {
     switch (id) {

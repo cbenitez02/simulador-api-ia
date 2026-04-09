@@ -42,6 +42,8 @@ const prismaMock = {
     upsert: vi.fn(),
   },
   apiLog: {
+    aggregate: vi.fn(),
+    count: vi.fn(),
     create: vi.fn(),
     findMany: vi.fn(),
     deleteMany: vi.fn(),
@@ -251,6 +253,190 @@ describe('app integration', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.id).toBe('s1');
+  });
+
+  it('GET /api/v1/projects/:projectId/dashboard-summary devuelve summary real agregado', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({
+      id: 'p1',
+      name: 'Proyecto',
+      slug: 'proyecto',
+      description: 'Demo',
+      updatedAt: new Date('2026-04-08T10:00:00.000Z'),
+      globalConfig: {
+        latencyEnabled: false,
+        latencyMinMs: 0,
+        latencyMaxMs: 1000,
+        latencyMode: 'fixed',
+        errorSimulationEnabled: true,
+        errorSimulationRate: 0.1,
+        errorSimulationCodes: [500],
+        rateLimitingEnabled: true,
+        rateLimitingRpm: 120,
+        loggingLevel: 'full',
+        scope: 'all',
+      },
+      endpoints: [
+        {
+          id: 'e1',
+          method: 'GET',
+          path: '/users',
+          description: 'List users',
+          endpointConfig: {
+            latencyMode: 'fixed',
+            fixedDelayMs: 90,
+            minDelayMs: 0,
+            maxDelayMs: 0,
+          },
+          scenarios: [
+            { id: 's1', type: 'success' },
+            { id: 's2', type: 'error' },
+          ],
+        },
+        {
+          id: 'e2',
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          endpointConfig: null,
+          scenarios: [],
+        },
+      ],
+    });
+    prismaMock.apiLog.aggregate.mockResolvedValueOnce({
+      _count: { _all: 4 },
+      _avg: { latencyMs: 120 },
+    });
+    prismaMock.apiLog.count.mockResolvedValueOnce(1);
+    prismaMock.apiLog.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'log-1',
+          method: 'GET',
+          path: '/users',
+          statusCode: 500,
+          latencyMs: 140,
+          scenarioType: 'error',
+          createdAt: new Date('2026-04-08T11:00:00.000Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        { method: 'GET', path: '/users', statusCode: 200, latencyMs: 100 },
+        { method: 'GET', path: '/users', statusCode: 500, latencyMs: 140 },
+      ]);
+
+    const response = await request(app).get('/api/v1/projects/p1/dashboard-summary');
+
+    expect(response.status).toBe(200);
+    expect(response.body.project).toEqual({
+      id: 'p1',
+      name: 'Proyecto',
+      description: 'Demo',
+      slug: 'proyecto',
+      mockUrl: 'http://localhost:3000/mock/proyecto',
+      updatedAt: '2026-04-08T10:00:00.000Z',
+      status: 'attention',
+    });
+    expect(response.body.metrics).toEqual({
+      totalEndpoints: 2,
+      totalScenarios: 2,
+      avgLatencyMs: 120,
+      errorRatePct: 25,
+      totalRequests: 4,
+    });
+    expect(response.body.health).toEqual({
+      readyEndpoints: 1,
+      needsAttentionEndpoints: 1,
+      errorScenarioEndpoints: 1,
+      emptyScenarioEndpoints: 0,
+      timeoutScenarioEndpoints: 0,
+    });
+    expect(response.body.endpointRows).toEqual([
+      {
+        endpointId: 'e1',
+        method: 'GET',
+        path: '/users',
+        description: 'List users',
+        scenarioCount: 2,
+        latencyMs: 120,
+        errorRatePct: 50,
+        status: 'ready',
+      },
+      {
+        endpointId: 'e2',
+        method: 'POST',
+        path: '/users',
+        description: 'Create user',
+        scenarioCount: 0,
+        latencyMs: 0,
+        errorRatePct: 0,
+        status: 'needs-attention',
+      },
+    ]);
+    expect(response.body.recentRequests).toEqual([
+      {
+        id: 'log-1',
+        method: 'GET',
+        path: '/users',
+        statusCode: 500,
+        latencyMs: 140,
+        scenarioType: 'error',
+        createdAt: '2026-04-08T11:00:00.000Z',
+      },
+    ]);
+    expect(response.body.configSummary).toEqual({
+      latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
+      errorSimulation: { enabled: true, ratePct: 10, codes: [500] },
+      rateLimiting: { enabled: true, rpm: 120 },
+      logging: { level: 'full' },
+      scope: 'all',
+    });
+  });
+
+  it('GET /api/v1/projects/:projectId/dashboard-summary responde 404 cuando falta el proyecto', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce(null);
+
+    const response = await request(app).get('/api/v1/projects/p404/dashboard-summary');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: 'Project not found' });
+  });
+
+  it('GET /api/v1/projects/:projectId/dashboard-summary devuelve recientes vacíos y config default sin logs', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({
+      id: 'p1',
+      name: 'Proyecto vacío',
+      slug: 'proyecto-vacio',
+      description: '',
+      updatedAt: new Date('2026-04-08T10:00:00.000Z'),
+      globalConfig: null,
+      endpoints: [],
+    });
+    prismaMock.apiLog.aggregate.mockResolvedValueOnce({
+      _count: { _all: 0 },
+      _avg: { latencyMs: null },
+    });
+    prismaMock.apiLog.count.mockResolvedValueOnce(0);
+    prismaMock.apiLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const response = await request(app).get('/api/v1/projects/p1/dashboard-summary');
+
+    expect(response.status).toBe(200);
+    expect(response.body.project.status).toBe('empty');
+    expect(response.body.metrics).toEqual({
+      totalEndpoints: 0,
+      totalScenarios: 0,
+      avgLatencyMs: 0,
+      errorRatePct: 0,
+      totalRequests: 0,
+    });
+    expect(response.body.recentRequests).toEqual([]);
+    expect(response.body.configSummary).toEqual({
+      latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
+      errorSimulation: { enabled: false, ratePct: 0, codes: [500] },
+      rateLimiting: { enabled: false, rpm: 60 },
+      logging: { level: 'basic' },
+      scope: 'all',
+    });
   });
 
   it('GET /mock/:projectSlug/:path responde y loguea fire-and-forget', async () => {

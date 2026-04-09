@@ -48,6 +48,7 @@ type WorkspaceShellTestApi = {
   deleteProjectPending: () => boolean;
   deleteProjectError: () => string | null;
   retryLoadProjects(): void;
+  selectProject(id: string): void;
   editGlobalConfig(): void;
   openEditProjectModal(): void;
   onEditProjectModalSave(payload: EditProjectModalPayload): void;
@@ -88,21 +89,53 @@ const endpointFixture: EndpointPreview = {
   },
 };
 
+const emptyDashboardState = {
+  metrics: {
+    totalEndpoints: 0,
+    totalScenarios: 0,
+    avgLatencyMs: 0,
+    errorRatePct: 0,
+    totalRequests: 0,
+  },
+  health: {
+    readyEndpoints: 0,
+    needsAttentionEndpoints: 0,
+    errorScenarioEndpoints: 0,
+    emptyScenarioEndpoints: 0,
+    timeoutScenarioEndpoints: 0,
+  },
+  endpointRows: [],
+  recentRequests: [],
+  configSummary: {
+    latency: { enabled: false, mode: 'fixed' as const, minMs: 0, maxMs: 1000 },
+    errorSimulation: { enabled: false, ratePct: 0, codes: [500] },
+    rateLimiting: { enabled: false, rpm: 60 },
+    logging: { level: 'basic' as const },
+    scope: 'all' as const,
+  },
+};
+
 const projectFixture: DashboardProject = {
   id: 'project-1',
   name: 'Workspace project',
+  slug: 'project-1',
+  status: 'running',
   mockUrl: 'https://mock.example.com/project-1',
   description: 'Live backend project',
   lastUpdatedRelative: 'just now',
+  ...emptyDashboardState,
   endpoints: [endpointFixture],
 };
 
 const secondProjectFixture: DashboardProject = {
   id: 'project-2',
   name: 'Billing API',
+  slug: 'project-2',
+  status: 'empty',
   mockUrl: 'https://mock.example.com/project-2',
   description: 'Second project',
   lastUpdatedRelative: '1 minute ago',
+  ...emptyDashboardState,
   endpoints: [],
 };
 
@@ -177,6 +210,10 @@ describe('WorkspaceShellComponent', () => {
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
+
+    projectsRepository.getProject.mockImplementation(async (projectId: string) =>
+      projectId === secondProjectFixture.id ? secondProjectFixture : projectFixture,
+    );
   });
 
   it('shows a recoverable error and clears project state when the initial project load fails', async () => {
@@ -189,6 +226,96 @@ describe('WorkspaceShellComponent', () => {
     expect(component.projectsError()).toBe('Backend unavailable');
     expect(component.projects()).toEqual([]);
     expect(component.selectedProjectId()).toBe('');
+  });
+
+  it('hydrates the initially selected project with the real dashboard summary after loading the sidebar list', async () => {
+    const summaryProject: DashboardProject = {
+      ...projectFixture,
+      metrics: {
+        ...projectFixture.metrics,
+        totalScenarios: 3,
+      },
+      recentRequests: [
+        {
+          id: 'log-1',
+          method: 'GET',
+          path: '/users',
+          statusCode: 200,
+          latencyMs: 84,
+          scenarioType: 'success',
+          createdAt: '2026-04-08T10:00:00.000Z',
+          timeLabel: 'just now',
+        },
+      ],
+    };
+
+    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.getProject.mockResolvedValue(summaryProject);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    expect(projectsRepository.getProject).toHaveBeenCalledWith('project-1');
+    expect(component.selectedProjectId()).toBe('project-1');
+    expect(component.activeProject()?.metrics.totalScenarios).toBe(3);
+    expect(component.activeProject()?.recentRequests).toHaveLength(1);
+  });
+
+  it('reloads the dashboard summary when the user changes the active project', async () => {
+    const summaryProjectOne: DashboardProject = {
+      ...projectFixture,
+      metrics: {
+        ...projectFixture.metrics,
+        totalScenarios: 2,
+      },
+    };
+    const summaryProjectTwo: DashboardProject = {
+      ...secondProjectFixture,
+      status: 'running',
+      metrics: {
+        ...secondProjectFixture.metrics,
+        totalEndpoints: 2,
+        totalScenarios: 4,
+      },
+      endpointRows: [
+        {
+          endpointId: 'ep-2',
+          method: 'POST',
+          path: '/billing',
+          description: 'Create invoice',
+          scenarioCount: 4,
+          latencyMs: 90,
+          errorRatePct: 0,
+          status: 'ready',
+        },
+      ],
+      endpoints: [
+        {
+          id: 'ep-2',
+          method: 'POST',
+          path: '/billing',
+          description: 'Create invoice',
+          latencyMs: 90,
+          statusCode: 200,
+          responseBody: { ok: true },
+        },
+      ],
+    };
+
+    projectsRepository.listProjects.mockResolvedValue([projectFixture, secondProjectFixture]);
+    projectsRepository.getProject.mockResolvedValueOnce(summaryProjectOne).mockResolvedValueOnce(summaryProjectTwo);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.selectProject('project-2');
+    await flushAsyncWork();
+
+    expect(projectsRepository.getProject).toHaveBeenNthCalledWith(1, 'project-1');
+    expect(projectsRepository.getProject).toHaveBeenNthCalledWith(2, 'project-2');
+    expect(component.selectedProjectId()).toBe('project-2');
+    expect(component.activeProject()?.metrics.totalScenarios).toBe(4);
+    expect(component.activeProject()?.endpoints[0]?.path).toBe('/billing');
   });
 
   it('opens the config drawer with normalized values after loading backend config', async () => {
@@ -230,6 +357,30 @@ describe('WorkspaceShellComponent', () => {
     expect(component.globalConfigDrawerOpen()).toBe(true);
     expect(component.globalConfigSaving()).toBe(false);
     expect(component.globalConfigError()).toBe('Validation failed: latency max must be greater than latency min.');
+  });
+
+  it('refreshes the active dashboard project after saving global config so summary badges stay current', async () => {
+    const refreshedProject: DashboardProject = {
+      ...projectFixture,
+      configSummary: {
+        ...projectFixture.configSummary,
+        logging: { level: 'full' },
+      },
+    };
+
+    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.getProject.mockResolvedValue(refreshedProject);
+    globalConfigRepository.saveConfig.mockResolvedValue(normalizedConfigFixture);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.onGlobalConfigSaved(normalizedConfigFixture);
+    await flushAsyncWork();
+
+    expect(globalConfigRepository.saveConfig).toHaveBeenCalledWith('project-1', normalizedConfigFixture);
+    expect(projectsRepository.getProject).toHaveBeenCalledWith('project-1');
+    expect(component.projects()[0]?.configSummary.logging.level).toBe('full');
   });
 
   it('creates a project and generates the first endpoint through the AI backend flow', async () => {

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/error-handler.js';
 import { aiRouter } from './management/ai/router.js';
+import { dashboardRouter } from './management/dashboard/router.js';
 import { endpointConfigRouter } from './management/endpoint-config/router.js';
 import { endpointsRouter } from './management/endpoints/router.js';
 import { globalConfigRouter } from './management/global-config/router.js';
@@ -26,6 +27,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/v1/projects', projectsRouter);
+app.use('/api/v1/projects/:projectId/dashboard-summary', dashboardRouter);
 app.use('/api/v1/projects/:projectId/endpoints', endpointsRouter);
 app.use('/api/v1/projects/:projectId/endpoints', aiRouter);
 app.use('/api/v1/endpoints/:endpointId/scenarios', scenariosRouter);

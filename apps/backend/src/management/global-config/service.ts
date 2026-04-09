@@ -1,6 +1,8 @@
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
 import type { UpsertGlobalConfigInput } from './schema.js';
+export { buildDefaultGlobalConfig, DEFAULT_GLOBAL_CONFIG_VALUES } from './defaults.js';
+import { buildDefaultGlobalConfig } from './defaults.js';
 
 async function assertProjectExists(projectId: string): Promise<void> {
   const project = await prisma.project.findUnique({
@@ -24,20 +26,7 @@ export async function getGlobalConfig(projectId: string) {
     return config;
   }
 
-  return {
-    projectId,
-    latencyEnabled: false,
-    latencyMinMs: 0,
-    latencyMaxMs: 1000,
-    latencyMode: 'fixed',
-    errorSimulationEnabled: false,
-    errorSimulationRate: 0,
-    errorSimulationCodes: [500],
-    rateLimitingEnabled: false,
-    rateLimitingRpm: 60,
-    loggingLevel: 'basic',
-    scope: 'all',
-  };
+  return buildDefaultGlobalConfig(projectId);
 }
 
 export async function upsertGlobalConfig(projectId: string, input: UpsertGlobalConfigInput) {

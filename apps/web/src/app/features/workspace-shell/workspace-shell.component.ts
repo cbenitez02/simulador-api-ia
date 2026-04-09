@@ -112,6 +112,7 @@ export class WorkspaceShellComponent {
   protected readonly createEndpointFlowOpen = signal(false);
   protected readonly endpointWizardInitial = signal<EndpointPreview | null>(null);
   protected readonly navBeforeCreateFlow = signal<WorkspaceNavId | null>(null);
+  private activeSummaryRequestId = 0;
 
   protected readonly selectedEndpoint = computed((): EndpointPreview | null => {
     const id = this.selectedEndpointId();
@@ -263,6 +264,7 @@ export class WorkspaceShellComponent {
     this.selectedLog.set(null);
     this.endpointMutationError.set(null);
     this.closeCreateEndpointWizard(true);
+    void this.hydrateActiveProjectSummary(project.id);
   }
 
   protected selectNav(id: WorkspaceNavId): void {
@@ -386,6 +388,10 @@ export class WorkspaceShellComponent {
       ) {
         this.selectedEndpointId.set(null);
       }
+
+      if (nextSelected) {
+        await this.hydrateActiveProjectSummary(nextSelected);
+      }
     } catch (error) {
       this.projects.set([]);
       this.selectedProjectId.set('');
@@ -401,6 +407,28 @@ export class WorkspaceShellComponent {
       this.projects.update((projects) => projects.map((project) => (project.id === projectId ? refreshed : project)));
     } catch (error) {
       this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not refresh project data.');
+    }
+  }
+
+  private async hydrateActiveProjectSummary(projectId: string): Promise<void> {
+    const requestId = ++this.activeSummaryRequestId;
+
+    try {
+      const summaryProject = await this.projectsRepository.getProject(projectId);
+
+      if (requestId !== this.activeSummaryRequestId) {
+        return;
+      }
+
+      this.projects.update((projects) =>
+        projects.map((project) => (project.id === projectId ? summaryProject : project)),
+      );
+    } catch (error) {
+      if (requestId !== this.activeSummaryRequestId) {
+        return;
+      }
+
+      this.projectsError.set(error instanceof Error ? error.message : 'Could not load project summary.');
     }
   }
 
@@ -577,6 +605,7 @@ export class WorkspaceShellComponent {
     try {
       const saved = await this.globalConfigRepository.saveConfig(projectId, config);
       this.globalConfig.set(saved);
+      await this.refreshProject(projectId);
       this.globalConfigDrawerOpen.set(false);
     } catch (error) {
       this.globalConfigError.set(error instanceof Error ? error.message : 'Could not save global config.');
