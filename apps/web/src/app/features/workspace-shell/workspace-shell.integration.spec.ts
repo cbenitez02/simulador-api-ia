@@ -109,6 +109,69 @@ describe('WorkspaceShellComponent integration', () => {
     globalConfigRepository.saveConfig.mockReset();
   });
 
+  function createProjectListItem(endpointCount: number) {
+    return {
+      id: 'p1',
+      name: 'Generated project',
+      slug: 'generated-project',
+      description: 'AI assisted workspace',
+      updatedAt: new Date().toISOString(),
+      _count: { endpoints: endpointCount },
+    };
+  }
+
+  function createDashboardSummary(endpointCount: number) {
+    const hasEndpoint = endpointCount > 0;
+
+    return {
+      project: {
+        id: 'p1',
+        name: 'Generated project',
+        slug: 'generated-project',
+        description: 'AI assisted workspace',
+        mockUrl: 'http://localhost:3000/mock/generated-project',
+        updatedAt: new Date().toISOString(),
+        status: hasEndpoint ? 'running' : 'empty',
+      },
+      metrics: {
+        totalEndpoints: endpointCount,
+        totalScenarios: hasEndpoint ? 1 : 0,
+        avgLatencyMs: hasEndpoint ? 120 : 0,
+        errorRatePct: 0,
+        totalRequests: 0,
+      },
+      health: {
+        readyEndpoints: endpointCount,
+        needsAttentionEndpoints: 0,
+        errorScenarioEndpoints: 0,
+        emptyScenarioEndpoints: 0,
+        timeoutScenarioEndpoints: 0,
+      },
+      endpointRows: hasEndpoint
+        ? [
+            {
+              endpointId: 'e1',
+              method: 'POST',
+              path: '/users',
+              description: 'Create user',
+              scenarioCount: 1,
+              latencyMs: 120,
+              errorRatePct: 0,
+              status: 'ready',
+            },
+          ]
+        : [],
+      recentRequests: [],
+      configSummary: {
+        latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
+        errorSimulation: { enabled: false, ratePct: 0, codes: [500] },
+        rateLimiting: { enabled: false, rpm: 60 },
+        logging: { level: 'basic' },
+        scope: 'all',
+      },
+    };
+  }
+
   function createComponent() {
     const injector = Injector.create({
       providers: [
@@ -141,6 +204,54 @@ describe('WorkspaceShellComponent integration', () => {
             _count: { endpoints: 1 },
           },
         ];
+      }
+
+      if (path === '/projects/p1/dashboard-summary') {
+        return {
+          project: {
+            id: 'p1',
+            name: 'Workspace project',
+            slug: 'workspace-project',
+            description: 'Live backend project',
+            mockUrl: 'http://localhost:3000/mock/workspace-project',
+            updatedAt: new Date().toISOString(),
+            status: 'running',
+          },
+          metrics: {
+            totalEndpoints: 1,
+            totalScenarios: 1,
+            avgLatencyMs: 120,
+            errorRatePct: 0,
+            totalRequests: 0,
+          },
+          health: {
+            readyEndpoints: 1,
+            needsAttentionEndpoints: 0,
+            errorScenarioEndpoints: 0,
+            emptyScenarioEndpoints: 0,
+            timeoutScenarioEndpoints: 0,
+          },
+          endpointRows: [
+            {
+              endpointId: 'e1',
+              method: 'GET',
+              path: '/users',
+              description: 'List users',
+              scenarioCount: 1,
+              latencyMs: 120,
+              errorRatePct: 0,
+              status: 'ready',
+            },
+          ],
+          recentRequests: [],
+          configSummary: {
+            latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
+            errorSimulation: { enabled: false, ratePct: 0, codes: [500] },
+            rateLimiting: { enabled: false, rpm: 60 },
+            logging: { level: 'basic' },
+            scope: 'all',
+          },
+        };
       }
 
       if (path === '/projects/p1/endpoints') {
@@ -187,6 +298,7 @@ describe('WorkspaceShellComponent integration', () => {
     const content = await renderSnapshot(component, logsRepository);
     expect(api.get).toHaveBeenCalledWith('/projects');
     expect(api.get).toHaveBeenCalledWith('/projects/p1/endpoints');
+    expect(api.get).toHaveBeenCalledWith('/projects/p1/dashboard-summary');
     expect(content).toContain('Workspace project');
     expect(content).toContain('Live backend project');
     expect(content).toContain('http://localhost:3000/mock/workspace-project');
@@ -289,32 +401,38 @@ describe('WorkspaceShellComponent integration', () => {
   });
 
   it('creates the project first, generates the first endpoint, and opens it on full success', async () => {
-    api.get
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: 'p1',
-          name: 'Generated project',
-          slug: 'generated-project',
-          description: 'AI assisted workspace',
-          updatedAt: new Date().toISOString(),
-          _count: { endpoints: 1 },
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'e1',
-          projectId: 'p1',
-          method: 'POST',
-          path: '/users',
-          description: 'Create user',
-          statusCode: 201,
-          responseBody: { id: 'u1' },
-          endpointConfig: null,
-          scenarios: [],
-        },
-      ]);
+    let projectExists = false;
+    let endpointCreated = false;
+
+    api.get.mockImplementation(async (path: string) => {
+      if (path === '/projects') {
+        return projectExists ? [createProjectListItem(endpointCreated ? 1 : 0)] : [];
+      }
+
+      if (path === '/projects/p1/endpoints') {
+        return endpointCreated
+          ? [
+              {
+                id: 'e1',
+                projectId: 'p1',
+                method: 'POST',
+                path: '/users',
+                description: 'Create user',
+                statusCode: 201,
+                responseBody: { id: 'u1' },
+                endpointConfig: null,
+                scenarios: [],
+              },
+            ]
+          : [];
+      }
+
+      if (path === '/projects/p1/dashboard-summary') {
+        return createDashboardSummary(endpointCreated ? 1 : 0);
+      }
+
+      throw new Error(`Unexpected GET ${path}`);
+    });
     api.post.mockResolvedValueOnce({
       id: 'p1',
       name: 'Generated project',
@@ -323,18 +441,22 @@ describe('WorkspaceShellComponent integration', () => {
       updatedAt: new Date().toISOString(),
       _count: { endpoints: 0 },
     });
-    endpointsRepository.generateAiEndpoint.mockResolvedValue({
-      id: 'e1',
-      method: 'POST',
-      path: '/users',
-      description: 'Create user',
-      latencyMs: 120,
-      statusCode: 201,
-      responseBody: { id: 'u1' },
+    endpointsRepository.generateAiEndpoint.mockImplementation(async () => {
+      endpointCreated = true;
+      return {
+        id: 'e1',
+        method: 'POST',
+        path: '/users',
+        description: 'Create user',
+        latencyMs: 120,
+        statusCode: 201,
+        responseBody: { id: 'u1' },
+      };
     });
 
     const { component } = createComponent();
     await flushAsyncWork();
+    projectExists = true;
 
     component.onCreateProjectModalWithEndpoint({
       name: 'Generated project',
@@ -357,43 +479,38 @@ describe('WorkspaceShellComponent integration', () => {
   });
 
   it('keeps the created project usable after partial success and retries generation without duplicating the project', async () => {
-    api.get
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: 'p1',
-          name: 'Generated project',
-          slug: 'generated-project',
-          description: 'AI assisted workspace',
-          updatedAt: new Date().toISOString(),
-          _count: { endpoints: 0 },
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: 'p1',
-          name: 'Generated project',
-          slug: 'generated-project',
-          description: 'AI assisted workspace',
-          updatedAt: new Date().toISOString(),
-          _count: { endpoints: 1 },
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'e1',
-          projectId: 'p1',
-          method: 'POST',
-          path: '/users',
-          description: 'Create user',
-          statusCode: 201,
-          responseBody: { id: 'u1' },
-          endpointConfig: null,
-          scenarios: [],
-        },
-      ]);
+    let projectExists = false;
+    let endpointCreated = false;
+
+    api.get.mockImplementation(async (path: string) => {
+      if (path === '/projects') {
+        return projectExists ? [createProjectListItem(endpointCreated ? 1 : 0)] : [];
+      }
+
+      if (path === '/projects/p1/endpoints') {
+        return endpointCreated
+          ? [
+              {
+                id: 'e1',
+                projectId: 'p1',
+                method: 'POST',
+                path: '/users',
+                description: 'Create user',
+                statusCode: 201,
+                responseBody: { id: 'u1' },
+                endpointConfig: null,
+                scenarios: [],
+              },
+            ]
+          : [];
+      }
+
+      if (path === '/projects/p1/dashboard-summary') {
+        return createDashboardSummary(endpointCreated ? 1 : 0);
+      }
+
+      throw new Error(`Unexpected GET ${path}`);
+    });
     api.post.mockResolvedValueOnce({
       id: 'p1',
       name: 'Generated project',
@@ -404,18 +521,22 @@ describe('WorkspaceShellComponent integration', () => {
     });
     endpointsRepository.generateAiEndpoint
       .mockRejectedValueOnce(new Error('AI request timed out'))
-      .mockResolvedValueOnce({
-        id: 'e1',
-        method: 'POST',
-        path: '/users',
-        description: 'Create user',
-        latencyMs: 120,
-        statusCode: 201,
-        responseBody: { id: 'u1' },
+      .mockImplementationOnce(async () => {
+        endpointCreated = true;
+        return {
+          id: 'e1',
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          latencyMs: 120,
+          statusCode: 201,
+          responseBody: { id: 'u1' },
+        };
       });
 
     const { component } = createComponent();
     await flushAsyncWork();
+    projectExists = true;
 
     component.onCreateProjectModalWithEndpoint({
       name: 'Generated project',
@@ -447,20 +568,23 @@ describe('WorkspaceShellComponent integration', () => {
   });
 
   it('surfaces unavailable-now fallback copy when create-project generation fails due to missing OpenAI config', async () => {
-    api.get
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: 'p1',
-          name: 'Generated project',
-          slug: 'generated-project',
-          description: 'AI assisted workspace',
-          updatedAt: new Date().toISOString(),
-          _count: { endpoints: 0 },
-        },
-      ])
-      .mockResolvedValueOnce([]);
+    let projectExists = false;
+
+    api.get.mockImplementation(async (path: string) => {
+      if (path === '/projects') {
+        return projectExists ? [createProjectListItem(0)] : [];
+      }
+
+      if (path === '/projects/p1/endpoints') {
+        return [];
+      }
+
+      if (path === '/projects/p1/dashboard-summary') {
+        return createDashboardSummary(0);
+      }
+
+      throw new Error(`Unexpected GET ${path}`);
+    });
     api.post.mockResolvedValueOnce({
       id: 'p1',
       name: 'Generated project',
@@ -475,6 +599,7 @@ describe('WorkspaceShellComponent integration', () => {
 
     const { component } = createComponent();
     await flushAsyncWork();
+    projectExists = true;
 
     component.onCreateProjectModalWithEndpoint({
       name: 'Generated project',

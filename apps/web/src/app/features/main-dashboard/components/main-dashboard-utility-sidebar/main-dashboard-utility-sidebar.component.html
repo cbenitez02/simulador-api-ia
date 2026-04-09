@@ -32,44 +32,39 @@
   </section>
 
   <section class="utility__section utility__section--activity" aria-labelledby="utility-activity-heading">
-    <h2 id="utility-activity-heading" class="utility__label">Recent activity</h2>
+    <h2 id="utility-activity-heading" class="utility__label">Recent requests</h2>
     <div class="utility__activity-card">
-      <ul class="utility__activity-list cp-scrollbar" role="list">
-        @for (item of recentActivities; track item.id) {
-          <li class="utility__activity-row">
-            <span class="utility__activity-icon" aria-hidden="true">
-              @switch (item.icon) {
-                @case ('branch') {
-                  <svg lucideGitBranch [size]="16" strokeWidth="1.75"></svg>
-                }
-                @case ('layers') {
-                  <svg lucideLayers [size]="16" strokeWidth="1.75"></svg>
-                }
-                @case ('settings') {
-                  <svg lucideSettings [size]="16" strokeWidth="1.75"></svg>
-                }
-              }
-            </span>
-            <div class="utility__activity-body">
-              <p class="utility__activity-primary">
-                <span class="utility__activity-verb" [attr.data-tone]="item.verbTone">{{ item.verb }}</span>
-                <strong class="utility__activity-target">{{ item.target }}</strong>
-              </p>
-              <p class="utility__activity-meta">
-                <svg
-                  lucideClock
-                  [size]="12"
-                  strokeWidth="1.75"
-                  class="utility__activity-meta-icon"
-                  aria-hidden="true"
-                ></svg>
-                <span class="utility__activity-time">{{ item.timeAgo }}</span>
-                <span class="utility__activity-by">by You</span>
-              </p>
-            </div>
-          </li>
-        }
-      </ul>
+      @if (recentRequests().length > 0) {
+        <ul class="utility__activity-list cp-scrollbar" role="list">
+          @for (item of recentRequests(); track item.id) {
+            <li class="utility__activity-row">
+              <span class="utility__activity-icon" aria-hidden="true">
+                <svg lucideGitBranch [size]="16" strokeWidth="1.75"></svg>
+              </span>
+              <div class="utility__activity-body">
+                <p class="utility__activity-primary">
+                  <strong class="utility__activity-target">{{ item.requestLabel }}</strong>
+                </p>
+                <p class="utility__activity-meta">
+                  <svg
+                    lucideClock
+                    [size]="12"
+                    strokeWidth="1.75"
+                    class="utility__activity-meta-icon"
+                    aria-hidden="true"
+                  ></svg>
+                  <span class="utility__activity-time">{{ item.timeLabel }}</span>
+                  <span>{{ item.statusCode }}</span>
+                  <span>{{ item.latencyMs }}ms</span>
+                  <span>{{ item.scenarioType }}</span>
+                </p>
+              </div>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="utility__activity-empty">No recent requests yet.</p>
+      }
     </div>
   </section>
 
@@ -77,7 +72,7 @@
     <h2 id="utility-global-heading" class="utility__label">Global config</h2>
     <div class="utility__config-card">
       <ul class="utility__config-rows" role="list">
-        @for (row of globalConfigRows; track row.label) {
+        @for (row of globalConfigRows(); track row.label) {
           <li class="utility__config-row">
             <span class="utility__config-key">{{ row.label }}</span>
             <span class="utility__config-badge" [class.utility__config-badge--success]="row.tone === 'success'">
