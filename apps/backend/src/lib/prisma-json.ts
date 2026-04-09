@@ -1,6 +1,13 @@
-import { Prisma } from '../generated/prisma/client.js';
+import {
+  DbNull,
+  JsonNull,
+  type DbNullClass,
+  type JsonNullClass,
+} from '@prisma/client/runtime/client';
 
-type JsonLike = Prisma.InputJsonValue | typeof Prisma.JsonNull;
+type JsonPrimitive = string | number | boolean;
+type JsonLike = JsonPrimitive | JsonLike[] | { [key: string]: JsonLike } | JsonNullClass;
+type NullableJsonLike = JsonLike | DbNullClass;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -8,7 +15,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 export function toPrismaJson(value: unknown): JsonLike {
   if (value === null) {
-    return Prisma.JsonNull;
+    return JsonNull;
   }
 
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -16,24 +23,22 @@ export function toPrismaJson(value: unknown): JsonLike {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => toPrismaJson(item)) as Prisma.InputJsonArray;
+    return value.map((item) => toPrismaJson(item));
   }
 
   if (isPlainObject(value)) {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [key, toPrismaJson(item)])
-    ) as Prisma.InputJsonObject;
+    );
   }
 
   return JSON.parse(JSON.stringify(value ?? null)) as JsonLike;
 }
 
-export function toNullablePrismaJson(
-  value: unknown
-): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+export function toNullablePrismaJson(value: unknown): NullableJsonLike {
   if (value === null || value === undefined) {
-    return Prisma.DbNull;
+    return DbNull;
   }
 
-  return toPrismaJson(value) as Prisma.InputJsonValue;
+  return toPrismaJson(value);
 }
