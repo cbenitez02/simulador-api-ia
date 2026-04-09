@@ -2,22 +2,24 @@
 
 Monorepo para diseñar, administrar y ejecutar APIs mockeadas con soporte para proyectos, endpoints, escenarios, configuración global, logs y generación asistida por IA.
 
-El repo está dividido en dos aplicaciones principales:
+## Qué incluye este monorepo
 
-- **`apps/web`**: interfaz Angular para operar el simulador
-- **`apps/backend`**: API de gestión + runtime de mocks + persistencia
+- **`apps/backend`**: API de gestión, runtime de mocks y persistencia con Prisma/PostgreSQL.
+- **`apps/web`**: interfaz Angular para operar el simulador desde navegador.
+- **`docs/sdd`**: artefactos del flujo Spec-Driven Development usado por el proyecto.
+- **`libs`**: espacio reservado para código compartido.
 
 ## Estructura del repo
 
 ```text
 .
 ├── apps/
-│   ├── web/        # Frontend Angular 21
-│   └── backend/    # API backend + mock runtime + Prisma/PostgreSQL
+│   ├── backend/
+│   └── web/
 ├── docs/
-│   └── sdd/        # Artefactos y documentación del flujo SDD
-├── libs/           # Espacio para librerías compartidas
-└── .github/        # Workflows y automatización
+│   └── sdd/
+├── libs/
+└── .github/
 ```
 
 ## Stack
@@ -27,48 +29,71 @@ El repo está dividido en dos aplicaciones principales:
 - **Backend:** Node.js, Express 5, Prisma, PostgreSQL, Zod
 - **CI:** GitHub Actions
 
-## Qué podés hacer con el proyecto
+## Prerrequisitos
 
-- crear, editar y eliminar proyectos
-- definir endpoints manuales y escenarios
-- configurar comportamiento global del mock por proyecto
-- inspeccionar logs de requests simuladas
-- exponer mocks accesibles por URL
-- generar estructuras iniciales vía IA desde backend
-
-## Requisitos
-
-- Node.js 22+
-- pnpm 10+
-- Docker Desktop o PostgreSQL local
+- Node.js **22+**
+- pnpm **10+**
+- Docker Desktop **o** PostgreSQL local
 
 ## Instalación
 
-Desde la raíz:
+Desde la raíz del repo:
 
 ```bash
 pnpm install
 ```
 
-## Quick start local
+## Variables de entorno
 
-### 1. Levantar PostgreSQL
+### Backend
 
-La opción más simple y reproducible es usar Docker desde `apps/backend`:
+El backend carga variables desde `apps/backend/.env`.
+
+1. Copiá el ejemplo:
+
+   ```bash
+   cp apps/backend/.env.example apps/backend/.env
+   ```
+
+   > En PowerShell podés usar: `Copy-Item apps/backend/.env.example apps/backend/.env`
+
+2. Valores disponibles:
+
+| Variable         | Obligatoria                          | Uso                                                                |
+| ---------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| `DATABASE_URL`   | Sí                                   | Conexión Prisma/PostgreSQL para desarrollo local                   |
+| `OPENAI_API_KEY` | No para boot, sí para probar IA real | Si no vas a probar IA, podés dejar una dummy                       |
+| `OPENAI_MODEL`   | No                                   | Modelo usado por backend para features asistidas por IA            |
+| `MOCK_BASE_URL`  | No                                   | Base pública que el backend usa al construir URLs del mock runtime |
+| `PORT`           | No                                   | Puerto HTTP del backend                                            |
+| `NODE_ENV`       | No                                   | Entorno de ejecución                                               |
+
+### Frontend
+
+Hoy el frontend **no usa un `.env` propio**. Por defecto consume el backend en `http://localhost:3000` desde `apps/web/src/app/shared/config/api.config.ts`.
+
+## Setup local paso a paso
+
+### 1. Levantar PostgreSQL con Docker
+
+La opción más simple es reutilizar el compose del backend:
 
 ```bash
-cd apps/backend
-docker compose -f docker-compose.test.yml up -d
+pnpm --dir apps/backend db:test:up
 ```
 
-### 2. Configurar backend
+Eso expone PostgreSQL en `localhost:54329`.
 
-Asegurate de tener un `.env` válido en `apps/backend/.env`.
+> El compose crea por default la base `simulador_api_test`. Para desarrollo local del backend conviene usar otra base, por ejemplo `simulador_api`, en el mismo servidor.
 
-Ejemplo mínimo:
+### 2. Configurar el backend
+
+Copiá `apps/backend/.env.example` a `apps/backend/.env` y ajustá al menos `DATABASE_URL`.
+
+Ejemplo local:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:54329/simulador_api"
+DATABASE_URL="postgresql://postgres:postgres@localhost:54329/simulador_api?schema=public"
 OPENAI_API_KEY="test-key-local-dev"
 OPENAI_MODEL="gpt-4.1-mini"
 MOCK_BASE_URL="http://localhost:3000/mock"
@@ -76,36 +101,52 @@ PORT=3000
 NODE_ENV=development
 ```
 
-Aplicá migraciones:
+Después aplicá migraciones:
 
 ```bash
+pnpm --dir apps/backend prisma:generate
 pnpm --dir apps/backend exec prisma migrate deploy --schema prisma/schema.prisma
 ```
 
-Levantá el backend:
+### 3. Levantar backend
 
 ```bash
 pnpm --dir apps/backend dev
 ```
 
-Backend local:
+URLs locales:
 
 - API: `http://localhost:3000`
 - Health: `http://localhost:3000/health`
+- Mock runtime base: `http://localhost:3000/mock`
 
-### 3. Levantar frontend
+### 4. Levantar frontend
 
-Levantá el frontend:
+En otra terminal:
 
 ```bash
-pnpm --dir apps/web exec ng serve --host 127.0.0.1 --port 4200 --no-open
+pnpm --dir apps/web start -- --host 127.0.0.1 --port 4200 --no-open
 ```
 
 Frontend local:
 
 - Web: `http://127.0.0.1:4200`
 
-## Scripts útiles
+## Docker y base de datos
+
+Comandos útiles del backend:
+
+```bash
+pnpm --dir apps/backend db:test:up
+pnpm --dir apps/backend db:test:down
+pnpm --dir apps/backend prisma:generate
+pnpm --dir apps/backend prisma:migrate
+pnpm --dir apps/backend prisma:studio
+```
+
+Si usás PostgreSQL local en vez de Docker, solo asegurate de que `DATABASE_URL` apunte a una base existente y luego corré migraciones.
+
+## Comandos útiles del workspace
 
 ### Raíz
 
@@ -113,16 +154,9 @@ Frontend local:
 pnpm lint
 pnpm format:check
 pnpm test
-```
-
-### Frontend
-
-```bash
-pnpm --dir apps/web start
-pnpm --dir apps/web build
-pnpm --dir apps/web test
-pnpm --dir apps/web exec tsc --project tsconfig.app.json --noEmit
-pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
+pnpm test:coverage
+pnpm test:coverage:backend
+pnpm test:coverage:web
 ```
 
 ### Backend
@@ -134,28 +168,41 @@ pnpm --dir apps/backend test
 pnpm --dir apps/backend test:db
 pnpm --dir apps/backend prisma:generate
 pnpm --dir apps/backend prisma:migrate
+pnpm --dir apps/backend prisma:studio
 ```
 
-## CI actual
+### Frontend
 
-El workflow principal valida:
+```bash
+pnpm --dir apps/web start
+pnpm --dir apps/web test
+pnpm --dir apps/web test:coverage
+pnpm --dir apps/web exec tsc --project tsconfig.app.json --noEmit
+pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
+```
 
-- backend lint + tests
-- frontend lint + typecheck app/spec + tests headless
-- integración backend con DB
-- shellcheck
+## Troubleshooting rápido
+
+- **`DATABASE_URL` inválida o base inexistente** → Prisma no va a migrar ni arrancar. Verificá host, puerto, credenciales y nombre de base.
+- **Docker levantó solo `simulador_api_test`** → creá una base de desarrollo separada o apuntá conscientemente a la de tests si sabés lo que estás haciendo.
+- **El frontend no conecta** → revisá que el backend esté corriendo en `http://localhost:3000` o ajustá `apps/web/src/app/shared/config/api.config.ts`.
+- **La funcionalidad de IA falla** → el backend arranca sin `OPENAI_API_KEY`, pero las rutas de IA van a responder como no disponibles si no configurás una key real.
+- **No mezcles `npm` con `pnpm`** → el workspace está pensado para pnpm; evitá generar `package-lock.json`.
 
 ## Flujo recomendado de trabajo
 
-1. levantar backend y frontend en local
-2. validar cambios con tests/checks acotados por app
-3. abrir PR contra `dev`
-4. dejar que CI valide frontend y backend
+1. instalar dependencias con `pnpm install`
+2. levantar PostgreSQL
+3. configurar `apps/backend/.env`
+4. correr migraciones del backend
+5. levantar backend y frontend
+6. validar cambios con lint/tests acotados
+7. abrir PR contra `dev`
 
 ## Documentación por app
 
-- [Frontend (`apps/web/README.md`)](apps/web/README.md)
 - [Backend (`apps/backend/README.md`)](apps/backend/README.md)
+- [Frontend (`apps/web/README.md`)](apps/web/README.md)
 
 ## Endpoints principales del backend
 
@@ -171,7 +218,6 @@ El workflow principal valida:
 
 ## Notas importantes
 
-- El repo usa **pnpm**; evitá mezclarlo con `npm` o `package-lock.json`.
-- La integración con OpenAI requiere una key real si querés usar IA de verdad.
-- Los cambios grandes del repo se vienen trabajando con **SDD (Spec-Driven Development)**.
 - La rama de integración del equipo hoy es **`dev`**.
+- La CI valida lint y tests de backend/frontend, más integración del backend con DB.
+- Los cambios grandes del repo se vienen trabajando con **SDD (Spec-Driven Development)**.

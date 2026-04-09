@@ -34,10 +34,18 @@ apps/backend/src/
 
 ## Variables de entorno
 
-Copiá o creá `apps/backend/.env` y definí al menos:
+El backend carga variables desde `apps/backend/.env`.
+
+```bash
+cp apps/backend/.env.example apps/backend/.env
+```
+
+> En PowerShell: `Copy-Item apps/backend/.env.example apps/backend/.env`
+
+Ejemplo base:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:54329/simulador_api"
+DATABASE_URL="postgresql://postgres:postgres@localhost:54329/simulador_api?schema=public"
 OPENAI_API_KEY="test-key-local-dev"
 OPENAI_MODEL="gpt-4.1-mini"
 MOCK_BASE_URL="http://localhost:3000/mock"
@@ -48,27 +56,28 @@ NODE_ENV=development
 ### Notas
 
 - `DATABASE_URL` es obligatoria.
-- `OPENAI_API_KEY` hoy también es requerida al arrancar; para desarrollo local puede usarse una dummy si no vas a probar IA real.
-- `MOCK_BASE_URL` define la base usada para URLs del mock runtime.
+- `OPENAI_API_KEY` puede quedar dummy en desarrollo si no vas a probar IA real.
+- `OPENAI_MODEL`, `MOCK_BASE_URL`, `PORT` y `NODE_ENV` tienen defaults en código, pero conviene dejarlos explícitos en `.env` para onboarding.
 
 ## Base de datos local
 
-El repo ya trae un compose reutilizable:
+El repo trae un compose reutilizable:
 
 ```bash
-cd apps/backend
-docker compose -f docker-compose.test.yml up -d
+pnpm --dir apps/backend db:test:up
 ```
 
-Eso levanta PostgreSQL en `localhost:54329`.
+Eso levanta PostgreSQL en `localhost:54329` y crea la base `simulador_api_test`.
 
-Si necesitás la base `simulador_api`, creala dentro del contenedor y después aplicá migraciones.
+Para desarrollo local del backend, creá además una base como `simulador_api` y apuntá `DATABASE_URL` a esa base.
 
 ## Arranque local
 
-Desde la raíz:
+Desde la raíz del monorepo:
 
 ```bash
+pnpm --dir apps/backend prisma:generate
+pnpm --dir apps/backend exec prisma migrate deploy --schema prisma/schema.prisma
 pnpm --dir apps/backend dev
 ```
 
@@ -77,6 +86,11 @@ Servidor local:
 ```text
 http://localhost:3000
 ```
+
+Endpoints útiles:
+
+- `GET /health`
+- `ANY /mock/:projectSlug/*`
 
 ## Migraciones y Prisma
 
@@ -91,10 +105,9 @@ pnpm --dir apps/backend prisma:studio
 
 ```bash
 pnpm --dir apps/backend dev
-pnpm --dir apps/backend build
-pnpm --dir apps/backend start
 pnpm --dir apps/backend lint
 pnpm --dir apps/backend test
+pnpm --dir apps/backend test:coverage
 pnpm --dir apps/backend test:watch
 pnpm --dir apps/backend test:db
 pnpm --dir apps/backend db:test:up
@@ -119,18 +132,6 @@ postgresql://postgres:postgres@localhost:54329/simulador_api_test?schema=public
 
 Podés overridear con `DATABASE_URL_TEST`.
 
-## Endpoints clave
-
-- `GET /health`
-- `GET/POST/PATCH/DELETE /api/v1/projects`
-- `GET/POST/PATCH/DELETE /api/v1/projects/:projectId/endpoints`
-- `GET/POST/PATCH/DELETE /api/v1/endpoints/:endpointId/scenarios`
-- `GET/PUT /api/v1/endpoints/:endpointId/config`
-- `GET/PUT /api/v1/projects/:projectId/config`
-- `GET/DELETE /api/v1/projects/:projectId/logs`
-- `POST /api/v1/projects/:projectId/endpoints/ai-generate`
-- `ANY /mock/:projectSlug/*`
-
 ## Dónde tocar según el caso
 
 - **API y bootstrap**: `src/app.ts`, `src/server.ts`
@@ -143,6 +144,5 @@ Podés overridear con `DATABASE_URL_TEST`.
 ## Consideraciones actuales
 
 - el mock runtime todavía tiene deuda entre config expuesta y comportamiento real en algunas opciones avanzadas
-- el backend ya soporta edición y eliminación de proyectos
-- el flujo de IA existe en backend, pero todavía hay deuda de alineación end-to-end con frontend
+- el flujo de IA existe en backend, pero sin `OPENAI_API_KEY` real las rutas asistidas van a responder como no disponibles
 - la CI del repo valida lint, tests e integración DB del backend
