@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildDefaultGlobalConfig } from './service.js';
-import { buildDashboardSummary, buildProjectTrafficAggregate } from '../dashboard/service.js';
+import { buildDefaultGlobalConfig } from './defaults.js';
+import { buildDashboardSummary, buildProjectTrafficAggregate } from '../dashboard/summary.js';
 
 describe('global-config/service', () => {
   it('shares one default global-config source with dashboard fallback mapping', () => {

@@ -13,6 +13,10 @@ type MainDashboardDataHarness = MainDashboardDataComponent & {
   endpointRows: () => DashboardProject['endpointRows'];
 };
 
+function bindProjectInput(component: { project: unknown }, project: DashboardProject): void {
+  component.project = (() => project) as typeof component.project;
+}
+
 const projectFixture: DashboardProject = {
   id: 'p1',
   name: 'Users API',
@@ -76,7 +80,7 @@ describe('MainDashboardDataComponent', () => {
       () => new MainDashboardDataComponent(),
     ) as unknown as MainDashboardDataHarness & { project: () => DashboardProject };
 
-    component.project = () => projectFixture;
+    bindProjectInput(component, projectFixture);
 
     expect(component.projectStatusLabel()).toBe('Needs attention');
     expect(component.metrics()).toEqual(projectFixture.metrics);

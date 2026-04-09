@@ -4,7 +4,7 @@ import {
   buildProjectTrafficAggregate,
   calculateErrorRatePct,
   resolveLatencyFallback,
-} from './service.js';
+} from './summary.js';
 
 describe('dashboard/service', () => {
   it('builds rule-based status, health, and log-driven metrics for mixed dashboard data', () => {

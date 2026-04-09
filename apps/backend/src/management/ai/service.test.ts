@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAiDraft } from './service.js';
+import { normalizeAiDraft } from './normalize-draft.js';
 
 describe('normalizeAiDraft', () => {
   it('normaliza method/path y expone locks para preview/persist', () => {

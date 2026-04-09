@@ -18,6 +18,10 @@ type MainDashboardUtilityHarness = MainDashboardUtilitySidebarComponent & {
   globalConfigRows: () => Array<{ label: string; badge: string; tone: 'neutral' | 'success' }>;
 };
 
+function bindProjectInput(component: { project: unknown }, project: DashboardProject): void {
+  component.project = (() => project) as typeof component.project;
+}
+
 const projectFixture: DashboardProject = {
   id: 'p1',
   name: 'Users API',
@@ -71,7 +75,7 @@ describe('MainDashboardUtilitySidebarComponent', () => {
       () => new MainDashboardUtilitySidebarComponent(),
     ) as unknown as MainDashboardUtilityHarness & { project: () => DashboardProject };
 
-    component.project = () => projectFixture;
+    bindProjectInput(component, projectFixture);
 
     expect(component.recentRequests()).toEqual([
       {
@@ -98,7 +102,7 @@ describe('MainDashboardUtilitySidebarComponent', () => {
       () => new MainDashboardUtilitySidebarComponent(),
     ) as unknown as MainDashboardUtilityHarness & { project: () => DashboardProject };
 
-    component.project = () => ({ ...projectFixture, recentRequests: [] });
+    bindProjectInput(component, { ...projectFixture, recentRequests: [] });
 
     expect(component.recentRequests()).toEqual([]);
   });
