@@ -73,12 +73,12 @@ Implementar el backend MVP de simulación de APIs con:
 
 ## Gaps aceptados (fuera de alcance MVP)
 
-1. `rateLimitingEnabled` y `rateLimitingRpm` se persisten, pero aún no hay enforcement runtime.
+1. Al cierre original del MVP, `rateLimitingEnabled` y `rateLimitingRpm` se documentaron como gap porque faltaba enforcement runtime; hoy esa limitación ya no aplica porque el runtime sí ejecuta rate limiting, así que este punto queda sólo como contexto histórico.
 
 ---
 
 ## Próximas líneas recomendadas
 
-1. Implementar enforcement real de rate limiting por proyecto/endpoint.
+1. Extender el rate limiting actual con políticas más avanzadas por proyecto/endpoint si el producto lo requiere.
 2. Agregar métricas operativas (p95 latency, error ratio por endpoint).
 3. Incorporar suite de contrato API (OpenAPI + validación automática de responses).

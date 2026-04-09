@@ -231,5 +231,5 @@ pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 ## Notas importantes
 
 - La rama de integración del equipo hoy es **`dev`**.
-- La CI valida lint y tests de backend/frontend, más integración del backend con DB.
+- La CI valida lint, typecheck, tests y build de producción del frontend, más cobertura/integración del backend con DB.
 - Los cambios grandes del repo se vienen trabajando con **SDD (Spec-Driven Development)**.

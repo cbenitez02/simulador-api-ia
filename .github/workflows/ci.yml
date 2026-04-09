@@ -93,6 +93,9 @@ jobs:
       - name: Frontend headless tests
         run: pnpm test:web
 
+      - name: Frontend production build
+        run: pnpm build
+
   backend-db-integration:
     name: Backend DB Integration
     runs-on: ubuntu-latest
