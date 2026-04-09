@@ -46,7 +46,6 @@ Ejemplo base:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:54329/simulador_api?schema=public"
-OPENAI_API_KEY="test-key-local-dev"
 OPENAI_MODEL="gpt-4.1-mini"
 MOCK_BASE_URL="http://localhost:3000/mock"
 PORT=3000
@@ -56,7 +55,7 @@ NODE_ENV=development
 ### Notas
 
 - `DATABASE_URL` es obligatoria.
-- `OPENAI_API_KEY` puede quedar dummy en desarrollo si no vas a probar IA real.
+- `OPENAI_API_KEY` es opcional para boot. Solo configurala si vas a usar endpoints asistidos por IA.
 - `OPENAI_MODEL`, `MOCK_BASE_URL`, `PORT` y `NODE_ENV` tienen defaults en código, pero conviene dejarlos explícitos en `.env` para onboarding.
 
 ## Base de datos local

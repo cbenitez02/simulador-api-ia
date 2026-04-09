@@ -119,7 +119,6 @@ function buildMockEndpoint(overrides: Record<string, unknown> = {}) {
 describe('app integration', () => {
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgresql://user:password@localhost:5432/simulador_api_ia_test';
-    process.env.OPENAI_API_KEY ??= 'test-key';
     process.env.OPENAI_MODEL ??= 'gpt-4.1-mini';
 
     ({ app } = await import('../app.js'));

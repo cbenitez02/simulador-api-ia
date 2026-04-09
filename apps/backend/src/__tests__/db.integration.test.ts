@@ -80,7 +80,6 @@ describeDb('db integration (real postgres)', () => {
     process.env.NODE_ENV = 'test';
     process.env.DATABASE_URL ??=
       'postgresql://postgres:postgres@localhost:54329/simulador_api_test?schema=public';
-    process.env.OPENAI_API_KEY ??= 'test-key';
     process.env.OPENAI_MODEL ??= 'gpt-4.1-mini';
 
     ({ app } = await import('../app.js'));

@@ -62,7 +62,7 @@ El backend carga variables desde `apps/backend/.env`.
 | Variable         | Obligatoria                          | Uso                                                                |
 | ---------------- | ------------------------------------ | ------------------------------------------------------------------ |
 | `DATABASE_URL`   | Sí                                   | Conexión Prisma/PostgreSQL para desarrollo local                   |
-| `OPENAI_API_KEY` | No para boot, sí para probar IA real | Si no vas a probar IA, podés dejar una dummy                       |
+| `OPENAI_API_KEY` | No para boot, sí para probar IA real | Solo hace falta si vas a usar endpoints asistidos por IA           |
 | `OPENAI_MODEL`   | No                                   | Modelo usado por backend para features asistidas por IA            |
 | `MOCK_BASE_URL`  | No                                   | Base pública que el backend usa al construir URLs del mock runtime |
 | `PORT`           | No                                   | Puerto HTTP del backend                                            |
@@ -94,7 +94,6 @@ Ejemplo local:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:54329/simulador_api?schema=public"
-OPENAI_API_KEY="test-key-local-dev"
 OPENAI_MODEL="gpt-4.1-mini"
 MOCK_BASE_URL="http://localhost:3000/mock"
 PORT=3000
