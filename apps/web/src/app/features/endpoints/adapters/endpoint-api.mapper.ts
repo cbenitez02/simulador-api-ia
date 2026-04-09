@@ -32,7 +32,7 @@ function configToUi(config?: EndpointConfigDto | null): EndpointConfig {
       resolved.latencyMode === 'range'
         ? Math.round((resolved.minDelayMs + resolved.maxDelayMs) / 2)
         : resolved.fixedDelayMs,
-    errorRatePct: Math.round(resolved.errorRate * 100),
+    errorRatePct: 0,
     scenarios: { success: true, empty: false, error: false, timeout: false },
   };
 }
@@ -83,7 +83,7 @@ export function mapEndpointDraftFromApi(endpoint: EndpointDto): EndpointDraft {
       fixedDelayMs: config?.fixedDelayMs ?? 0,
       minDelayMs: config?.minDelayMs ?? 0,
       maxDelayMs: config?.maxDelayMs ?? 500,
-      errorRate: Math.round((config?.errorRate ?? 0) * 100),
+      errorRate: 0,
       useScenarioWeights: config?.useScenarioWeights ?? true,
     },
     locks: unlockedEndpointDraftLocks(),
@@ -187,7 +187,7 @@ export function mapEndpointConfigRequestFromDraft(endpointId: string, draft: End
     fixedDelayMs: draft.behavior.fixedDelayMs,
     minDelayMs: draft.behavior.minDelayMs,
     maxDelayMs: draft.behavior.maxDelayMs,
-    errorRate: draft.behavior.errorRate / 100,
+    errorRate: 0,
     useScenarioWeights: draft.behavior.useScenarioWeights,
   };
 }

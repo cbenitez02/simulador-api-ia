@@ -8,7 +8,7 @@ describe('logs-api.mapper', () => {
       projectId: 'p1',
       method: 'HEAD',
       path: '/users',
-      fullUrl: 'http://localhost:3000/mock/users/users',
+      fullUrl: 'https://mock.example.com/users/users',
       origin: 'forced-error',
       statusCode: 504,
       latencyMs: 900,

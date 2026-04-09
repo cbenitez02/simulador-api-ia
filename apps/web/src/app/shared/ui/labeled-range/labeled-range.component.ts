@@ -16,6 +16,7 @@ export class LabeledRangeComponent {
   readonly max = input(100);
   readonly step = input(1);
   readonly inputId = input<string | null>(null);
+  readonly disabled = input(false);
 
   readonly valueChange = output<number>();
 

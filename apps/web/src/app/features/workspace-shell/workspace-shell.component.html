@@ -128,13 +128,16 @@
 }
 
 @if (activeNav() === 'dashboard' && hasProjects()) {
-  <app-main-dashboard-utility-sidebar
-    (createEndpoint)="createEndpoint()"
-    (testAllEndpoints)="testAllEndpoints()"
-    (exportConfig)="exportConfig()"
-    (importEndpoints)="importEndpoints()"
-    (editGlobalConfig)="editGlobalConfig()"
-  />
+  @if (activeProject(); as project) {
+    <app-main-dashboard-utility-sidebar
+      [project]="project"
+      (createEndpoint)="createEndpoint()"
+      (testAllEndpoints)="testAllEndpoints()"
+      (exportConfig)="exportConfig()"
+      (importEndpoints)="importEndpoints()"
+      (editGlobalConfig)="editGlobalConfig()"
+    />
+  }
 } @else if (activeNav() === 'endpoints' && !createEndpointFlowOpen() && hasProjects()) {
   <app-endpoint-detail-panel
     [selectedEndpoint]="selectedEndpoint()"

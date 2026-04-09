@@ -1,9 +1,9 @@
 import type { DashboardProject } from '../models/dashboard-project.model';
 import type { EndpointPreview } from '../../../shared/models/endpoint-preview.model';
 import type { DashboardSummaryDto, ProjectDto } from '../../../shared/http/api.types';
+import { getMockBaseUrl } from '../../../shared/config/app-runtime-config';
 import { formatRelativeTime } from '../../../shared/utils/relative-time';
 
-const MOCK_BASE_URL = 'http://localhost:3000/mock';
 const HTTP_METHODS = new Set<EndpointPreview['method']>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 function normalizeMethod(method: string): EndpointPreview['method'] {
@@ -29,12 +29,14 @@ export function mapDashboardEndpointPreviewFromSummaryRow(
 }
 
 export function mapDashboardProjectFromApi(summary: DashboardSummaryDto): DashboardProject {
+  const mockBaseUrl = getMockBaseUrl();
+
   return {
     id: summary.project.id,
     name: summary.project.name,
     slug: summary.project.slug,
     status: summary.project.status,
-    mockUrl: summary.project.mockUrl || `${MOCK_BASE_URL}/${summary.project.slug}`,
+    mockUrl: summary.project.mockUrl || `${mockBaseUrl}/${summary.project.slug}`,
     description: summary.project.description || 'Your mock API workspace.',
     lastUpdatedRelative: formatRelativeTime(summary.project.updatedAt),
     metrics: summary.metrics,
@@ -55,12 +57,14 @@ export function mapDashboardProjectFromApi(summary: DashboardSummaryDto): Dashbo
 }
 
 export function mapCreatedProjectPlaceholder(project: ProjectDto): DashboardProject {
+  const mockBaseUrl = getMockBaseUrl();
+
   return {
     id: project.id,
     name: project.name,
     slug: project.slug,
     status: 'empty',
-    mockUrl: `${MOCK_BASE_URL}/${project.slug}`,
+    mockUrl: `${mockBaseUrl}/${project.slug}`,
     description: project.description || 'Your mock API workspace.',
     lastUpdatedRelative: formatRelativeTime(project.updatedAt),
     metrics: {

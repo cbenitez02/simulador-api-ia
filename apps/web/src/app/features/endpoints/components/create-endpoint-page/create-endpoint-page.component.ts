@@ -307,15 +307,15 @@ export class CreateEndpointPageComponent {
   private mapGenerationError(error: unknown): string {
     if (error instanceof ApiError) {
       if (error.code === 'AI_TIMEOUT' || error.status === 504) {
-        return 'AI timed out before it could return a valid draft. Retry or continue manually.';
+        return 'AI timed out before it could return a valid draft. Retry to get a preview.';
       }
 
       if (error.code === 'AI_UNAVAILABLE' || error.status === 503) {
-        return 'AI is unavailable right now. Retry in a moment or continue manually.';
+        return 'AI is unavailable right now. Retry in a moment to get a preview.';
       }
 
       if (error.code === 'AI_INVALID_OUTPUT' || error.status === 422) {
-        return 'AI returned an invalid draft. Retry with a more explicit prompt or continue manually.';
+        return 'AI returned an invalid draft. Retry with a more explicit prompt to get a preview.';
       }
     }
 

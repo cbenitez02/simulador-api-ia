@@ -1,7 +1,24 @@
-import { describe, expect, it } from 'vitest';
-import { mapDashboardEndpointPreviewFromSummaryRow, mapDashboardProjectFromApi } from './project-api.mapper';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  mapCreatedProjectPlaceholder,
+  mapDashboardEndpointPreviewFromSummaryRow,
+  mapDashboardProjectFromApi,
+} from './project-api.mapper';
+
+type RuntimeConfigGlobal = typeof globalThis & {
+  __SIMULADOR_RUNTIME_CONFIG__?: {
+    apiBaseUrl?: string;
+    mockBaseUrl?: string;
+  };
+};
+
+const runtimeConfigGlobal = globalThis as RuntimeConfigGlobal;
 
 describe('project-api.mapper', () => {
+  afterEach(() => {
+    delete runtimeConfigGlobal.__SIMULADOR_RUNTIME_CONFIG__;
+  });
+
   it('maps backend summary data into dashboard shape', () => {
     const result = mapDashboardProjectFromApi({
       project: {
@@ -9,7 +26,7 @@ describe('project-api.mapper', () => {
         name: 'Users API',
         description: '',
         slug: 'users-api',
-        mockUrl: 'http://localhost:3000/mock/users-api',
+        mockUrl: 'https://mock.example.com/users-api',
         updatedAt: new Date().toISOString(),
         status: 'attention',
       },
@@ -60,7 +77,7 @@ describe('project-api.mapper', () => {
     });
 
     expect(result.status).toBe('attention');
-    expect(result.mockUrl).toBe('http://localhost:3000/mock/users-api');
+    expect(result.mockUrl).toBe('https://mock.example.com/users-api');
     expect(result.description).toBe('Your mock API workspace.');
     expect(result.metrics.totalScenarios).toBe(3);
     expect(result.health.errorScenarioEndpoints).toBe(1);
@@ -81,7 +98,7 @@ describe('project-api.mapper', () => {
         name: 'Empty API',
         description: 'Seedless',
         slug: 'empty-api',
-        mockUrl: 'http://localhost:3000/mock/empty-api',
+        mockUrl: 'https://mock.example.com/empty-api',
         updatedAt: new Date().toISOString(),
         status: 'empty',
       },
@@ -114,6 +131,23 @@ describe('project-api.mapper', () => {
     expect(result.recentRequests).toEqual([]);
     expect(result.configSummary.logging.level).toBe('basic');
     expect(result.endpoints).toEqual([]);
+  });
+
+  it('builds placeholder mock URLs from runtime config when the backend has not returned a summary yet', () => {
+    runtimeConfigGlobal.__SIMULADOR_RUNTIME_CONFIG__ = {
+      mockBaseUrl: 'https://deploy.example.com/mock',
+    };
+
+    const result = mapCreatedProjectPlaceholder({
+      id: 'p3',
+      name: 'Generated API',
+      slug: 'generated-api',
+      description: '',
+      updatedAt: new Date().toISOString(),
+      _count: { endpoints: 0 },
+    });
+
+    expect(result.mockUrl).toBe('https://deploy.example.com/mock/generated-api');
   });
 
   it('maps summary endpoint rows into navigation-only previews explicitly derived on the frontend', () => {

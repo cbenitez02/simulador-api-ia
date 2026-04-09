@@ -70,7 +70,19 @@ El backend carga variables desde `apps/backend/.env`.
 
 ### Frontend
 
-Hoy el frontend **no usa un `.env` propio**. Por defecto consume el backend en `http://localhost:3000` desde `apps/web/src/app/shared/config/api.config.ts`.
+El frontend carga configuración runtime desde `apps/web/public/app-config.js`.
+
+- si no definís nada, usa defaults locales: `http://localhost:3000/api/v1` y `http://localhost:3000/mock`
+- si desplegás en otro entorno, podés reemplazar ese archivo sin rebuild y definir `window.__SIMULADOR_RUNTIME_CONFIG__`
+
+Ejemplo:
+
+```js
+window.__SIMULADOR_RUNTIME_CONFIG__ = {
+  apiBaseUrl: 'https://api.example.com/api/v1',
+  mockBaseUrl: 'https://api.example.com/mock',
+};
+```
 
 ## Setup local paso a paso
 
@@ -184,7 +196,7 @@ pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 
 - **`DATABASE_URL` inválida o base inexistente** → Prisma no va a migrar ni arrancar. Verificá host, puerto, credenciales y nombre de base.
 - **Docker levantó solo `simulador_api_test`** → creá una base de desarrollo separada o apuntá conscientemente a la de tests si sabés lo que estás haciendo.
-- **El frontend no conecta** → revisá que el backend esté corriendo en `http://localhost:3000` o ajustá `apps/web/src/app/shared/config/api.config.ts`.
+- **El frontend no conecta** → revisá que el backend esté corriendo en `http://localhost:3000` o ajustá `apps/web/public/app-config.js` para tu entorno.
 - **La funcionalidad de IA falla** → el backend arranca sin `OPENAI_API_KEY`, pero las rutas de IA van a responder como no disponibles si no configurás una key real.
 - **No mezcles `npm` con `pnpm`** → el workspace está pensado para pnpm; evitá generar `package-lock.json`.
 
@@ -212,6 +224,7 @@ pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 - `GET/PUT /api/v1/endpoints/:endpointId/config`
 - `GET/PUT /api/v1/projects/:projectId/config`
 - `GET/DELETE /api/v1/projects/:projectId/logs`
+- `POST /api/v1/projects/:projectId/endpoints/ai-preview`
 - `POST /api/v1/projects/:projectId/endpoints/ai-generate`
 - `ANY /mock/:projectSlug/*`
 

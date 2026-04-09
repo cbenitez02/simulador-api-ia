@@ -4,6 +4,13 @@ import type { UpsertGlobalConfigInput } from './schema.js';
 export { buildDefaultGlobalConfig, DEFAULT_GLOBAL_CONFIG_VALUES } from './defaults.js';
 import { buildDefaultGlobalConfig } from './defaults.js';
 
+function canonicalizeGlobalConfig(input: UpsertGlobalConfigInput): UpsertGlobalConfigInput {
+  return {
+    ...input,
+    scope: 'all',
+  };
+}
+
 async function assertProjectExists(projectId: string): Promise<void> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -32,34 +39,36 @@ export async function getGlobalConfig(projectId: string) {
 export async function upsertGlobalConfig(projectId: string, input: UpsertGlobalConfigInput) {
   await assertProjectExists(projectId);
 
+  const canonical = canonicalizeGlobalConfig(input);
+
   return prisma.globalConfig.upsert({
     where: { projectId },
     update: {
-      latencyEnabled: input.latencyEnabled,
-      latencyMinMs: input.latencyMinMs,
-      latencyMaxMs: input.latencyMaxMs,
-      latencyMode: input.latencyMode,
-      errorSimulationEnabled: input.errorSimulationEnabled,
-      errorSimulationRate: input.errorSimulationRate,
-      errorSimulationCodes: input.errorSimulationCodes,
-      rateLimitingEnabled: input.rateLimitingEnabled,
-      rateLimitingRpm: input.rateLimitingRpm,
-      loggingLevel: input.loggingLevel,
-      scope: input.scope,
+      latencyEnabled: canonical.latencyEnabled,
+      latencyMinMs: canonical.latencyMinMs,
+      latencyMaxMs: canonical.latencyMaxMs,
+      latencyMode: canonical.latencyMode,
+      errorSimulationEnabled: canonical.errorSimulationEnabled,
+      errorSimulationRate: canonical.errorSimulationRate,
+      errorSimulationCodes: canonical.errorSimulationCodes,
+      rateLimitingEnabled: canonical.rateLimitingEnabled,
+      rateLimitingRpm: canonical.rateLimitingRpm,
+      loggingLevel: canonical.loggingLevel,
+      scope: canonical.scope,
     },
     create: {
       projectId,
-      latencyEnabled: input.latencyEnabled,
-      latencyMinMs: input.latencyMinMs,
-      latencyMaxMs: input.latencyMaxMs,
-      latencyMode: input.latencyMode,
-      errorSimulationEnabled: input.errorSimulationEnabled,
-      errorSimulationRate: input.errorSimulationRate,
-      errorSimulationCodes: input.errorSimulationCodes,
-      rateLimitingEnabled: input.rateLimitingEnabled,
-      rateLimitingRpm: input.rateLimitingRpm,
-      loggingLevel: input.loggingLevel,
-      scope: input.scope,
+      latencyEnabled: canonical.latencyEnabled,
+      latencyMinMs: canonical.latencyMinMs,
+      latencyMaxMs: canonical.latencyMaxMs,
+      latencyMode: canonical.latencyMode,
+      errorSimulationEnabled: canonical.errorSimulationEnabled,
+      errorSimulationRate: canonical.errorSimulationRate,
+      errorSimulationCodes: canonical.errorSimulationCodes,
+      rateLimitingEnabled: canonical.rateLimitingEnabled,
+      rateLimitingRpm: canonical.rateLimitingRpm,
+      loggingLevel: canonical.loggingLevel,
+      scope: canonical.scope,
     },
   });
 }

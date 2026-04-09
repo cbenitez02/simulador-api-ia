@@ -387,7 +387,7 @@ describe('CreateEndpointPageComponent integration', () => {
 
     expect(component.step()).toBe('prompt');
     expect(component.generationError()).toBe(
-      'AI timed out before it could return a valid draft. Retry or continue manually.',
+      'AI timed out before it could return a valid draft. Retry to get a preview.',
     );
     expect(component.generating()).toBe(false);
 
@@ -411,7 +411,7 @@ describe('CreateEndpointPageComponent integration', () => {
 
     expect(component.step()).toBe('prompt');
     expect(component.generationError()).toBe(
-      'AI returned an invalid draft. Retry with a more explicit prompt or continue manually.',
+      'AI returned an invalid draft. Retry with a more explicit prompt to get a preview.',
     );
     expect(component.generating()).toBe(false);
     expect(component.draft()).toBeNull();
@@ -429,7 +429,7 @@ describe('CreateEndpointPageComponent integration', () => {
     await component.onGenerateRequested();
 
     expect(component.step()).toBe('prompt');
-    expect(component.generationError()).toBe('AI is unavailable right now. Retry in a moment or continue manually.');
+    expect(component.generationError()).toBe('AI is unavailable right now. Retry in a moment to get a preview.');
     expect(component.generating()).toBe(false);
   });
 

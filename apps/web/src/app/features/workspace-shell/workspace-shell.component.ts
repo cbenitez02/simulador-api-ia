@@ -1,19 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { CreateEndpointPageComponent } from '../endpoints/components/create-endpoint-page/create-endpoint-page.component';
-import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
-import { EndpointsPageComponent } from '../endpoints/endpoints-page.component';
-import { LogsComponent } from '../logs/logs.component';
-import { LogsDetailSidebarComponent } from '../logs/components/logs-detail-sidebar/logs-detail-sidebar.component';
-import { DashboardEmptyStateComponent } from '../main-dashboard/components/dashboard-empty-state/dashboard-empty-state.component';
-import { MainDashboardDataComponent } from '../main-dashboard/components/main-dashboard-data/main-dashboard-data.component';
-import { MainDashboardSidebarComponent } from '../main-dashboard/components/main-dashboard-sidebar/main-dashboard-sidebar.component';
-import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/components/main-dashboard-utility-sidebar/main-dashboard-utility-sidebar.component';
-import { GlobalConfigDrawerComponent } from '../global-config/components/global-config-drawer/global-config-drawer.component';
-import { createDefaultGlobalConfig, type GlobalConfig } from '../global-config/models/global-config.model';
-import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
-import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
-import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { ApiError } from '../../shared/http/api-error.mapper';
+import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
+import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
+import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
 import type {
   CreateProjectModalPayload,
   CreateProjectWithEndpointPayload,
@@ -21,12 +10,23 @@ import type {
   ProjectModalInitialValues,
   ProjectModalMode,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
+import { CreateEndpointPageComponent } from '../endpoints/components/create-endpoint-page/create-endpoint-page.component';
+import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
+import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
+import { EndpointsPageComponent } from '../endpoints/endpoints-page.component';
+import { GlobalConfigDrawerComponent } from '../global-config/components/global-config-drawer/global-config-drawer.component';
+import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
+import { createDefaultGlobalConfig, type GlobalConfig } from '../global-config/models/global-config.model';
+import { LogsDetailSidebarComponent } from '../logs/components/logs-detail-sidebar/logs-detail-sidebar.component';
+import { LogsComponent } from '../logs/logs.component';
+import type { ApiLogEntry } from '../logs/models/api-log.model';
+import { DashboardEmptyStateComponent } from '../main-dashboard/components/dashboard-empty-state/dashboard-empty-state.component';
+import { MainDashboardDataComponent } from '../main-dashboard/components/main-dashboard-data/main-dashboard-data.component';
+import { MainDashboardSidebarComponent } from '../main-dashboard/components/main-dashboard-sidebar/main-dashboard-sidebar.component';
+import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/components/main-dashboard-utility-sidebar/main-dashboard-utility-sidebar.component';
+import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type { CreateProjectAiFlowState, SidebarProjectRow, WorkspaceNavId } from './models/workspace-shell.model';
-import type { ApiLogEntry } from '../logs/models/api-log.model';
-import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
-import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
-import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 
 @Component({
   selector: 'app-workspace-shell',

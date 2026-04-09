@@ -19,7 +19,7 @@ const dashboardSummaryDto = {
     name: 'Users',
     description: '',
     slug: 'users',
-    mockUrl: 'http://localhost:3000/mock/users',
+    mockUrl: 'https://mock.example.com/users',
     updatedAt: new Date().toISOString(),
     status: 'running' as const,
   },
@@ -116,7 +116,7 @@ describe('ProjectsRepository', () => {
     expect(api.get).toHaveBeenCalledWith('/projects/p1/dashboard-summary');
     expect(result.name).toBe('Users v2');
     expect(result.metrics.totalScenarios).toBe(2);
-    expect(result.mockUrl).toBe('http://localhost:3000/mock/users');
+    expect(result.mockUrl).toBe('https://mock.example.com/users');
   });
 
   it('loads dashboard detail from the summary endpoint without endpoint fan-out', async () => {

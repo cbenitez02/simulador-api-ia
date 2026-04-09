@@ -583,6 +583,112 @@ describe('app integration', () => {
     expect(blocked.headers['retry-after']).toBe('55');
   });
 
+  it('PUT /api/v1/projects/:projectId/config canonicaliza scope no soportado a all', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.globalConfig.upsert.mockResolvedValueOnce({
+      projectId: 'p1',
+      latencyEnabled: false,
+      latencyMinMs: 0,
+      latencyMaxMs: 1000,
+      latencyMode: 'fixed',
+      errorSimulationEnabled: false,
+      errorSimulationRate: 0,
+      errorSimulationCodes: [500],
+      rateLimitingEnabled: false,
+      rateLimitingRpm: 60,
+      loggingLevel: 'basic',
+      scope: 'all',
+    });
+
+    const response = await request(app)
+      .put('/api/v1/projects/p1/config')
+      .send({
+        latencyEnabled: false,
+        latencyMinMs: 0,
+        latencyMaxMs: 1000,
+        latencyMode: 'fixed',
+        errorSimulationEnabled: false,
+        errorSimulationRate: 0,
+        errorSimulationCodes: [500],
+        rateLimitingEnabled: false,
+        rateLimitingRpm: 60,
+        loggingLevel: 'basic',
+        scope: 'unset',
+      });
+
+    expect(response.status).toBe(200);
+    expect(prismaMock.globalConfig.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ scope: 'all' }),
+        create: expect.objectContaining({ scope: 'all' }),
+      })
+    );
+    expect(response.body.scope).toBe('all');
+  });
+
+  it('PUT /api/v1/endpoints/:endpointId/config canonicaliza errorRate no soportado a 0', async () => {
+    prismaMock.endpoint.findUnique.mockResolvedValueOnce({ id: 'e1' });
+    prismaMock.endpointConfig.upsert.mockResolvedValueOnce({
+      endpointId: 'e1',
+      latencyMode: 'range',
+      fixedDelayMs: 0,
+      minDelayMs: 50,
+      maxDelayMs: 250,
+      errorRate: 0,
+      useScenarioWeights: false,
+    });
+
+    const response = await request(app).put('/api/v1/endpoints/e1/config').send({
+      latencyMode: 'range',
+      fixedDelayMs: 0,
+      minDelayMs: 50,
+      maxDelayMs: 250,
+      errorRate: 0.35,
+      useScenarioWeights: false,
+    });
+
+    expect(response.status).toBe(200);
+    expect(prismaMock.endpointConfig.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ errorRate: 0 }),
+        create: expect.objectContaining({ errorRate: 0 }),
+      })
+    );
+    expect(response.body.errorRate).toBe(0);
+  });
+
+  it('GET /mock/:projectSlug/:path aplica latencia global aunque exista scope legacy distinto de all', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce(
+      buildMockProject({
+        globalConfig: {
+          ...buildMockProject().globalConfig,
+          latencyEnabled: true,
+          latencyMode: 'fixed',
+          latencyMinMs: 123,
+          latencyMaxMs: 456,
+          scope: 'unset',
+        },
+      })
+    );
+    prismaMock.endpoint.findFirst.mockResolvedValueOnce(
+      buildMockEndpoint({
+        endpointConfig: {
+          latencyMode: 'fixed',
+          fixedDelayMs: 25,
+          minDelayMs: 0,
+          maxDelayMs: 25,
+          useScenarioWeights: true,
+        },
+      })
+    );
+    prismaMock.apiLog.create.mockResolvedValueOnce({ id: 'l1' });
+
+    const response = await request(app).get('/mock/demo/users');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['x-simulador-latency']).toBe('123');
+  });
+
   it('GET /api/v1/projects/:projectId/logs devuelve últimos logs', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
     prismaMock.apiLog.findMany.mockResolvedValueOnce([
