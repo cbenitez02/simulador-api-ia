@@ -3,7 +3,6 @@ import {
   LucideClock,
   LucideDownload,
   LucideGitBranch,
-  LucideLayers,
   LucidePlay,
   LucidePlus,
   LucideSettings,
@@ -26,16 +25,7 @@ export interface UtilitySidebarRequestItem {
   templateUrl: './main-dashboard-utility-sidebar.component.html',
   styleUrls: ['./main-dashboard-utility-sidebar.component.css'],
   standalone: true,
-  imports: [
-    LucideClock,
-    LucideDownload,
-    LucideGitBranch,
-    LucideLayers,
-    LucidePlay,
-    LucidePlus,
-    LucideSettings,
-    LucideUpload,
-  ],
+  imports: [LucideClock, LucideDownload, LucideGitBranch, LucidePlay, LucidePlus, LucideSettings, LucideUpload],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardUtilitySidebarComponent {
