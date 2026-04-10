@@ -10,6 +10,33 @@ let app: Express;
 let prisma: PrismaClient;
 let prismaJsonNull: unknown;
 
+function authHeaders(overrides: Record<string, string> = {}) {
+  return {
+    'x-clerk-auth-status': 'signed-in',
+    'x-clerk-user-id': 'user_clerk_123',
+    'x-clerk-email': 'owner@example.com',
+    'x-clerk-email-verified': 'true',
+    'x-clerk-display-name': 'Owner User',
+    ...overrides,
+  };
+}
+
+function apiGet(appInstance: Express, path: string) {
+  return request(appInstance).get(path).set(authHeaders());
+}
+
+function apiPost(appInstance: Express, path: string) {
+  return request(appInstance).post(path).set(authHeaders());
+}
+
+function apiPut(appInstance: Express, path: string) {
+  return request(appInstance).put(path).set(authHeaders());
+}
+
+function apiDelete(appInstance: Express, path: string) {
+  return request(appInstance).delete(path).set(authHeaders());
+}
+
 async function cleanDatabase() {
   await prisma.apiLog.deleteMany();
   await prisma.scenario.deleteMany();
@@ -50,7 +77,7 @@ async function waitForLogEntries(
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const response = await request(appInstance).get(`/api/v1/projects/${projectId}/logs`);
+    const response = await apiGet(appInstance, `/api/v1/projects/${projectId}/logs`);
 
     if (
       response.status === 200 &&
@@ -93,7 +120,7 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('crea proyecto y persiste globalConfig default', async () => {
-    const response = await request(app).post('/api/v1/projects').send({
+    const response = await apiPost(app, '/api/v1/projects').send({
       name: 'Proyecto DB Real',
       description: 'Test con postgres real',
     });
@@ -183,29 +210,30 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('flujo real de endpoint + scenario + mock + logs', async () => {
-    const projectRes = await request(app).post('/api/v1/projects').send({ name: 'Demo Mock' });
+    const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Demo Mock' });
     expect(projectRes.status).toBe(201);
 
-    const endpointRes = await request(app)
-      .post(`/api/v1/projects/${projectRes.body.id}/endpoints`)
-      .send({
+    const endpointRes = await apiPost(app, `/api/v1/projects/${projectRes.body.id}/endpoints`).send(
+      {
         method: 'GET',
         path: '/users',
         statusCode: 200,
         responseBody: { source: 'endpoint-default' },
-      });
+      }
+    );
 
     expect(endpointRes.status).toBe(201);
 
-    const scenarioRes = await request(app)
-      .post(`/api/v1/endpoints/${endpointRes.body.id}/scenarios`)
-      .send({
-        name: 'success-case',
-        type: 'success',
-        statusCode: 200,
-        body: { source: 'scenario' },
-        weight: 1,
-      });
+    const scenarioRes = await apiPost(
+      app,
+      `/api/v1/endpoints/${endpointRes.body.id}/scenarios`
+    ).send({
+      name: 'success-case',
+      type: 'success',
+      statusCode: 200,
+      body: { source: 'scenario' },
+      weight: 1,
+    });
 
     expect(scenarioRes.status).toBe(201);
 
@@ -220,9 +248,7 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('lista logs con envelope incremental, orden estable y cursor por tupla', async () => {
-    const projectRes = await request(app)
-      .post('/api/v1/projects')
-      .send({ name: 'Live Logs Order' });
+    const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Live Logs Order' });
     expect(projectRes.status).toBe(201);
 
     await prisma.apiLog.createMany({
@@ -284,9 +310,7 @@ describeDb('db integration (real postgres)', () => {
       ],
     });
 
-    const firstResponse = await request(app).get(
-      `/api/v1/projects/${projectRes.body.id}/logs?limit=2`
-    );
+    const firstResponse = await apiGet(app, `/api/v1/projects/${projectRes.body.id}/logs?limit=2`);
 
     expect(firstResponse.status).toBe(200);
     expect(firstResponse.body.items.map((item: { id: string }) => item.id)).toEqual([
@@ -299,7 +323,8 @@ describeDb('db integration (real postgres)', () => {
     });
     expect(typeof firstResponse.body.serverTime).toBe('string');
 
-    const incrementalResponse = await request(app).get(
+    const incrementalResponse = await apiGet(
+      app,
       `/api/v1/projects/${projectRes.body.id}/logs?cursorCreatedAt=${encodeURIComponent('2026-04-08T12:01:00.000Z')}&cursorId=log-same-a`
     );
 
@@ -314,29 +339,27 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('forced-error global responde código configurado', async () => {
-    const projectRes = await request(app).post('/api/v1/projects').send({ name: 'Forced Error' });
+    const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Forced Error' });
     expect(projectRes.status).toBe(201);
 
-    const endpointRes = await request(app)
-      .post(`/api/v1/projects/${projectRes.body.id}/endpoints`)
-      .send({ method: 'GET', path: '/healthz', statusCode: 200, responseBody: { ok: true } });
+    const endpointRes = await apiPost(app, `/api/v1/projects/${projectRes.body.id}/endpoints`).send(
+      { method: 'GET', path: '/healthz', statusCode: 200, responseBody: { ok: true } }
+    );
     expect(endpointRes.status).toBe(201);
 
-    const cfgRes = await request(app)
-      .put(`/api/v1/projects/${projectRes.body.id}/config`)
-      .send({
-        latencyEnabled: false,
-        latencyMinMs: 0,
-        latencyMaxMs: 0,
-        latencyMode: 'fixed',
-        errorSimulationEnabled: true,
-        errorSimulationRate: 1,
-        errorSimulationCodes: [503],
-        rateLimitingEnabled: false,
-        rateLimitingRpm: 60,
-        loggingLevel: 'basic',
-        scope: 'all',
-      });
+    const cfgRes = await apiPut(app, `/api/v1/projects/${projectRes.body.id}/config`).send({
+      latencyEnabled: false,
+      latencyMinMs: 0,
+      latencyMaxMs: 0,
+      latencyMode: 'fixed',
+      errorSimulationEnabled: true,
+      errorSimulationRate: 1,
+      errorSimulationCodes: [503],
+      rateLimitingEnabled: false,
+      rateLimitingRpm: 60,
+      loggingLevel: 'basic',
+      scope: 'all',
+    });
 
     expect(cfgRes.status).toBe(200);
 
@@ -345,36 +368,37 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('persiste y expone metadata real de trazabilidad sin inventar scenario', async () => {
-    const projectRes = await request(app)
-      .post('/api/v1/projects')
-      .send({ name: 'Traceability Logs' });
+    const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Traceability Logs' });
     expect(projectRes.status).toBe(201);
 
-    const scenarioEndpointRes = await request(app)
-      .post(`/api/v1/projects/${projectRes.body.id}/endpoints`)
-      .send({
-        method: 'POST',
-        path: '/users',
-        statusCode: 201,
-        responseBody: { source: 'endpoint-default' },
-      });
+    const scenarioEndpointRes = await apiPost(
+      app,
+      `/api/v1/projects/${projectRes.body.id}/endpoints`
+    ).send({
+      method: 'POST',
+      path: '/users',
+      statusCode: 201,
+      responseBody: { source: 'endpoint-default' },
+    });
     expect(scenarioEndpointRes.status).toBe(201);
 
-    const scenarioRes = await request(app)
-      .post(`/api/v1/endpoints/${scenarioEndpointRes.body.id}/scenarios`)
-      .send({
-        name: 'create-user',
-        type: 'success',
-        statusCode: 201,
-        body: { ok: true },
-        delayMs: 0,
-        weight: 1,
-      });
+    const scenarioRes = await apiPost(
+      app,
+      `/api/v1/endpoints/${scenarioEndpointRes.body.id}/scenarios`
+    ).send({
+      name: 'create-user',
+      type: 'success',
+      statusCode: 201,
+      body: { ok: true },
+      delayMs: 0,
+      weight: 1,
+    });
     expect(scenarioRes.status).toBe(201);
 
-    const directEndpointRes = await request(app)
-      .post(`/api/v1/projects/${projectRes.body.id}/endpoints`)
-      .send({ method: 'GET', path: '/health', statusCode: 200, responseBody: { ok: true } });
+    const directEndpointRes = await apiPost(
+      app,
+      `/api/v1/projects/${projectRes.body.id}/endpoints`
+    ).send({ method: 'GET', path: '/health', statusCode: 200, responseBody: { ok: true } });
     expect(directEndpointRes.status).toBe(201);
 
     const scenarioMockRes = await request(app)
@@ -414,34 +438,32 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('respeta loggingLevel basic omitiendo request y response bodies', async () => {
-    const projectRes = await request(app).post('/api/v1/projects').send({ name: 'Basic Logging' });
+    const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Basic Logging' });
     expect(projectRes.status).toBe(201);
 
-    const configRes = await request(app)
-      .put(`/api/v1/projects/${projectRes.body.id}/config`)
-      .send({
-        latencyEnabled: false,
-        latencyMinMs: 0,
-        latencyMaxMs: 0,
-        latencyMode: 'fixed',
-        errorSimulationEnabled: false,
-        errorSimulationRate: 0,
-        errorSimulationCodes: [500],
-        rateLimitingEnabled: false,
-        rateLimitingRpm: 60,
-        loggingLevel: 'basic',
-        scope: 'all',
-      });
+    const configRes = await apiPut(app, `/api/v1/projects/${projectRes.body.id}/config`).send({
+      latencyEnabled: false,
+      latencyMinMs: 0,
+      latencyMaxMs: 0,
+      latencyMode: 'fixed',
+      errorSimulationEnabled: false,
+      errorSimulationRate: 0,
+      errorSimulationCodes: [500],
+      rateLimitingEnabled: false,
+      rateLimitingRpm: 60,
+      loggingLevel: 'basic',
+      scope: 'all',
+    });
     expect(configRes.status).toBe(200);
 
-    const endpointRes = await request(app)
-      .post(`/api/v1/projects/${projectRes.body.id}/endpoints`)
-      .send({
+    const endpointRes = await apiPost(app, `/api/v1/projects/${projectRes.body.id}/endpoints`).send(
+      {
         method: 'POST',
         path: '/users',
         statusCode: 201,
         responseBody: { created: true, secret: 'server-payload' },
-      });
+      }
+    );
     expect(endpointRes.status).toBe(201);
 
     const mockRes = await request(app)
@@ -460,12 +482,12 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('borra los logs del proyecto via DELETE /projects/:projectId/logs', async () => {
-    const projectRes = await request(app).post('/api/v1/projects').send({ name: 'Delete Logs' });
+    const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Delete Logs' });
     expect(projectRes.status).toBe(201);
 
-    const endpointRes = await request(app)
-      .post(`/api/v1/projects/${projectRes.body.id}/endpoints`)
-      .send({ method: 'GET', path: '/users', statusCode: 200, responseBody: { ok: true } });
+    const endpointRes = await apiPost(app, `/api/v1/projects/${projectRes.body.id}/endpoints`).send(
+      { method: 'GET', path: '/users', statusCode: 200, responseBody: { ok: true } }
+    );
     expect(endpointRes.status).toBe(201);
 
     const mockRes = await request(app).get(`/mock/${projectRes.body.slug}/users`);
@@ -474,10 +496,10 @@ describeDb('db integration (real postgres)', () => {
     const logsBeforeDelete = await waitForLogEntries(app, projectRes.body.id);
     expect(logsBeforeDelete.length).toBeGreaterThan(0);
 
-    const deleteRes = await request(app).delete(`/api/v1/projects/${projectRes.body.id}/logs`);
+    const deleteRes = await apiDelete(app, `/api/v1/projects/${projectRes.body.id}/logs`);
     expect(deleteRes.status).toBe(204);
 
-    const listAfterDelete = await request(app).get(`/api/v1/projects/${projectRes.body.id}/logs`);
+    const listAfterDelete = await apiGet(app, `/api/v1/projects/${projectRes.body.id}/logs`);
     expect(listAfterDelete.status).toBe(200);
     expect(listAfterDelete.body.items).toEqual([]);
 
@@ -488,24 +510,25 @@ describeDb('db integration (real postgres)', () => {
   });
 
   it('timeout scenario cierra socket (teardown)', async () => {
-    const projectRes = await request(app).post('/api/v1/projects').send({ name: 'Timeout Mock' });
+    const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Timeout Mock' });
     expect(projectRes.status).toBe(201);
 
-    const endpointRes = await request(app)
-      .post(`/api/v1/projects/${projectRes.body.id}/endpoints`)
-      .send({ method: 'GET', path: '/slow', statusCode: 200, responseBody: { ok: true } });
+    const endpointRes = await apiPost(app, `/api/v1/projects/${projectRes.body.id}/endpoints`).send(
+      { method: 'GET', path: '/slow', statusCode: 200, responseBody: { ok: true } }
+    );
     expect(endpointRes.status).toBe(201);
 
-    const scenarioRes = await request(app)
-      .post(`/api/v1/endpoints/${endpointRes.body.id}/scenarios`)
-      .send({
-        name: 'timeout-case',
-        type: 'timeout',
-        statusCode: 504,
-        body: { timeout: true },
-        delayMs: 0,
-        weight: 1,
-      });
+    const scenarioRes = await apiPost(
+      app,
+      `/api/v1/endpoints/${endpointRes.body.id}/scenarios`
+    ).send({
+      name: 'timeout-case',
+      type: 'timeout',
+      statusCode: 504,
+      body: { timeout: true },
+      delayMs: 0,
+      weight: 1,
+    });
 
     expect(scenarioRes.status).toBe(201);
 
