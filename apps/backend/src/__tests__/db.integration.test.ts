@@ -1,23 +1,13 @@
 import request from 'supertest';
 import type { Express } from 'express';
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from 'vitest';
+import type { PrismaClient } from '../generated/prisma/client.js';
 
 const runDbTests = process.env.RUN_DB_TESTS === 'true';
 const describeDb = runDbTests ? describe : describe.skip;
 
 let app: Express;
-let prisma: {
-  apiLog: { deleteMany: () => Promise<unknown>; createMany: (args: unknown) => Promise<unknown> };
-  scenario: { deleteMany: () => Promise<unknown> };
-  endpointConfig: { deleteMany: () => Promise<unknown> };
-  endpoint: { deleteMany: () => Promise<unknown> };
-  globalConfig: { deleteMany: () => Promise<unknown> };
-  project: {
-    deleteMany: () => Promise<unknown>;
-    findUnique: (args: unknown) => Promise<unknown>;
-  };
-  $disconnect: () => Promise<unknown>;
-};
+let prisma: PrismaClient;
 let prismaJsonNull: unknown;
 
 async function cleanDatabase() {
@@ -27,6 +17,10 @@ async function cleanDatabase() {
   await prisma.endpoint.deleteMany();
   await prisma.globalConfig.deleteMany();
   await prisma.project.deleteMany();
+  await prisma.externalIdentity.deleteMany();
+  await prisma.workspaceMembership.deleteMany();
+  await prisma.workspace.deleteMany();
+  await prisma.user.deleteMany();
 }
 
 interface LogListResponse {
@@ -114,6 +108,78 @@ describeDb('db integration (real postgres)', () => {
 
     expect(savedProject?.globalConfig).not.toBeNull();
     expect(savedProject?.globalConfig?.loggingLevel).toBe('basic');
+  });
+
+  it('soporta ownership por workspace y enlaces de identidad externos sin acoplarse a Clerk', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: 'owner@example.com',
+        displayName: 'Owner User',
+      },
+    });
+
+    const workspace = await prisma.workspace.create({
+      data: {
+        name: 'Owner Personal Workspace',
+        kind: 'personal',
+        personalForUserId: user.id,
+      },
+    });
+
+    await prisma.workspaceMembership.create({
+      data: {
+        workspaceId: workspace.id,
+        userId: user.id,
+        role: 'owner',
+      },
+    });
+
+    await prisma.externalIdentity.create({
+      data: {
+        userId: user.id,
+        provider: 'clerk',
+        subject: 'user_clerk_123',
+        email: 'owner@example.com',
+        emailVerified: true,
+        displayName: 'Owner User',
+      },
+    });
+
+    const project = await prisma.project.create({
+      data: {
+        name: 'Workspace Owned Project',
+        slug: 'workspace-owned-project',
+        description: 'Ownership foundation test',
+        workspaceId: workspace.id,
+      },
+    });
+
+    const savedWorkspace = await prisma.workspace.findUnique({
+      where: { id: workspace.id },
+      include: {
+        personalForUser: true,
+        memberships: true,
+        projects: true,
+      },
+    });
+
+    const savedIdentity = await prisma.externalIdentity.findUnique({
+      where: {
+        provider_subject: {
+          provider: 'clerk',
+          subject: 'user_clerk_123',
+        },
+      },
+    });
+
+    expect(savedWorkspace?.kind).toBe('personal');
+    expect(savedWorkspace?.personalForUser?.id).toBe(user.id);
+    expect(savedWorkspace?.memberships).toHaveLength(1);
+    expect(savedWorkspace?.memberships[0]?.role).toBe('owner');
+    expect(savedWorkspace?.projects).toHaveLength(1);
+    expect(savedWorkspace?.projects[0]?.id).toBe(project.id);
+    expect(savedIdentity?.provider).toBe('clerk');
+    expect(savedIdentity?.subject).toBe('user_clerk_123');
   });
 
   it('flujo real de endpoint + scenario + mock + logs', async () => {
