@@ -69,7 +69,7 @@ Etapa SDD: `verify (completada)`
 
 ## 3) Gaps / Riesgos abiertos
 
-1. **Rate limiting** persiste configuración pero no hay enforcement runtime (aceptado por spec MVP).
+1. **Rate limiting**: el reporte original lo dejó marcado como gap aceptado del MVP porque en ese momento faltaba enforcement runtime; hoy esa afirmación quedó stale, ya que el runtime actual sí aplica límites y expone headers/cuando corresponde bloqueos 429.
 
 ---
 

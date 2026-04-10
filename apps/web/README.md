@@ -104,6 +104,7 @@ El workflow `CI` del repo corre un job dedicado **Frontend Validation** con:
 - typecheck de app
 - typecheck de specs
 - tests headless
+- build de producción vía `pnpm build`
 
 ## Convenciones relevantes
 
@@ -122,6 +123,5 @@ El workflow `CI` del repo corre un job dedicado **Frontend Validation** con:
 
 ## Limitaciones actuales
 
-- no hay build de producción dentro del gate inicial de CI
 - la configuración runtime depende de que el hosting publique `app-config.js`
 - la creación asistida usa dos recorridos distintos: el wizard de endpoints consume `ai-preview` para editar un draft antes de guardar y el modal de crear proyecto usa `ai-generate` para persistir el primer endpoint automáticamente
