@@ -22,6 +22,36 @@
       (cancelled)="closeCreateEndpointWizard(true)"
     />
   </main>
+} @else if (showProtectedApiBoundary()) {
+  <main class="workspace__main workspace__main--status" aria-label="Protected workspace session">
+    <div class="workspace__status-card workspace__needs-project">
+      <h1 class="workspace__needs-project-title">{{ protectedApiBoundaryTitle() }}</h1>
+      <p class="workspace__needs-project-sub">{{ protectedApiBoundaryDescription() }}</p>
+      <div class="workspace__needs-project-actions">
+        @if (authSnapshot().state !== 'misconfigured' && authSnapshot().state !== 'loading') {
+          <button
+            type="button"
+            class="workspace__needs-project-btn workspace__needs-project-btn--primary"
+            (click)="openSignIn()"
+          >
+            Sign in with Clerk
+          </button>
+        }
+
+        <button type="button" class="workspace__needs-project-btn" (click)="retryLoadProjects()">Retry</button>
+
+        @if (authSnapshot().state === 'authenticated' || protectedApiAccessState() === 'unauthorized') {
+          <button
+            type="button"
+            class="workspace__needs-project-btn workspace__needs-project-btn--ghost"
+            (click)="signOut()"
+          >
+            Sign out
+          </button>
+        }
+      </div>
+    </div>
+  </main>
 } @else if (projectsLoading()) {
   <main class="workspace__main workspace__main--status" aria-label="Loading projects">
     <div class="workspace__status-card">

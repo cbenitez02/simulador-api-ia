@@ -5,6 +5,7 @@ type RuntimeConfigGlobal = typeof globalThis & {
   __SIMULADOR_RUNTIME_CONFIG__?: {
     apiBaseUrl?: string;
     mockBaseUrl?: string;
+    clerkPublishableKey?: string;
   };
 };
 
@@ -19,6 +20,7 @@ describe('app-runtime-config', () => {
     expect(getAppRuntimeConfig()).toEqual({
       apiBaseUrl: DEFAULT_API_BASE_URL,
       mockBaseUrl: DEFAULT_MOCK_BASE_URL,
+      clerkPublishableKey: undefined,
     });
   });
 
@@ -26,11 +28,13 @@ describe('app-runtime-config', () => {
     runtimeConfigGlobal.__SIMULADOR_RUNTIME_CONFIG__ = {
       apiBaseUrl: 'https://api.example.com/api/v1/',
       mockBaseUrl: 'https://mock.example.com/base/',
+      clerkPublishableKey: ' pk_test_runtime ',
     };
 
     expect(getAppRuntimeConfig()).toEqual({
       apiBaseUrl: 'https://api.example.com/api/v1',
       mockBaseUrl: 'https://mock.example.com/base',
+      clerkPublishableKey: 'pk_test_runtime',
     });
   });
 
@@ -42,6 +46,7 @@ describe('app-runtime-config', () => {
     expect(getAppRuntimeConfig()).toEqual({
       apiBaseUrl: 'https://deploy.example.com/backend/api/v1',
       mockBaseUrl: 'https://deploy.example.com/backend/mock',
+      clerkPublishableKey: undefined,
     });
   });
 });

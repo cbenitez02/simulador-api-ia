@@ -1,6 +1,7 @@
 import { Injector, runInInjectionContext } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupAngularVitest } from '../../testing/angular-vitest';
+import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import type { GlobalConfig } from '../global-config/models/global-config.model';
@@ -14,6 +15,7 @@ import type {
 import type { ApiLogEntry } from '../logs/models/api-log.model';
 import type { CreateProjectAiFlowState } from './models/workspace-shell.model';
 import { WorkspaceShellComponent } from './workspace-shell.component';
+import { signal } from '@angular/core';
 
 setupAngularVitest();
 
@@ -187,12 +189,38 @@ describe('WorkspaceShellComponent', () => {
     saveConfig: vi.fn(),
   };
 
+  const authSession = {
+    snapshot: signal({
+      state: 'authenticated',
+      userId: 'user-1',
+      displayName: 'Owner User',
+      email: 'owner@example.com',
+      emailVerified: true,
+      headers: {
+        authStatus: 'signed-in' as const,
+        userId: 'user-1',
+        email: 'owner@example.com',
+        emailVerified: true,
+        displayName: 'Owner User',
+      },
+      reason: null,
+    }),
+    accessState: signal<'ready' | 'unauthenticated' | 'unauthorized'>('ready'),
+    bootstrap: vi.fn(async () => undefined),
+    openSignIn: vi.fn(async () => undefined),
+    signOut: vi.fn(async () => undefined),
+    markProtectedApiReady: vi.fn(),
+    handleProtectedApiError: vi.fn(() => false),
+    canAccessProtectedRoutes: vi.fn(() => true),
+  };
+
   function createComponent() {
     const injector = Injector.create({
       providers: [
         { provide: ProjectsRepository, useValue: projectsRepository },
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
+        { provide: FrontendAuthSessionService, useValue: authSession },
       ],
     });
 
@@ -210,6 +238,30 @@ describe('WorkspaceShellComponent', () => {
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
+    authSession.bootstrap.mockReset();
+    authSession.openSignIn.mockReset();
+    authSession.signOut.mockReset();
+    authSession.markProtectedApiReady.mockReset();
+    authSession.handleProtectedApiError.mockReset();
+    authSession.canAccessProtectedRoutes.mockReset();
+    authSession.handleProtectedApiError.mockReturnValue(false);
+    authSession.canAccessProtectedRoutes.mockReturnValue(true);
+    authSession.snapshot.set({
+      state: 'authenticated',
+      userId: 'user-1',
+      displayName: 'Owner User',
+      email: 'owner@example.com',
+      emailVerified: true,
+      headers: {
+        authStatus: 'signed-in',
+        userId: 'user-1',
+        email: 'owner@example.com',
+        emailVerified: true,
+        displayName: 'Owner User',
+      },
+      reason: null,
+    });
+    authSession.accessState.set('ready');
 
     projectsRepository.getProject.mockImplementation(async (projectId: string) =>
       projectId === secondProjectFixture.id ? secondProjectFixture : projectFixture,

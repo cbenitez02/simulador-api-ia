@@ -1,11 +1,13 @@
 export interface AppRuntimeConfig {
   apiBaseUrl?: string;
   mockBaseUrl?: string;
+  clerkPublishableKey?: string;
 }
 
 export interface ResolvedAppRuntimeConfig {
   apiBaseUrl: string;
   mockBaseUrl: string;
+  clerkPublishableKey?: string;
 }
 
 type RuntimeConfigGlobal = typeof globalThis & {
@@ -46,8 +48,9 @@ export function getAppRuntimeConfig(overrides: AppRuntimeConfig = {}): ResolvedA
   const runtimeConfig = { ...readRuntimeConfig(), ...overrides };
   const apiBaseUrl = normalizeBaseUrl(runtimeConfig.apiBaseUrl) ?? DEFAULT_API_BASE_URL;
   const mockBaseUrl = normalizeBaseUrl(runtimeConfig.mockBaseUrl) ?? deriveMockBaseUrl(apiBaseUrl);
+  const clerkPublishableKey = runtimeConfig.clerkPublishableKey?.trim() || undefined;
 
-  return { apiBaseUrl, mockBaseUrl };
+  return { apiBaseUrl, mockBaseUrl, clerkPublishableKey };
 }
 
 export function getMockBaseUrl(overrides: AppRuntimeConfig = {}): string {
