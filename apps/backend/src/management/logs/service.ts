@@ -1,5 +1,6 @@
+import { authorizeProjectAccess } from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
-import { AppError } from '../../middleware/error-handler.js';
 import type { ListProjectLogsQuery } from './schema.js';
 
 export interface ApiLogCursor {
@@ -31,17 +32,6 @@ export interface ProjectLogListResult {
   items: ProjectLogItem[];
   nextCursor: ApiLogCursor | null;
   serverTime: string;
-}
-
-async function assertProjectExists(projectId: string): Promise<void> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true },
-  });
-
-  if (!project) {
-    throw new AppError(404, 'Project not found');
-  }
 }
 
 function buildCursorFilter(query: ListProjectLogsQuery) {
@@ -113,10 +103,11 @@ function toProjectLogItem(log: {
 }
 
 export async function listProjectLogs(
+  actor: AuthenticatedActor,
   projectId: string,
   query: ListProjectLogsQuery
 ): Promise<ProjectLogListResult> {
-  await assertProjectExists(projectId);
+  await authorizeProjectAccess(actor, projectId);
 
   const cursorFilter = buildCursorFilter(query);
 
@@ -136,8 +127,11 @@ export async function listProjectLogs(
   };
 }
 
-export async function clearProjectLogs(projectId: string): Promise<void> {
-  await assertProjectExists(projectId);
+export async function clearProjectLogs(
+  actor: AuthenticatedActor,
+  projectId: string
+): Promise<void> {
+  await authorizeProjectAccess(actor, projectId);
 
   await prisma.apiLog.deleteMany({
     where: { projectId },

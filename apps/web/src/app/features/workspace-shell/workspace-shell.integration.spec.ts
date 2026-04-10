@@ -1,6 +1,7 @@
-import { Injector, runInInjectionContext } from '@angular/core';
+import { Injector, runInInjectionContext, signal } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../testing/angular-vitest';
+import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { ApiClient } from '../../shared/http/api-client';
 import { ApiError } from '../../shared/http/api-error.mapper';
 import type { ApiLogEntry } from '../logs/models/api-log.model';
@@ -96,6 +97,31 @@ describe('WorkspaceShellComponent integration', () => {
     saveConfig: vi.fn(),
   };
 
+  const authSession = {
+    snapshot: signal({
+      state: 'authenticated',
+      userId: 'user-1',
+      displayName: 'Owner User',
+      email: 'owner@example.com',
+      emailVerified: true,
+      headers: {
+        authStatus: 'signed-in' as const,
+        userId: 'user-1',
+        email: 'owner@example.com',
+        emailVerified: true,
+        displayName: 'Owner User',
+      },
+      reason: null,
+    }),
+    accessState: signal<'ready' | 'unauthenticated' | 'unauthorized'>('ready'),
+    bootstrap: vi.fn(async () => undefined),
+    openSignIn: vi.fn(async () => undefined),
+    signOut: vi.fn(async () => undefined),
+    markProtectedApiReady: vi.fn(),
+    handleProtectedApiError: vi.fn(() => false),
+    canAccessProtectedRoutes: vi.fn(() => true),
+  };
+
   beforeEach(() => {
     api.get.mockReset();
     api.post.mockReset();
@@ -107,6 +133,30 @@ describe('WorkspaceShellComponent integration', () => {
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
+    authSession.bootstrap.mockReset();
+    authSession.openSignIn.mockReset();
+    authSession.signOut.mockReset();
+    authSession.markProtectedApiReady.mockReset();
+    authSession.handleProtectedApiError.mockReset();
+    authSession.canAccessProtectedRoutes.mockReset();
+    authSession.handleProtectedApiError.mockReturnValue(false);
+    authSession.canAccessProtectedRoutes.mockReturnValue(true);
+    authSession.snapshot.set({
+      state: 'authenticated',
+      userId: 'user-1',
+      displayName: 'Owner User',
+      email: 'owner@example.com',
+      emailVerified: true,
+      headers: {
+        authStatus: 'signed-in',
+        userId: 'user-1',
+        email: 'owner@example.com',
+        emailVerified: true,
+        displayName: 'Owner User',
+      },
+      reason: null,
+    });
+    authSession.accessState.set('ready');
   });
 
   function createProjectListItem(endpointCount: number) {
@@ -180,6 +230,7 @@ describe('WorkspaceShellComponent integration', () => {
         { provide: ApiClient, useValue: api },
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
+        { provide: FrontendAuthSessionService, useValue: authSession },
       ],
     });
 

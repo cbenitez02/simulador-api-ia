@@ -1,0 +1,22 @@
+<main class="auth-page" aria-label="Authentication boundary">
+  <section class="auth-page__card">
+    <p class="auth-page__eyebrow">Issue #37 · frontend auth/session boundary</p>
+    <h1 class="auth-page__title">{{ title() }}</h1>
+    <p class="auth-page__description">{{ description() }}</p>
+
+    <div class="auth-page__actions">
+      @if (snapshot().state === 'authenticated') {
+        <a routerLink="/dashboard" class="auth-page__button auth-page__button--primary">Enter workspace</a>
+        <button type="button" class="auth-page__button" (click)="signOut()">Sign out</button>
+      } @else if (snapshot().state !== 'loading' && snapshot().state !== 'misconfigured') {
+        <button type="button" class="auth-page__button auth-page__button--primary" (click)="openSignIn()">
+          Sign in with Clerk
+        </button>
+      }
+
+      @if (snapshot().state !== 'authenticated') {
+        <a routerLink="/dashboard" class="auth-page__button auth-page__button--ghost">Retry protected route</a>
+      }
+    </div>
+  </section>
+</main>

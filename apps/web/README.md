@@ -68,10 +68,13 @@ Si cambiás host, puerto o dominio para un deploy, podés reemplazar ese archivo
 window.__SIMULADOR_RUNTIME_CONFIG__ = {
   apiBaseUrl: 'https://api.example.com/api/v1',
   mockBaseUrl: 'https://api.example.com/mock',
+  clerkPublishableKey: 'pk_test_***',
 };
 ```
 
 Si omitís `mockBaseUrl`, el frontend intenta derivarlo desde `apiBaseUrl` reemplazando `/api/v1` por `/mock`.
+
+Para el slice de auth/session del frontend, también necesitás `clerkPublishableKey` para que la app pueda inicializar Clerk y adjuntar los headers de sesión esperados por el backend protegido.
 
 ## Scripts útiles
 

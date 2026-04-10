@@ -1,21 +1,12 @@
+import { authorizeEndpointAccess } from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
 import { AppError } from '../../middleware/error-handler.js';
 import type { CreateScenarioInput, UpdateScenarioInput } from './schema.js';
 
-async function assertEndpointExists(endpointId: string): Promise<void> {
-  const endpoint = await prisma.endpoint.findUnique({
-    where: { id: endpointId },
-    select: { id: true },
-  });
-
-  if (!endpoint) {
-    throw new AppError(404, 'Endpoint not found');
-  }
-}
-
-export async function listScenarios(endpointId: string) {
-  await assertEndpointExists(endpointId);
+export async function listScenarios(actor: AuthenticatedActor, endpointId: string) {
+  await authorizeEndpointAccess(actor, endpointId);
 
   return prisma.scenario.findMany({
     where: { endpointId },
@@ -23,8 +14,12 @@ export async function listScenarios(endpointId: string) {
   });
 }
 
-export async function createScenario(endpointId: string, input: CreateScenarioInput) {
-  await assertEndpointExists(endpointId);
+export async function createScenario(
+  actor: AuthenticatedActor,
+  endpointId: string,
+  input: CreateScenarioInput
+) {
+  await authorizeEndpointAccess(actor, endpointId);
 
   return prisma.scenario.create({
     data: {
@@ -40,10 +35,13 @@ export async function createScenario(endpointId: string, input: CreateScenarioIn
 }
 
 export async function updateScenario(
+  actor: AuthenticatedActor,
   endpointId: string,
   scenarioId: string,
   input: UpdateScenarioInput
 ) {
+  await authorizeEndpointAccess(actor, endpointId);
+
   const scenario = await prisma.scenario.findFirst({
     where: { id: scenarioId, endpointId },
     select: { id: true },
@@ -66,7 +64,13 @@ export async function updateScenario(
   });
 }
 
-export async function deleteScenario(endpointId: string, scenarioId: string): Promise<void> {
+export async function deleteScenario(
+  actor: AuthenticatedActor,
+  endpointId: string,
+  scenarioId: string
+): Promise<void> {
+  await authorizeEndpointAccess(actor, endpointId);
+
   const scenario = await prisma.scenario.findFirst({
     where: { id: scenarioId, endpointId },
     select: { id: true },

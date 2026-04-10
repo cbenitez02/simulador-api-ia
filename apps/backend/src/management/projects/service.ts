@@ -1,3 +1,10 @@
+import {
+  getAccessibleWorkspaceIds,
+  authorizeProjectAccess,
+  requireWorkspaceAccess,
+  resolveDefaultWorkspaceId,
+} from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { buildBaseSlug, resolveNextAvailableSlug } from './slug.js';
@@ -19,8 +26,13 @@ async function generateUniqueProjectSlug(name: string): Promise<string> {
   );
 }
 
-export async function listProjects() {
+export async function listProjects(actor: AuthenticatedActor) {
   return prisma.project.findMany({
+    where: {
+      workspaceId: {
+        in: getAccessibleWorkspaceIds(actor),
+      },
+    },
     orderBy: { createdAt: 'desc' },
     include: {
       _count: {
@@ -30,10 +42,13 @@ export async function listProjects() {
   });
 }
 
-export async function getProjectById(projectId: string) {
+export async function getProjectById(actor: AuthenticatedActor, projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
+      workspace: {
+        select: { id: true },
+      },
       globalConfig: true,
       _count: {
         select: { endpoints: true },
@@ -45,15 +60,19 @@ export async function getProjectById(projectId: string) {
     throw new AppError(404, 'Project not found');
   }
 
+  requireWorkspaceAccess(actor, project.workspaceId);
+
   return project;
 }
 
-export async function createProject(input: CreateProjectInput) {
+export async function createProject(actor: AuthenticatedActor, input: CreateProjectInput) {
   const slug = await generateUniqueProjectSlug(input.name);
+  const workspaceId = resolveDefaultWorkspaceId(actor);
 
   return prisma.$transaction(async (tx) => {
     const createdProject = await tx.project.create({
       data: {
+        workspaceId,
         name: input.name,
         slug,
         description: input.description ?? '',
@@ -78,15 +97,12 @@ export async function createProject(input: CreateProjectInput) {
   });
 }
 
-export async function updateProject(projectId: string, input: UpdateProjectInput) {
-  const existingProject = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true },
-  });
-
-  if (!existingProject) {
-    throw new AppError(404, 'Project not found');
-  }
+export async function updateProject(
+  actor: AuthenticatedActor,
+  projectId: string,
+  input: UpdateProjectInput
+) {
+  await authorizeProjectAccess(actor, projectId);
 
   return prisma.project.update({
     where: { id: projectId },
@@ -103,15 +119,8 @@ export async function updateProject(projectId: string, input: UpdateProjectInput
   });
 }
 
-export async function deleteProject(projectId: string): Promise<void> {
-  const existingProject = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true },
-  });
-
-  if (!existingProject) {
-    throw new AppError(404, 'Project not found');
-  }
+export async function deleteProject(actor: AuthenticatedActor, projectId: string): Promise<void> {
+  await authorizeProjectAccess(actor, projectId);
 
   await prisma.project.delete({ where: { id: projectId } });
 }

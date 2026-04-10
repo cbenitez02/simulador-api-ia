@@ -6,6 +6,21 @@ import { resetRateLimitStoreForTests } from '../mock-server/rate-limit.js';
 const openaiCreateMock = vi.fn();
 
 const prismaMock = {
+  user: {
+    create: vi.fn(),
+    update: vi.fn(),
+  },
+  workspace: {
+    create: vi.fn(),
+  },
+  workspaceMembership: {
+    create: vi.fn(),
+  },
+  externalIdentity: {
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
   project: {
     findMany: vi.fn(),
     findUnique: vi.fn(),
@@ -67,6 +82,17 @@ vi.mock('openai', () => ({
 
 let app: Express;
 
+function authHeaders(overrides: Record<string, string> = {}) {
+  return {
+    'x-clerk-auth-status': 'signed-in',
+    'x-clerk-user-id': 'user_clerk_123',
+    'x-clerk-email': 'owner@example.com',
+    'x-clerk-email-verified': 'true',
+    'x-clerk-display-name': 'Owner User',
+    ...overrides,
+  };
+}
+
 function buildMockProject(overrides: Record<string, unknown> = {}) {
   return {
     id: 'p1',
@@ -116,6 +142,14 @@ function buildMockEndpoint(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function resetNestedMocks(group: Record<string, unknown>) {
+  for (const value of Object.values(group)) {
+    if (typeof value === 'function' && 'mockReset' in value) {
+      (value as { mockReset: () => void }).mockReset();
+    }
+  }
+}
+
 describe('app integration', () => {
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgresql://user:password@localhost:5432/simulador_api_ia_test';
@@ -127,7 +161,48 @@ describe('app integration', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    resetNestedMocks(prismaMock.user);
+    resetNestedMocks(prismaMock.workspace);
+    resetNestedMocks(prismaMock.workspaceMembership);
+    resetNestedMocks(prismaMock.externalIdentity);
+    resetNestedMocks(prismaMock.project);
+    resetNestedMocks(prismaMock.endpoint);
+    resetNestedMocks(prismaMock.scenario);
+    resetNestedMocks(prismaMock.endpointConfig);
+    resetNestedMocks(prismaMock.globalConfig);
+    resetNestedMocks(prismaMock.apiLog);
+    prismaMock.$transaction.mockReset();
+    openaiCreateMock.mockReset();
     resetRateLimitStoreForTests();
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.endpoint.findUnique.mockResolvedValue({
+      id: 'e1',
+      projectId: 'p1',
+      project: { workspaceId: 'workspace-1' },
+    });
+    prismaMock.externalIdentity.findUnique.mockResolvedValue({
+      provider: 'clerk',
+      subject: 'user_clerk_123',
+      email: 'owner@example.com',
+      emailVerified: true,
+      displayName: 'Owner User',
+      userId: 'user-1',
+      user: {
+        id: 'user-1',
+        email: 'owner@example.com',
+        displayName: 'Owner User',
+        memberships: [{ workspaceId: 'workspace-1', role: 'owner' }],
+        personalWorkspace: { id: 'workspace-1' },
+      },
+    });
+  });
+
+  it('rechaza /api/v1 sin identidad autenticada', async () => {
+    const response = await request(app).get('/api/v1/projects');
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe('Authentication required');
+    expect(prismaMock.project.findMany).not.toHaveBeenCalled();
   });
 
   it('GET /api/v1/projects responde lista', async () => {
@@ -135,7 +210,7 @@ describe('app integration', () => {
       { id: 'p1', name: 'Proyecto', slug: 'proyecto', description: '', _count: { endpoints: 0 } },
     ]);
 
-    const response = await request(app).get('/api/v1/projects');
+    const response = await request(app).get('/api/v1/projects').set(authHeaders());
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -164,7 +239,10 @@ describe('app integration', () => {
 
     prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
 
-    const response = await request(app).post('/api/v1/projects').send({ name: 'Mi API' });
+    const response = await request(app)
+      .post('/api/v1/projects')
+      .set(authHeaders())
+      .send({ name: 'Mi API' });
 
     expect(response.status).toBe(201);
     expect(response.body.slug).toBe('mi-api');
@@ -172,7 +250,7 @@ describe('app integration', () => {
   });
 
   it('PATCH /api/v1/projects/:projectId actualiza metadata sin cambiar slug', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.project.update.mockResolvedValueOnce({
       id: 'p1',
       name: 'Mi API v2',
@@ -184,6 +262,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .patch('/api/v1/projects/p1')
+      .set(authHeaders())
       .send({ name: 'Mi API v2', description: 'Nuevo texto' });
 
     expect(response.status).toBe(200);
@@ -196,6 +275,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .patch('/api/v1/projects/p404')
+      .set(authHeaders())
       .send({ name: 'Ghost project' });
 
     expect(response.status).toBe(404);
@@ -203,10 +283,10 @@ describe('app integration', () => {
   });
 
   it('DELETE /api/v1/projects/:projectId responde 204 sin body', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.project.delete.mockResolvedValueOnce({ id: 'p1' });
 
-    const response = await request(app).delete('/api/v1/projects/p1');
+    const response = await request(app).delete('/api/v1/projects/p1').set(authHeaders());
 
     expect(response.status).toBe(204);
     expect(response.text).toBe('');
@@ -215,18 +295,19 @@ describe('app integration', () => {
   it('DELETE /api/v1/projects/:projectId responde 404 si el proyecto no existe', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce(null);
 
-    const response = await request(app).delete('/api/v1/projects/p404');
+    const response = await request(app).delete('/api/v1/projects/p404').set(authHeaders());
 
     expect(response.status).toBe(404);
     expect(response.body.error).toBe('Project not found');
   });
 
   it('POST /api/v1/projects/:projectId/endpoints responde 409 si ya existe', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.endpoint.findFirst.mockResolvedValueOnce({ id: 'e1' });
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints')
+      .set(authHeaders())
       .send({ method: 'GET', path: '/users' });
 
     expect(response.status).toBe(409);
@@ -234,7 +315,11 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/endpoints/:endpointId/scenarios crea scenario', async () => {
-    prismaMock.endpoint.findUnique.mockResolvedValueOnce({ id: 'e1' });
+    prismaMock.endpoint.findUnique.mockResolvedValueOnce({
+      id: 'e1',
+      projectId: 'p1',
+      project: { workspaceId: 'workspace-1' },
+    });
     prismaMock.scenario.create.mockResolvedValueOnce({
       id: 's1',
       endpointId: 'e1',
@@ -248,6 +333,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .post('/api/v1/endpoints/e1/scenarios')
+      .set(authHeaders())
       .send({ name: 'ok', type: 'success', statusCode: 200, body: { ok: true } });
 
     expect(response.status).toBe(201);
@@ -257,6 +343,7 @@ describe('app integration', () => {
   it('GET /api/v1/projects/:projectId/dashboard-summary devuelve summary real agregado', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({
       id: 'p1',
+      workspaceId: 'workspace-1',
       name: 'Proyecto',
       slug: 'proyecto',
       description: 'Demo',
@@ -323,7 +410,9 @@ describe('app integration', () => {
         { method: 'GET', path: '/users', statusCode: 500, latencyMs: 140 },
       ]);
 
-    const response = await request(app).get('/api/v1/projects/p1/dashboard-summary');
+    const response = await request(app)
+      .get('/api/v1/projects/p1/dashboard-summary')
+      .set(authHeaders());
 
     expect(response.status).toBe(200);
     expect(response.body.project).toEqual({
@@ -394,7 +483,9 @@ describe('app integration', () => {
   it('GET /api/v1/projects/:projectId/dashboard-summary responde 404 cuando falta el proyecto', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce(null);
 
-    const response = await request(app).get('/api/v1/projects/p404/dashboard-summary');
+    const response = await request(app)
+      .get('/api/v1/projects/p404/dashboard-summary')
+      .set(authHeaders());
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ error: 'Project not found' });
@@ -403,6 +494,7 @@ describe('app integration', () => {
   it('GET /api/v1/projects/:projectId/dashboard-summary devuelve recientes vacíos y config default sin logs', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({
       id: 'p1',
+      workspaceId: 'workspace-1',
       name: 'Proyecto vacío',
       slug: 'proyecto-vacio',
       description: '',
@@ -417,7 +509,9 @@ describe('app integration', () => {
     prismaMock.apiLog.count.mockResolvedValueOnce(0);
     prismaMock.apiLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
-    const response = await request(app).get('/api/v1/projects/p1/dashboard-summary');
+    const response = await request(app)
+      .get('/api/v1/projects/p1/dashboard-summary')
+      .set(authHeaders());
 
     expect(response.status).toBe(200);
     expect(response.body.project.status).toBe('empty');
@@ -584,7 +678,7 @@ describe('app integration', () => {
   });
 
   it('PUT /api/v1/projects/:projectId/config canonicaliza scope no soportado a all', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.globalConfig.upsert.mockResolvedValueOnce({
       projectId: 'p1',
       latencyEnabled: false,
@@ -602,6 +696,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .put('/api/v1/projects/p1/config')
+      .set(authHeaders())
       .send({
         latencyEnabled: false,
         latencyMinMs: 0,
@@ -627,7 +722,11 @@ describe('app integration', () => {
   });
 
   it('PUT /api/v1/endpoints/:endpointId/config canonicaliza errorRate no soportado a 0', async () => {
-    prismaMock.endpoint.findUnique.mockResolvedValueOnce({ id: 'e1' });
+    prismaMock.endpoint.findUnique.mockResolvedValueOnce({
+      id: 'e1',
+      projectId: 'p1',
+      project: { workspaceId: 'workspace-1' },
+    });
     prismaMock.endpointConfig.upsert.mockResolvedValueOnce({
       endpointId: 'e1',
       latencyMode: 'range',
@@ -638,7 +737,7 @@ describe('app integration', () => {
       useScenarioWeights: false,
     });
 
-    const response = await request(app).put('/api/v1/endpoints/e1/config').send({
+    const response = await request(app).put('/api/v1/endpoints/e1/config').set(authHeaders()).send({
       latencyMode: 'range',
       fixedDelayMs: 0,
       minDelayMs: 50,
@@ -690,7 +789,7 @@ describe('app integration', () => {
   });
 
   it('GET /api/v1/projects/:projectId/logs devuelve últimos logs', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.apiLog.findMany.mockResolvedValueOnce([
       {
         id: 'l2',
@@ -730,7 +829,7 @@ describe('app integration', () => {
       },
     ]);
 
-    const response = await request(app).get('/api/v1/projects/p1/logs');
+    const response = await request(app).get('/api/v1/projects/p1/logs').set(authHeaders());
 
     expect(response.status).toBe(200);
     expect(response.body.items).toHaveLength(2);
@@ -740,6 +839,7 @@ describe('app integration', () => {
   it('POST /api/v1/projects/:projectId/endpoints/ai-generate valida prompt corto', async () => {
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .set(authHeaders())
       .send({ prompt: 'corto' });
 
     expect(response.status).toBe(400);
@@ -747,7 +847,7 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-generate crea endpoint generado por IA', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.endpoint.findFirst.mockResolvedValueOnce(null);
 
     openaiCreateMock.mockResolvedValueOnce({
@@ -799,6 +899,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .set(authHeaders())
       .send({ prompt: 'Generate endpoint for listing users with success scenario' });
 
     expect(response.status).toBe(201);
@@ -815,13 +916,14 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-generate responde AI_TIMEOUT sin persistencia parcial', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockRejectedValueOnce(
       Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })
     );
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .set(authHeaders())
       .send({ prompt: 'Generate a slow endpoint that times out before persistence' });
 
     expect(response.status).toBe(504);
@@ -835,7 +937,7 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-generate responde AI_INVALID_OUTPUT sin persistencia parcial', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockResolvedValue({
       choices: [
         {
@@ -855,6 +957,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .set(authHeaders())
       .send({ prompt: 'Generate an endpoint with malformed AI output for runtime validation' });
 
     expect(response.status).toBe(422);
@@ -868,7 +971,7 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview devuelve draft normalizado sin persistir', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockResolvedValueOnce({
       choices: [
         {
@@ -897,6 +1000,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
       .send({ prompt: 'Generate a user creation endpoint preview with one empty edge case' });
 
     expect(response.status).toBe(200);
@@ -920,11 +1024,12 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_UNAVAILABLE cuando OpenAI falla', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockRejectedValueOnce(new Error('upstream unavailable'));
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
       .send({ prompt: 'Generate a user listing endpoint preview with retryable failure' });
 
     expect(response.status).toBe(503);
@@ -936,7 +1041,7 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_UNAVAILABLE cuando falta OPENAI_API_KEY', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     const { env } = await import('../config/env.js');
     const originalApiKey = env.OPENAI_API_KEY;
     env.OPENAI_API_KEY = undefined;
@@ -944,6 +1049,7 @@ describe('app integration', () => {
     try {
       const response = await request(app)
         .post('/api/v1/projects/p1/endpoints/ai-preview')
+        .set(authHeaders())
         .send({ prompt: 'Generate a users endpoint preview without configured OpenAI key' });
 
       expect(response.status).toBe(503);
@@ -960,13 +1066,14 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_TIMEOUT cuando OpenAI agota el tiempo', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockRejectedValueOnce(
       Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })
     );
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
       .send({ prompt: 'Generate a slow endpoint preview that should timeout upstream' });
 
     expect(response.status).toBe(504);
@@ -978,7 +1085,7 @@ describe('app integration', () => {
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_INVALID_OUTPUT cuando la salida no se puede normalizar', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockResolvedValue({
       choices: [
         {
@@ -998,6 +1105,7 @@ describe('app integration', () => {
 
     const response = await request(app)
       .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
       .send({ prompt: 'Generate a users endpoint preview with malformed AI output' });
 
     expect(response.status).toBe(422);

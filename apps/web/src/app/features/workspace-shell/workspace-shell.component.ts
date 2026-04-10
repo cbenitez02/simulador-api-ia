@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../../shared/http/api-error.mapper';
+import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
@@ -50,11 +51,14 @@ import type { CreateProjectAiFlowState, SidebarProjectRow, WorkspaceNavId } from
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkspaceShellComponent {
+  private readonly authSession = inject(FrontendAuthSessionService);
   private readonly projectsRepository = inject(ProjectsRepository);
   private readonly endpointsRepository = inject(EndpointsRepository);
   private readonly globalConfigRepository = inject(GlobalConfigRepository);
 
   protected readonly projects = signal<DashboardProject[]>([]);
+  protected readonly authSnapshot = this.authSession.snapshot;
+  protected readonly protectedApiAccessState = this.authSession.accessState;
   protected readonly projectsLoading = signal(true);
   protected readonly projectsError = signal<string | null>(null);
   protected readonly selectedProjectId = signal<string>('');
@@ -70,6 +74,35 @@ export class WorkspaceShellComponent {
   );
 
   protected readonly hasProjects = computed(() => this.projects().length > 0);
+  protected readonly showProtectedApiBoundary = computed(
+    () => this.protectedApiAccessState() !== 'ready' || this.authSnapshot().state !== 'authenticated',
+  );
+  protected readonly protectedApiBoundaryTitle = computed(() => {
+    if (this.authSnapshot().state === 'misconfigured') return 'Frontend auth is not configured';
+    if (this.authSnapshot().state === 'error') return 'Could not initialize secure session';
+    if (this.protectedApiAccessState() === 'unauthorized') return 'You do not have access to this workspace';
+    if (this.authSnapshot().state === 'loading') return 'Initializing secure session';
+    return 'Sign in is required to load your workspace';
+  });
+  protected readonly protectedApiBoundaryDescription = computed(() => {
+    if (this.authSnapshot().state === 'misconfigured') {
+      return 'Set clerkPublishableKey in the frontend runtime config so the Angular app can attach Clerk-backed management headers.';
+    }
+
+    if (this.authSnapshot().state === 'error') {
+      return this.authSnapshot().reason ?? 'The Clerk SDK could not initialize.';
+    }
+
+    if (this.protectedApiAccessState() === 'unauthorized') {
+      return 'The backend accepted your identity but denied workspace access. Sign in with a different Clerk user or ask for workspace membership.';
+    }
+
+    if (this.authSnapshot().state === 'loading') {
+      return 'We are preparing your authenticated browser session before loading protected API data.';
+    }
+
+    return this.authSnapshot().reason ?? 'Sign in first so the frontend can call the protected management API.';
+  });
 
   protected readonly activeProject = computed((): DashboardProject | null => {
     const list = this.projects();
@@ -146,7 +179,16 @@ export class WorkspaceShellComponent {
   });
 
   constructor() {
+    void this.authSession.bootstrap();
     void this.reloadProjects();
+  }
+
+  protected openSignIn(): void {
+    void this.authSession.openSignIn();
+  }
+
+  protected signOut(): void {
+    void this.authSession.signOut();
   }
 
   protected openCreateProjectModal(): void {
@@ -377,6 +419,7 @@ export class WorkspaceShellComponent {
     this.projectsError.set(null);
     try {
       const projects = await this.projectsRepository.listProjects();
+      this.authSession.markProtectedApiReady();
       this.projects.set(projects);
 
       const currentSelected = selectProjectId ?? this.selectedProjectId();
@@ -393,6 +436,13 @@ export class WorkspaceShellComponent {
         await this.hydrateActiveProjectSummary(nextSelected);
       }
     } catch (error) {
+      if (this.authSession.handleProtectedApiError(error)) {
+        this.projects.set([]);
+        this.selectedProjectId.set('');
+        this.projectsError.set(null);
+        return;
+      }
+
       this.projects.set([]);
       this.selectedProjectId.set('');
       this.projectsError.set(error instanceof Error ? error.message : 'Could not load projects.');
@@ -415,6 +465,7 @@ export class WorkspaceShellComponent {
 
     try {
       const summaryProject = await this.projectsRepository.getProject(projectId);
+      this.authSession.markProtectedApiReady();
 
       if (requestId !== this.activeSummaryRequestId) {
         return;
@@ -425,6 +476,11 @@ export class WorkspaceShellComponent {
       );
     } catch (error) {
       if (requestId !== this.activeSummaryRequestId) {
+        return;
+      }
+
+      if (this.authSession.handleProtectedApiError(error)) {
+        this.projectsError.set(null);
         return;
       }
 

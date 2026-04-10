@@ -1,3 +1,5 @@
+import { requireWorkspaceAccess } from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
 import {
@@ -127,7 +129,10 @@ function normalizeEndpointLogAggregates(
   return aggregates;
 }
 
-export async function getProjectDashboardSummary(projectId: string): Promise<DashboardSummaryDto> {
+export async function getProjectDashboardSummary(
+  actor: AuthenticatedActor,
+  projectId: string
+): Promise<DashboardSummaryDto> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
@@ -154,6 +159,8 @@ export async function getProjectDashboardSummary(projectId: string): Promise<Das
   if (!project) {
     throw new AppError(404, 'Project not found');
   }
+
+  requireWorkspaceAccess(actor, project.workspaceId);
 
   const [trafficAggregate, errorRequests, recentLogs, endpointLogs] = await Promise.all([
     prisma.apiLog.aggregate({

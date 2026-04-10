@@ -1,21 +1,12 @@
+import { authorizeProjectAccess } from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
 import { AppError } from '../../middleware/error-handler.js';
 import type { CreateEndpointInput, UpdateEndpointInput } from './schema.js';
 
-async function assertProjectExists(projectId: string): Promise<void> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true },
-  });
-
-  if (!project) {
-    throw new AppError(404, 'Project not found');
-  }
-}
-
-export async function listEndpoints(projectId: string) {
-  await assertProjectExists(projectId);
+export async function listEndpoints(actor: AuthenticatedActor, projectId: string) {
+  await authorizeProjectAccess(actor, projectId);
 
   return prisma.endpoint.findMany({
     where: { projectId },
@@ -28,7 +19,13 @@ export async function listEndpoints(projectId: string) {
   });
 }
 
-export async function getEndpointById(projectId: string, endpointId: string) {
+export async function getEndpointById(
+  actor: AuthenticatedActor,
+  projectId: string,
+  endpointId: string
+) {
+  await authorizeProjectAccess(actor, projectId);
+
   const endpoint = await prisma.endpoint.findFirst({
     where: { id: endpointId, projectId },
     include: {
@@ -44,8 +41,12 @@ export async function getEndpointById(projectId: string, endpointId: string) {
   return endpoint;
 }
 
-export async function createEndpoint(projectId: string, input: CreateEndpointInput) {
-  await assertProjectExists(projectId);
+export async function createEndpoint(
+  actor: AuthenticatedActor,
+  projectId: string,
+  input: CreateEndpointInput
+) {
+  await authorizeProjectAccess(actor, projectId);
 
   const duplicatedEndpoint = await prisma.endpoint.findFirst({
     where: {
@@ -89,10 +90,13 @@ export async function createEndpoint(projectId: string, input: CreateEndpointInp
 }
 
 export async function updateEndpoint(
+  actor: AuthenticatedActor,
   projectId: string,
   endpointId: string,
   input: UpdateEndpointInput
 ) {
+  await authorizeProjectAccess(actor, projectId);
+
   const endpoint = await prisma.endpoint.findFirst({
     where: { id: endpointId, projectId },
     select: { id: true },
@@ -118,7 +122,13 @@ export async function updateEndpoint(
   });
 }
 
-export async function deleteEndpoint(projectId: string, endpointId: string): Promise<void> {
+export async function deleteEndpoint(
+  actor: AuthenticatedActor,
+  projectId: string,
+  endpointId: string
+): Promise<void> {
+  await authorizeProjectAccess(actor, projectId);
+
   const endpoint = await prisma.endpoint.findFirst({
     where: { id: endpointId, projectId },
     select: { id: true },

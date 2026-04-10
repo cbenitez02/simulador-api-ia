@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRequestActor } from '../../auth/request-context.js';
 import { createProjectSchema, projectParamsSchema, updateProjectSchema } from './schema.js';
 import {
   createProject,
@@ -12,7 +13,7 @@ export const projectsRouter = Router();
 
 projectsRouter.get('/', async (_req, res, next) => {
   try {
-    const projects = await listProjects();
+    const projects = await listProjects(requireRequestActor(_req));
     res.status(200).json(projects);
   } catch (error) {
     next(error);
@@ -21,8 +22,9 @@ projectsRouter.get('/', async (_req, res, next) => {
 
 projectsRouter.post('/', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const input = createProjectSchema.parse(req.body);
-    const project = await createProject(input);
+    const project = await createProject(actor, input);
 
     res.status(201).json(project);
   } catch (error) {
@@ -32,8 +34,9 @@ projectsRouter.post('/', async (req, res, next) => {
 
 projectsRouter.get('/:projectId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId } = projectParamsSchema.parse(req.params);
-    const project = await getProjectById(projectId);
+    const project = await getProjectById(actor, projectId);
     res.status(200).json(project);
   } catch (error) {
     next(error);
@@ -42,10 +45,11 @@ projectsRouter.get('/:projectId', async (req, res, next) => {
 
 projectsRouter.patch('/:projectId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId } = projectParamsSchema.parse(req.params);
     const input = updateProjectSchema.parse(req.body);
 
-    const project = await updateProject(projectId, input);
+    const project = await updateProject(actor, projectId, input);
 
     res.status(200).json(project);
   } catch (error) {
@@ -55,8 +59,9 @@ projectsRouter.patch('/:projectId', async (req, res, next) => {
 
 projectsRouter.delete('/:projectId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId } = projectParamsSchema.parse(req.params);
-    await deleteProject(projectId);
+    await deleteProject(actor, projectId);
 
     res.status(204).send();
   } catch (error) {
