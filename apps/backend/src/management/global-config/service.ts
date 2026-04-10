@@ -1,5 +1,6 @@
+import { authorizeProjectAccess } from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
-import { AppError } from '../../middleware/error-handler.js';
 import type { UpsertGlobalConfigInput } from './schema.js';
 export { buildDefaultGlobalConfig, DEFAULT_GLOBAL_CONFIG_VALUES } from './defaults.js';
 import { buildDefaultGlobalConfig } from './defaults.js';
@@ -11,19 +12,8 @@ function canonicalizeGlobalConfig(input: UpsertGlobalConfigInput): UpsertGlobalC
   };
 }
 
-async function assertProjectExists(projectId: string): Promise<void> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true },
-  });
-
-  if (!project) {
-    throw new AppError(404, 'Project not found');
-  }
-}
-
-export async function getGlobalConfig(projectId: string) {
-  await assertProjectExists(projectId);
+export async function getGlobalConfig(actor: AuthenticatedActor, projectId: string) {
+  await authorizeProjectAccess(actor, projectId);
 
   const config = await prisma.globalConfig.findUnique({
     where: { projectId },
@@ -36,8 +26,12 @@ export async function getGlobalConfig(projectId: string) {
   return buildDefaultGlobalConfig(projectId);
 }
 
-export async function upsertGlobalConfig(projectId: string, input: UpsertGlobalConfigInput) {
-  await assertProjectExists(projectId);
+export async function upsertGlobalConfig(
+  actor: AuthenticatedActor,
+  projectId: string,
+  input: UpsertGlobalConfigInput
+) {
+  await authorizeProjectAccess(actor, projectId);
 
   const canonical = canonicalizeGlobalConfig(input);
 

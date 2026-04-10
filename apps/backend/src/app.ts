@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { authenticateApiRequest } from './auth/middleware.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { aiRouter } from './management/ai/router.js';
 import { dashboardRouter } from './management/dashboard/router.js';
@@ -25,6 +26,8 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true });
 });
+
+app.use('/api/v1', authenticateApiRequest);
 
 app.use('/api/v1/projects', projectsRouter);
 app.use('/api/v1/projects/:projectId/dashboard-summary', dashboardRouter);

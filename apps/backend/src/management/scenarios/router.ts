@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRequestActor } from '../../auth/request-context.js';
 import {
   createScenarioSchema,
   endpointParamsSchema,
@@ -11,8 +12,9 @@ export const scenariosRouter = Router({ mergeParams: true });
 
 scenariosRouter.get('/', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { endpointId } = endpointParamsSchema.parse(req.params);
-    const scenarios = await listScenarios(endpointId);
+    const scenarios = await listScenarios(actor, endpointId);
 
     res.status(200).json(scenarios);
   } catch (error) {
@@ -22,9 +24,10 @@ scenariosRouter.get('/', async (req, res, next) => {
 
 scenariosRouter.post('/', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { endpointId } = endpointParamsSchema.parse(req.params);
     const input = createScenarioSchema.parse(req.body);
-    const scenario = await createScenario(endpointId, input);
+    const scenario = await createScenario(actor, endpointId, input);
 
     res.status(201).json(scenario);
   } catch (error) {
@@ -34,9 +37,10 @@ scenariosRouter.post('/', async (req, res, next) => {
 
 scenariosRouter.patch('/:scenarioId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { endpointId, scenarioId } = scenarioParamsSchema.parse(req.params);
     const input = updateScenarioSchema.parse(req.body);
-    const scenario = await updateScenario(endpointId, scenarioId, input);
+    const scenario = await updateScenario(actor, endpointId, scenarioId, input);
 
     res.status(200).json(scenario);
   } catch (error) {
@@ -46,8 +50,9 @@ scenariosRouter.patch('/:scenarioId', async (req, res, next) => {
 
 scenariosRouter.delete('/:scenarioId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { endpointId, scenarioId } = scenarioParamsSchema.parse(req.params);
-    await deleteScenario(endpointId, scenarioId);
+    await deleteScenario(actor, endpointId, scenarioId);
 
     res.status(204).send();
   } catch (error) {

@@ -1,5 +1,6 @@
+import { authorizeEndpointAccess } from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
-import { AppError } from '../../middleware/error-handler.js';
 import type { UpsertEndpointConfigInput } from './schema.js';
 
 function canonicalizeEndpointConfig(input: UpsertEndpointConfigInput): UpsertEndpointConfigInput {
@@ -9,19 +10,8 @@ function canonicalizeEndpointConfig(input: UpsertEndpointConfigInput): UpsertEnd
   };
 }
 
-async function assertEndpointExists(endpointId: string): Promise<void> {
-  const endpoint = await prisma.endpoint.findUnique({
-    where: { id: endpointId },
-    select: { id: true },
-  });
-
-  if (!endpoint) {
-    throw new AppError(404, 'Endpoint not found');
-  }
-}
-
-export async function getEndpointConfig(endpointId: string) {
-  await assertEndpointExists(endpointId);
+export async function getEndpointConfig(actor: AuthenticatedActor, endpointId: string) {
+  await authorizeEndpointAccess(actor, endpointId);
 
   const config = await prisma.endpointConfig.findUnique({
     where: { endpointId },
@@ -42,8 +32,12 @@ export async function getEndpointConfig(endpointId: string) {
   };
 }
 
-export async function upsertEndpointConfig(endpointId: string, input: UpsertEndpointConfigInput) {
-  await assertEndpointExists(endpointId);
+export async function upsertEndpointConfig(
+  actor: AuthenticatedActor,
+  endpointId: string,
+  input: UpsertEndpointConfigInput
+) {
+  await authorizeEndpointAccess(actor, endpointId);
 
   const canonical = canonicalizeEndpointConfig(input);
 

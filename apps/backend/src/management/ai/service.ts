@@ -1,3 +1,5 @@
+import { authorizeProjectAccess } from '../../auth/authorization.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
 import OpenAI from 'openai';
 import { env } from '../../config/env.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
@@ -86,17 +88,6 @@ function createAiInvalidOutputError(): AppError {
     code: AI_INVALID_OUTPUT_CODE,
     retryable: true,
   });
-}
-
-async function assertProjectExists(projectId: string): Promise<void> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true },
-  });
-
-  if (!project) {
-    throw new AppError(404, 'Project not found');
-  }
 }
 
 function extractJson(text: string): string {
@@ -264,14 +255,22 @@ async function generateNormalizedDraft(prompt: string): Promise<AiPreviewRespons
   throw createAiInvalidOutputError();
 }
 
-export async function generateEndpointPreview(projectId: string, prompt: string) {
-  await assertProjectExists(projectId);
+export async function generateEndpointPreview(
+  actor: AuthenticatedActor,
+  projectId: string,
+  prompt: string
+) {
+  await authorizeProjectAccess(actor, projectId);
 
   return generateNormalizedDraft(prompt);
 }
 
-export async function generateEndpointWithAi(projectId: string, prompt: string) {
-  await assertProjectExists(projectId);
+export async function generateEndpointWithAi(
+  actor: AuthenticatedActor,
+  projectId: string,
+  prompt: string
+) {
+  await authorizeProjectAccess(actor, projectId);
 
   const previewDraft = await generateNormalizedDraft(prompt);
   return persistGeneratedEndpoint(projectId, toPersistedDraft(previewDraft));

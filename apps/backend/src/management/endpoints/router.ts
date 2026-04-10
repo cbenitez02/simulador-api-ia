@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRequestActor } from '../../auth/request-context.js';
 import {
   createEndpointSchema,
   endpointParamsSchema,
@@ -17,8 +18,9 @@ export const endpointsRouter = Router({ mergeParams: true });
 
 endpointsRouter.get('/', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId } = projectParamsSchema.parse(req.params);
-    const endpoints = await listEndpoints(projectId);
+    const endpoints = await listEndpoints(actor, projectId);
 
     res.status(200).json(endpoints);
   } catch (error) {
@@ -28,9 +30,10 @@ endpointsRouter.get('/', async (req, res, next) => {
 
 endpointsRouter.post('/', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId } = projectParamsSchema.parse(req.params);
     const input = createEndpointSchema.parse(req.body);
-    const endpoint = await createEndpoint(projectId, input);
+    const endpoint = await createEndpoint(actor, projectId, input);
 
     res.status(201).json(endpoint);
   } catch (error) {
@@ -40,8 +43,9 @@ endpointsRouter.post('/', async (req, res, next) => {
 
 endpointsRouter.get('/:endpointId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId, endpointId } = endpointParamsSchema.parse(req.params);
-    const endpoint = await getEndpointById(projectId, endpointId);
+    const endpoint = await getEndpointById(actor, projectId, endpointId);
 
     res.status(200).json(endpoint);
   } catch (error) {
@@ -51,9 +55,10 @@ endpointsRouter.get('/:endpointId', async (req, res, next) => {
 
 endpointsRouter.patch('/:endpointId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId, endpointId } = endpointParamsSchema.parse(req.params);
     const input = updateEndpointSchema.parse(req.body);
-    const endpoint = await updateEndpoint(projectId, endpointId, input);
+    const endpoint = await updateEndpoint(actor, projectId, endpointId, input);
 
     res.status(200).json(endpoint);
   } catch (error) {
@@ -63,8 +68,9 @@ endpointsRouter.patch('/:endpointId', async (req, res, next) => {
 
 endpointsRouter.delete('/:endpointId', async (req, res, next) => {
   try {
+    const actor = requireRequestActor(req);
     const { projectId, endpointId } = endpointParamsSchema.parse(req.params);
-    await deleteEndpoint(projectId, endpointId);
+    await deleteEndpoint(actor, projectId, endpointId);
 
     res.status(204).send();
   } catch (error) {
