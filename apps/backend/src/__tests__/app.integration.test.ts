@@ -4,6 +4,7 @@ import type { Express } from 'express';
 import { resetRateLimitStoreForTests } from '../mock-server/rate-limit.js';
 
 const openaiCreateMock = vi.fn();
+const runtimeRateLimitBuckets = new Map<string, { requestCount: number }>();
 
 const prismaMock = {
   user: {
@@ -62,6 +63,9 @@ const prismaMock = {
     create: vi.fn(),
     findMany: vi.fn(),
     deleteMany: vi.fn(),
+  },
+  runtimeRateLimitBucket: {
+    upsert: vi.fn(),
   },
   $transaction: vi.fn(),
 };
@@ -171,9 +175,37 @@ describe('app integration', () => {
     resetNestedMocks(prismaMock.endpointConfig);
     resetNestedMocks(prismaMock.globalConfig);
     resetNestedMocks(prismaMock.apiLog);
+    resetNestedMocks(prismaMock.runtimeRateLimitBucket);
     prismaMock.$transaction.mockReset();
     openaiCreateMock.mockReset();
     resetRateLimitStoreForTests();
+    runtimeRateLimitBuckets.clear();
+    prismaMock.runtimeRateLimitBucket.upsert.mockImplementation(
+      async ({ where, create, update }) => {
+        const key = `${where.projectId_windowStart.projectId}:${new Date(where.projectId_windowStart.windowStart).toISOString()}`;
+        const current = runtimeRateLimitBuckets.get(key);
+
+        if (current) {
+          current.requestCount += update.requestCount.increment;
+          return {
+            projectId: where.projectId_windowStart.projectId,
+            windowStart: where.projectId_windowStart.windowStart,
+            requestCount: current.requestCount,
+            updatedAt: new Date(),
+          };
+        }
+
+        const created = {
+          projectId: create.projectId,
+          windowStart: create.windowStart,
+          requestCount: create.requestCount,
+          updatedAt: new Date(),
+        };
+
+        runtimeRateLimitBuckets.set(key, { requestCount: created.requestCount });
+        return created;
+      }
+    );
     prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.endpoint.findUnique.mockResolvedValue({
       id: 'e1',

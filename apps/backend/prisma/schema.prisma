@@ -20,6 +20,7 @@ model Project {
   endpoints    Endpoint[]
   globalConfig GlobalConfig?
   logs         ApiLog[]
+  rateLimitBuckets RuntimeRateLimitBucket[]
 
   @@index([workspaceId])
 }
@@ -169,4 +170,16 @@ model ApiLog {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+model RuntimeRateLimitBucket {
+  projectId    String
+  windowStart  DateTime
+  requestCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, windowStart])
+  @@index([windowStart])
 }

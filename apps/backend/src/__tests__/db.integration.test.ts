@@ -367,6 +367,56 @@ describeDb('db integration (real postgres)', () => {
     expect(mockRes.status).toBe(503);
   });
 
+  it('persiste contadores de rate limiting en DB y bloquea el request excedente', async () => {
+    const projectRes = await apiPost(app, '/api/v1/projects').send({
+      name: 'Persistent Rate Limit',
+    });
+    expect(projectRes.status).toBe(201);
+
+    const endpointRes = await apiPost(app, `/api/v1/projects/${projectRes.body.id}/endpoints`).send(
+      {
+        method: 'GET',
+        path: '/quota',
+        statusCode: 200,
+        responseBody: { ok: true },
+      }
+    );
+    expect(endpointRes.status).toBe(201);
+
+    const cfgRes = await apiPut(app, `/api/v1/projects/${projectRes.body.id}/config`).send({
+      latencyEnabled: false,
+      latencyMinMs: 0,
+      latencyMaxMs: 0,
+      latencyMode: 'fixed',
+      errorSimulationEnabled: false,
+      errorSimulationRate: 0,
+      errorSimulationCodes: [500],
+      rateLimitingEnabled: true,
+      rateLimitingRpm: 1,
+      loggingLevel: 'basic',
+      scope: 'all',
+    });
+    expect(cfgRes.status).toBe(200);
+
+    const first = await request(app).get(`/mock/${projectRes.body.slug}/quota`);
+    const blocked = await request(app).get(`/mock/${projectRes.body.slug}/quota`);
+
+    expect(first.status).toBe(200);
+    expect(first.headers['x-ratelimit-limit']).toBe('1');
+    expect(first.headers['x-ratelimit-remaining']).toBe('0');
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers['x-ratelimit-limit']).toBe('1');
+    expect(blocked.headers['retry-after']).toBeDefined();
+
+    const buckets = await prisma.runtimeRateLimitBucket.findMany({
+      where: { projectId: projectRes.body.id },
+    });
+
+    expect(buckets).toHaveLength(1);
+    expect(buckets[0]?.requestCount).toBe(2);
+  });
+
   it('persiste y expone metadata real de trazabilidad sin inventar scenario', async () => {
     const projectRes = await apiPost(app, '/api/v1/projects').send({ name: 'Traceability Logs' });
     expect(projectRes.status).toBe(201);

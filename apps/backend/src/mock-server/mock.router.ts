@@ -2,11 +2,13 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import { prisma } from '../lib/prisma.js';
 import { applyLatency, calculateLatency } from './latency.js';
 import { logRequest, type LoggingLevel, type MockLogInput } from './logger.js';
-import { createRuntimeRateLimiter } from './rate-limit.js';
+import { createPrismaRateLimitStore, createRuntimeRateLimiter } from './rate-limit.js';
 import { selectScenario } from './scenario-selector.js';
 
 export const mockRouter = Router();
-const runtimeRateLimiter = createRuntimeRateLimiter();
+const runtimeRateLimiter = createRuntimeRateLimiter({
+  store: createPrismaRateLimitStore(prisma),
+});
 
 function toStringHeaders(headers: Record<string, unknown>): Record<string, string> {
   const normalizedEntries = Object.entries(headers).map(([key, value]) => {
@@ -135,7 +137,7 @@ async function resolveMockRequest(req: Request, res: Response, next: NextFunctio
     const fullUrl = toAbsoluteUrl(req);
     const isRateLimitEnabled = project.globalConfig?.rateLimitingEnabled === true;
     const rateLimitResult = isRateLimitEnabled
-      ? runtimeRateLimiter.evaluate(project.id, project.globalConfig?.rateLimitingRpm ?? 60)
+      ? await runtimeRateLimiter.evaluate(project.id, project.globalConfig?.rateLimitingRpm ?? 60)
       : null;
 
     if (rateLimitResult && !rateLimitResult.allowed) {

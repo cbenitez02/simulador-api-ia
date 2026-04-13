@@ -61,6 +61,8 @@ NODE_ENV=development
 - `OPENAI_API_KEY` es opcional para boot. Solo configurala si vas a usar endpoints asistidos por IA.
 - `OPENAI_MODEL`, `MOCK_BASE_URL`, `PORT` y `NODE_ENV` tienen defaults en código, pero conviene dejarlos explícitos en `.env` para onboarding.
 - `CORS_ALLOWED_ORIGINS` acepta una lista separada por comas. Si no se define, en `development`/`test` se permiten orígenes `localhost` y `127.0.0.1`; en `production`, el backend no habilita CORS para orígenes arbitrarios del navegador.
+- El rate limiting del mock runtime usa contadores persistidos en PostgreSQL por proyecto/ventana, así que no depende exclusivamente de memoria local del proceso.
+- `loggingLevel=full` persiste bodies completos de request/response; `basic` omite esos cuerpos para bajar costo y volumen de logs.
 
 ## Base de datos local
 

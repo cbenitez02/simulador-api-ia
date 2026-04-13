@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createRuntimeRateLimiter, resetRateLimitStoreForTests } from '../rate-limit.js';
 
 describe('mock-server/rate-limit', () => {
-  it('allow/exhaust dentro de la misma ventana alineada con headers consistentes', () => {
+  it('allow/exhaust dentro de la misma ventana alineada con headers consistentes', async () => {
     const nowMs = 65_000;
     const limiter = createRuntimeRateLimiter({ now: () => nowMs });
 
-    const first = limiter.evaluate('project-1', 2);
-    const second = limiter.evaluate('project-1', 2);
-    const third = limiter.evaluate('project-1', 2);
+    const first = await limiter.evaluate('project-1', 2);
+    const second = await limiter.evaluate('project-1', 2);
+    const third = await limiter.evaluate('project-1', 2);
 
     expect(first).toMatchObject({
       allowed: true,
@@ -50,16 +50,16 @@ describe('mock-server/rate-limit', () => {
     });
   });
 
-  it('resetea la cuota cuando cambia la ventana', () => {
+  it('resetea la cuota cuando cambia la ventana', async () => {
     let nowMs = 65_000;
     const limiter = createRuntimeRateLimiter({ now: () => nowMs });
 
-    limiter.evaluate('project-1', 1);
-    const blocked = limiter.evaluate('project-1', 1);
+    await limiter.evaluate('project-1', 1);
+    const blocked = await limiter.evaluate('project-1', 1);
 
     nowMs = 121_000;
 
-    const reset = limiter.evaluate('project-1', 1);
+    const reset = await limiter.evaluate('project-1', 1);
 
     expect(blocked).toMatchObject({
       allowed: false,
@@ -82,17 +82,17 @@ describe('mock-server/rate-limit', () => {
     });
   });
 
-  it('resetRateLimitStoreForTests limpia el store compartido', () => {
+  it('resetRateLimitStoreForTests limpia el store compartido', async () => {
     const nowMs = 10_000;
     const firstLimiter = createRuntimeRateLimiter({ now: () => nowMs });
 
-    firstLimiter.evaluate('project-1', 1);
-    expect(firstLimiter.evaluate('project-1', 1).allowed).toBe(false);
+    await firstLimiter.evaluate('project-1', 1);
+    expect((await firstLimiter.evaluate('project-1', 1)).allowed).toBe(false);
 
     resetRateLimitStoreForTests();
 
     const secondLimiter = createRuntimeRateLimiter({ now: () => nowMs });
-    expect(secondLimiter.evaluate('project-1', 1)).toMatchObject({
+    expect(await secondLimiter.evaluate('project-1', 1)).toMatchObject({
       allowed: true,
       remaining: 0,
       resetAtMs: 60_000,
