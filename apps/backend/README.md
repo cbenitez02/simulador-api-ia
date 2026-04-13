@@ -63,6 +63,15 @@ NODE_ENV=development
 - `CORS_ALLOWED_ORIGINS` acepta una lista separada por comas. Si no se define, en `development`/`test` se permiten orígenes `localhost` y `127.0.0.1`; en `production`, el backend no habilita CORS para orígenes arbitrarios del navegador.
 - El rate limiting del mock runtime usa contadores persistidos en PostgreSQL por proyecto/ventana, así que no depende exclusivamente de memoria local del proceso.
 - `loggingLevel=full` persiste bodies completos de request/response; `basic` omite esos cuerpos para bajar costo y volumen de logs.
+- El backend ahora expone `GET /ops/health` con métricas operativas básicas (`projects`, `endpoints`, `logs`) y propaga `X-Request-Id` para correlación mínima de requests.
+- Los errores no controlados se emiten con logging estructurado mínimo (`event`, `requestId`, `message`, `name`) para dejar evidencia utilizable fuera de desarrollo.
+
+## Observabilidad operativa mínima
+
+- `GET /health` sigue siendo un liveness check simple.
+- `GET /ops/health` entrega una señal operativa mínima con conteos básicos y timestamp.
+- `X-Request-Id` se devuelve en responses para correlación mínima entre cliente, logs y errores.
+- La retención de logs funcionales hoy depende de la tabla `ApiLog`; si el volumen crece, la política de cleanup/archivado debe evolucionar explícitamente.
 
 ## Base de datos local
 

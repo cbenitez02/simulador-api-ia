@@ -1,6 +1,18 @@
 import type { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 
+function emitStructuredErrorLog(err: unknown, requestId: string | null): void {
+  const payload = {
+    level: 'error',
+    event: 'unhandled_error',
+    requestId,
+    message: err instanceof Error ? err.message : 'Unknown error',
+    name: err instanceof Error ? err.name : 'UnknownError',
+  };
+
+  console.error(JSON.stringify(payload));
+}
+
 export class AppError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -22,7 +34,7 @@ function isPrismaKnownError(err: unknown): err is { code: string; meta?: { targe
   return 'code' in err && typeof (err as { code?: unknown }).code === 'string';
 }
 
-export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   void _next;
 
   if (err instanceof ZodError) {
@@ -61,6 +73,6 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
-  console.error('Unhandled error:', err);
+  emitStructuredErrorLog(err, req.requestId ?? null);
   res.status(500).json({ error: 'Internal Server Error' });
 };

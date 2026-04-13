@@ -24,6 +24,7 @@ const prismaMock = {
   },
   project: {
     findMany: vi.fn(),
+    count: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
     findUniqueOrThrow: vi.fn(),
@@ -32,6 +33,7 @@ const prismaMock = {
   },
   endpoint: {
     findMany: vi.fn(),
+    count: vi.fn(),
     findUnique: vi.fn(),
     findFirst: vi.fn(),
     create: vi.fn(),
@@ -235,6 +237,37 @@ describe('app integration', () => {
     expect(response.status).toBe(401);
     expect(response.body.error).toBe('Authentication required');
     expect(prismaMock.project.findMany).not.toHaveBeenCalled();
+  });
+
+  it('propaga X-Request-Id al health operativo', async () => {
+    prismaMock.project.count = vi.fn().mockResolvedValueOnce(2);
+    prismaMock.endpoint.count = vi.fn().mockResolvedValueOnce(5);
+    prismaMock.apiLog.count = vi.fn().mockResolvedValueOnce(11);
+
+    const response = await request(app).get('/ops/health').set('X-Request-Id', 'req-123');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['x-request-id']).toBe('req-123');
+    expect(response.body).toMatchObject({
+      ok: true,
+      service: 'backend',
+      metrics: {
+        projects: 2,
+        endpoints: 5,
+        logs: 11,
+      },
+    });
+  });
+
+  it('genera X-Request-Id cuando no viene en el request', async () => {
+    prismaMock.project.count = vi.fn().mockResolvedValueOnce(0);
+    prismaMock.endpoint.count = vi.fn().mockResolvedValueOnce(0);
+    prismaMock.apiLog.count = vi.fn().mockResolvedValueOnce(0);
+
+    const response = await request(app).get('/ops/health');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['x-request-id']).toBeTruthy();
   });
 
   it('permite origen localhost en desarrollo cuando no hay CORS_ALLOWED_ORIGINS explícito', async () => {
