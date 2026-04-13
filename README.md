@@ -47,6 +47,8 @@ pnpm install
 
 Para una auditoría completa del contrato runtime actual y de los supuestos locales todavía presentes, ver `docs/runtime-config-audit.md`.
 
+Para una checklist operativa de despliegue y validación de arranque, ver `docs/deployment-readiness.md`.
+
 ### Backend
 
 El backend carga variables desde `apps/backend/.env`.

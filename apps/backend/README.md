@@ -36,6 +36,8 @@ apps/backend/src/
 
 El backend carga variables desde `apps/backend/.env`.
 
+Para una checklist más operativa de preparación de entorno y validaciones de arranque, ver `../../docs/deployment-readiness.md`.
+
 ```bash
 cp apps/backend/.env.example apps/backend/.env
 ```

@@ -57,6 +57,8 @@ http://127.0.0.1:4200
 
 La app lee su configuración runtime desde `public/app-config.js`.
 
+Para una checklist completa de despliegue/readiness del sistema, ver `../../docs/deployment-readiness.md`.
+
 Por default usa:
 
 - API: `http://localhost:3000/api/v1`
