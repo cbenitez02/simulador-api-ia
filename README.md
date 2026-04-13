@@ -49,6 +49,8 @@ Para una auditoría completa del contrato runtime actual y de los supuestos loca
 
 Para una checklist operativa de despliegue y validación de arranque, ver `docs/deployment-readiness.md`.
 
+Para una auditoría puntual del estado actual de las validaciones backend en CI, ver `docs/backend-ci-audit.md`.
+
 ### Backend
 
 El backend carga variables desde `apps/backend/.env`.
