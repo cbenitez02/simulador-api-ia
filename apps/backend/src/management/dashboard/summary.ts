@@ -61,6 +61,10 @@ export type RecentLogRecord = {
   createdAt: Date;
 };
 
+function joinMockProjectUrl(mockBaseUrl: string, projectSlug: string): string {
+  return `${mockBaseUrl.replace(/\/$/, '')}/${projectSlug}`;
+}
+
 export function roundPercentage(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -143,6 +147,7 @@ export function buildDashboardSummary(input: {
   traffic: ProjectTrafficAggregate;
   endpointLogs: Map<string, EndpointLogAggregate>;
   recentLogs: RecentLogRecord[];
+  mockBaseUrl: string;
 }): DashboardSummaryDto {
   const projectConfig = input.project.globalConfig ?? DEFAULT_GLOBAL_CONFIG_VALUES;
 
@@ -172,7 +177,7 @@ export function buildDashboardSummary(input: {
       name: input.project.name,
       description: input.project.description,
       slug: input.project.slug,
-      mockUrl: `http://localhost:3000/mock/${input.project.slug}`,
+      mockUrl: joinMockProjectUrl(input.mockBaseUrl, input.project.slug),
       updatedAt: input.project.updatedAt.toISOString(),
       status: resolveProjectStatus(endpointRows.map((row) => ({ status: row.status }))),
     },

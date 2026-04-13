@@ -341,60 +341,131 @@ describe('app integration', () => {
   });
 
   it('GET /api/v1/projects/:projectId/dashboard-summary devuelve summary real agregado', async () => {
-    prismaMock.project.findUnique.mockResolvedValueOnce({
-      id: 'p1',
-      workspaceId: 'workspace-1',
-      name: 'Proyecto',
-      slug: 'proyecto',
-      description: 'Demo',
-      updatedAt: new Date('2026-04-08T10:00:00.000Z'),
-      globalConfig: {
-        latencyEnabled: false,
-        latencyMinMs: 0,
-        latencyMaxMs: 1000,
-        latencyMode: 'fixed',
-        errorSimulationEnabled: true,
-        errorSimulationRate: 0.1,
-        errorSimulationCodes: [500],
-        rateLimitingEnabled: true,
-        rateLimitingRpm: 120,
-        loggingLevel: 'full',
-        scope: 'all',
-      },
-      endpoints: [
+    const { env } = await import('../config/env.js');
+    const originalMockBaseUrl = env.MOCK_BASE_URL;
+    env.MOCK_BASE_URL = 'https://mock.example.com/public-base';
+
+    try {
+      prismaMock.project.findUnique.mockResolvedValueOnce({
+        id: 'p1',
+        workspaceId: 'workspace-1',
+        name: 'Proyecto',
+        slug: 'proyecto',
+        description: 'Demo',
+        updatedAt: new Date('2026-04-08T10:00:00.000Z'),
+        globalConfig: {
+          latencyEnabled: false,
+          latencyMinMs: 0,
+          latencyMaxMs: 1000,
+          latencyMode: 'fixed',
+          errorSimulationEnabled: true,
+          errorSimulationRate: 0.1,
+          errorSimulationCodes: [500],
+          rateLimitingEnabled: true,
+          rateLimitingRpm: 120,
+          loggingLevel: 'full',
+          scope: 'all',
+        },
+        endpoints: [
+          {
+            id: 'e1',
+            method: 'GET',
+            path: '/users',
+            description: 'List users',
+            endpointConfig: {
+              latencyMode: 'fixed',
+              fixedDelayMs: 90,
+              minDelayMs: 0,
+              maxDelayMs: 0,
+            },
+            scenarios: [
+              { id: 's1', type: 'success' },
+              { id: 's2', type: 'error' },
+            ],
+          },
+          {
+            id: 'e2',
+            method: 'POST',
+            path: '/users',
+            description: 'Create user',
+            endpointConfig: null,
+            scenarios: [],
+          },
+        ],
+      });
+      prismaMock.apiLog.aggregate.mockResolvedValueOnce({
+        _count: { _all: 4 },
+        _avg: { latencyMs: 120 },
+      });
+      prismaMock.apiLog.count.mockResolvedValueOnce(1);
+      prismaMock.apiLog.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'log-1',
+            method: 'GET',
+            path: '/users',
+            statusCode: 500,
+            latencyMs: 140,
+            scenarioType: 'error',
+            createdAt: new Date('2026-04-08T11:00:00.000Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          { method: 'GET', path: '/users', statusCode: 200, latencyMs: 100 },
+          { method: 'GET', path: '/users', statusCode: 500, latencyMs: 140 },
+        ]);
+
+      const response = await request(app)
+        .get('/api/v1/projects/p1/dashboard-summary')
+        .set(authHeaders());
+
+      expect(response.status).toBe(200);
+      expect(response.body.project).toEqual({
+        id: 'p1',
+        name: 'Proyecto',
+        description: 'Demo',
+        slug: 'proyecto',
+        mockUrl: 'https://mock.example.com/public-base/proyecto',
+        updatedAt: '2026-04-08T10:00:00.000Z',
+        status: 'attention',
+      });
+      expect(response.body.metrics).toEqual({
+        totalEndpoints: 2,
+        totalScenarios: 2,
+        avgLatencyMs: 120,
+        errorRatePct: 25,
+        totalRequests: 4,
+      });
+      expect(response.body.health).toEqual({
+        readyEndpoints: 1,
+        needsAttentionEndpoints: 1,
+        errorScenarioEndpoints: 1,
+        emptyScenarioEndpoints: 0,
+        timeoutScenarioEndpoints: 0,
+      });
+      expect(response.body.endpointRows).toEqual([
         {
-          id: 'e1',
+          endpointId: 'e1',
           method: 'GET',
           path: '/users',
           description: 'List users',
-          endpointConfig: {
-            latencyMode: 'fixed',
-            fixedDelayMs: 90,
-            minDelayMs: 0,
-            maxDelayMs: 0,
-          },
-          scenarios: [
-            { id: 's1', type: 'success' },
-            { id: 's2', type: 'error' },
-          ],
+          scenarioCount: 2,
+          latencyMs: 120,
+          errorRatePct: 50,
+          status: 'ready',
         },
         {
-          id: 'e2',
+          endpointId: 'e2',
           method: 'POST',
           path: '/users',
           description: 'Create user',
-          endpointConfig: null,
-          scenarios: [],
+          scenarioCount: 0,
+          latencyMs: 0,
+          errorRatePct: 0,
+          status: 'needs-attention',
         },
-      ],
-    });
-    prismaMock.apiLog.aggregate.mockResolvedValueOnce({
-      _count: { _all: 4 },
-      _avg: { latencyMs: 120 },
-    });
-    prismaMock.apiLog.count.mockResolvedValueOnce(1);
-    prismaMock.apiLog.findMany
-      .mockResolvedValueOnce([
+      ]);
+      expect(response.body.recentRequests).toEqual([
         {
           id: 'log-1',
           method: 'GET',
@@ -402,82 +473,19 @@ describe('app integration', () => {
           statusCode: 500,
           latencyMs: 140,
           scenarioType: 'error',
-          createdAt: new Date('2026-04-08T11:00:00.000Z'),
+          createdAt: '2026-04-08T11:00:00.000Z',
         },
-      ])
-      .mockResolvedValueOnce([
-        { method: 'GET', path: '/users', statusCode: 200, latencyMs: 100 },
-        { method: 'GET', path: '/users', statusCode: 500, latencyMs: 140 },
       ]);
-
-    const response = await request(app)
-      .get('/api/v1/projects/p1/dashboard-summary')
-      .set(authHeaders());
-
-    expect(response.status).toBe(200);
-    expect(response.body.project).toEqual({
-      id: 'p1',
-      name: 'Proyecto',
-      description: 'Demo',
-      slug: 'proyecto',
-      mockUrl: 'http://localhost:3000/mock/proyecto',
-      updatedAt: '2026-04-08T10:00:00.000Z',
-      status: 'attention',
-    });
-    expect(response.body.metrics).toEqual({
-      totalEndpoints: 2,
-      totalScenarios: 2,
-      avgLatencyMs: 120,
-      errorRatePct: 25,
-      totalRequests: 4,
-    });
-    expect(response.body.health).toEqual({
-      readyEndpoints: 1,
-      needsAttentionEndpoints: 1,
-      errorScenarioEndpoints: 1,
-      emptyScenarioEndpoints: 0,
-      timeoutScenarioEndpoints: 0,
-    });
-    expect(response.body.endpointRows).toEqual([
-      {
-        endpointId: 'e1',
-        method: 'GET',
-        path: '/users',
-        description: 'List users',
-        scenarioCount: 2,
-        latencyMs: 120,
-        errorRatePct: 50,
-        status: 'ready',
-      },
-      {
-        endpointId: 'e2',
-        method: 'POST',
-        path: '/users',
-        description: 'Create user',
-        scenarioCount: 0,
-        latencyMs: 0,
-        errorRatePct: 0,
-        status: 'needs-attention',
-      },
-    ]);
-    expect(response.body.recentRequests).toEqual([
-      {
-        id: 'log-1',
-        method: 'GET',
-        path: '/users',
-        statusCode: 500,
-        latencyMs: 140,
-        scenarioType: 'error',
-        createdAt: '2026-04-08T11:00:00.000Z',
-      },
-    ]);
-    expect(response.body.configSummary).toEqual({
-      latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
-      errorSimulation: { enabled: true, ratePct: 10, codes: [500] },
-      rateLimiting: { enabled: true, rpm: 120 },
-      logging: { level: 'full' },
-      scope: 'all',
-    });
+      expect(response.body.configSummary).toEqual({
+        latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
+        errorSimulation: { enabled: true, ratePct: 10, codes: [500] },
+        rateLimiting: { enabled: true, rpm: 120 },
+        logging: { level: 'full' },
+        scope: 'all',
+      });
+    } finally {
+      env.MOCK_BASE_URL = originalMockBaseUrl;
+    }
   });
 
   it('GET /api/v1/projects/:projectId/dashboard-summary responde 404 cuando falta el proyecto', async () => {

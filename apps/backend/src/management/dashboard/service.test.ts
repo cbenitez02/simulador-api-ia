@@ -99,9 +99,11 @@ describe('dashboard/service', () => {
           createdAt: new Date('2026-04-08T11:00:00.000Z'),
         },
       ],
+      mockBaseUrl: 'https://mock.example.com/base/',
     });
 
     expect(summary.project.status).toBe('attention');
+    expect(summary.project.mockUrl).toBe('https://mock.example.com/base/users-api');
     expect(summary.metrics).toEqual({
       totalEndpoints: 3,
       totalScenarios: 4,
@@ -172,9 +174,11 @@ describe('dashboard/service', () => {
       }),
       endpointLogs: new Map(),
       recentLogs: [],
+      mockBaseUrl: 'https://mock.example.com/base',
     });
 
     expect(summary.project.status).toBe('empty');
+    expect(summary.project.mockUrl).toBe('https://mock.example.com/base/empty-api');
     expect(summary.metrics).toEqual({
       totalEndpoints: 0,
       totalScenarios: 0,

@@ -1,4 +1,5 @@
 import { requireWorkspaceAccess } from '../../auth/authorization.js';
+import { env } from '../../config/env.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
@@ -211,5 +212,6 @@ export async function getProjectDashboardSummary(
     }),
     endpointLogs: normalizeEndpointLogAggregates(endpointLogs),
     recentLogs,
+    mockBaseUrl: env.MOCK_BASE_URL,
   });
 }
