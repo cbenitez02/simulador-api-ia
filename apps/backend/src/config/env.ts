@@ -28,6 +28,22 @@ const defaultedNonEmptyString = (fallback: string) =>
     return trimmed === '' ? undefined : trimmed;
   }, z.string().min(1).default(fallback));
 
+const optionalStringArray = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const items = value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    return items.length > 0 ? items : undefined;
+  },
+  z.array(z.string().min(1)).optional()
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -35,6 +51,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: optionalNonEmptyString,
   OPENAI_MODEL: defaultedNonEmptyString('gpt-4.1-mini'),
   MOCK_BASE_URL: z.string().url().default('http://localhost:3000/mock'),
+  CORS_ALLOWED_ORIGINS: optionalStringArray,
 });
 
 export function parseEnv(input: NodeJS.ProcessEnv): Env {

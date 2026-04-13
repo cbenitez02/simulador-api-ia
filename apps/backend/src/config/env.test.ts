@@ -35,4 +35,18 @@ describe('parseEnv', () => {
     expect(parsed.OPENAI_API_KEY).toBe('test-key');
     expect(parsed.OPENAI_MODEL).toBe('gpt-4.1-mini');
   });
+
+  it('normaliza CORS_ALLOWED_ORIGINS como lista separada por comas', () => {
+    const parsed = parseEnv({
+      ...baseEnv,
+      CORS_ALLOWED_ORIGINS:
+        'https://app.example.com, https://admin.example.com , http://localhost:4200',
+    });
+
+    expect(parsed.CORS_ALLOWED_ORIGINS).toEqual([
+      'https://app.example.com',
+      'https://admin.example.com',
+      'http://localhost:4200',
+    ]);
+  });
 });

@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { authenticateApiRequest } from './auth/middleware.js';
+import { createCorsOptions } from './config/cors.js';
+import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { aiRouter } from './management/ai/router.js';
 import { dashboardRouter } from './management/dashboard/router.js';
@@ -17,7 +19,7 @@ import { mockRouter } from './mock-server/mock.router.js';
 export const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors(createCorsOptions(env)));
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }

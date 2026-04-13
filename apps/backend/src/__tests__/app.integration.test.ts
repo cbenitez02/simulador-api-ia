@@ -205,6 +205,79 @@ describe('app integration', () => {
     expect(prismaMock.project.findMany).not.toHaveBeenCalled();
   });
 
+  it('permite origen localhost en desarrollo cuando no hay CORS_ALLOWED_ORIGINS explícito', async () => {
+    const { env } = await import('../config/env.js');
+    const originalNodeEnv = env.NODE_ENV;
+    const originalAllowedOrigins = env.CORS_ALLOWED_ORIGINS;
+    env.NODE_ENV = 'development';
+    env.CORS_ALLOWED_ORIGINS = undefined;
+
+    try {
+      const response = await request(app)
+        .options('/api/v1/projects')
+        .set('Origin', 'http://127.0.0.1:4200')
+        .set('Access-Control-Request-Method', 'GET');
+
+      expect(response.status).toBe(204);
+      expect(response.headers['access-control-allow-origin']).toBe('http://127.0.0.1:4200');
+    } finally {
+      env.NODE_ENV = originalNodeEnv;
+      env.CORS_ALLOWED_ORIGINS = originalAllowedOrigins;
+    }
+  });
+
+  it('bloquea orígenes arbitrarios en producción cuando no hay allowlist explícita', async () => {
+    const { env } = await import('../config/env.js');
+    const originalNodeEnv = env.NODE_ENV;
+    const originalAllowedOrigins = env.CORS_ALLOWED_ORIGINS;
+    env.NODE_ENV = 'production';
+    env.CORS_ALLOWED_ORIGINS = undefined;
+
+    try {
+      const response = await request(app)
+        .options('/api/v1/projects')
+        .set('Origin', 'https://evil.example.com')
+        .set('Access-Control-Request-Method', 'GET');
+
+      expect(response.status).toBe(401);
+      expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    } finally {
+      env.NODE_ENV = originalNodeEnv;
+      env.CORS_ALLOWED_ORIGINS = originalAllowedOrigins;
+    }
+  });
+
+  it('permite sólo los orígenes configurados cuando existe allowlist explícita', async () => {
+    const { env } = await import('../config/env.js');
+    const originalNodeEnv = env.NODE_ENV;
+    const originalAllowedOrigins = env.CORS_ALLOWED_ORIGINS;
+    env.NODE_ENV = 'production';
+    env.CORS_ALLOWED_ORIGINS = ['https://app.example.com'];
+
+    try {
+      const allowedResponse = await request(app)
+        .options('/api/v1/projects')
+        .set('Origin', 'https://app.example.com')
+        .set('Access-Control-Request-Method', 'GET');
+
+      expect(allowedResponse.status).toBe(204);
+      expect(allowedResponse.headers['access-control-allow-origin']).toBe(
+        'https://app.example.com'
+      );
+
+      const blockedResponse = await request(app)
+        .options('/api/v1/projects')
+        .set('Origin', 'https://other.example.com')
+        .set('Access-Control-Request-Method', 'GET');
+
+      expect(blockedResponse.status).toBe(401);
+      expect(blockedResponse.headers['access-control-allow-origin']).toBeUndefined();
+    } finally {
+      env.NODE_ENV = originalNodeEnv;
+      env.CORS_ALLOWED_ORIGINS = originalAllowedOrigins;
+    }
+  });
+
   it('GET /api/v1/projects responde lista', async () => {
     prismaMock.project.findMany.mockResolvedValueOnce([
       { id: 'p1', name: 'Proyecto', slug: 'proyecto', description: '', _count: { endpoints: 0 } },

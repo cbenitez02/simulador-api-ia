@@ -48,6 +48,7 @@ Ejemplo base:
 DATABASE_URL="postgresql://postgres:postgres@localhost:54329/simulador_api?schema=public"
 OPENAI_MODEL="gpt-4.1-mini"
 MOCK_BASE_URL="http://localhost:3000/mock"
+CORS_ALLOWED_ORIGINS="http://127.0.0.1:4200,http://localhost:4200"
 PORT=3000
 NODE_ENV=development
 ```
@@ -57,6 +58,7 @@ NODE_ENV=development
 - `DATABASE_URL` es obligatoria.
 - `OPENAI_API_KEY` es opcional para boot. Solo configurala si vas a usar endpoints asistidos por IA.
 - `OPENAI_MODEL`, `MOCK_BASE_URL`, `PORT` y `NODE_ENV` tienen defaults en código, pero conviene dejarlos explícitos en `.env` para onboarding.
+- `CORS_ALLOWED_ORIGINS` acepta una lista separada por comas. Si no se define, en `development`/`test` se permiten orígenes `localhost` y `127.0.0.1`; en `production`, el backend no habilita CORS para orígenes arbitrarios del navegador.
 
 ## Base de datos local
 
