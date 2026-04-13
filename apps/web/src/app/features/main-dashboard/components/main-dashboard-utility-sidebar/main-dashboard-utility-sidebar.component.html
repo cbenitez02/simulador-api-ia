@@ -4,7 +4,14 @@
     <ul class="utility__actions" role="list">
       @for (action of quickActions; track action.id) {
         <li>
-          <button type="button" class="utility__action" (click)="onQuickAction(action.id)">
+          <button
+            type="button"
+            class="utility__action"
+            [disabled]="action.disabled === true"
+            [attr.aria-disabled]="action.disabled === true"
+            [title]="action.disabled ? action.subtitle : null"
+            (click)="onQuickAction(action.id)"
+          >
             <span class="utility__action-icon" aria-hidden="true">
               @switch (action.icon) {
                 @case ('plus') {

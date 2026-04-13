@@ -143,18 +143,6 @@
       (createEndpoint)="createEndpoint()"
     />
   </main>
-} @else {
-  <main class="workspace__main workspace__main--placeholder" [attr.aria-label]="placeholderLabel()">
-    <header class="workspace__main-head">
-      <div class="workspace__main-titles">
-        <h1 class="workspace__main-title">{{ placeholderTitle() }}</h1>
-        <p class="workspace__main-sub">{{ placeholderSub() }}</p>
-      </div>
-    </header>
-    <div class="workspace__placeholder-body">
-      <p>This section is not implemented yet.</p>
-    </div>
-  </main>
 }
 
 @if (activeNav() === 'dashboard' && hasProjects()) {

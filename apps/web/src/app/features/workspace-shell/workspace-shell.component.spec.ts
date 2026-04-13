@@ -32,7 +32,7 @@ type WorkspaceShellTestApi = {
   selectedProjectId: WritableSignalLike<string>;
   selectedEndpointId: WritableSignalLike<string | null>;
   selectedLog: WritableSignalLike<ApiLogEntry | null>;
-  activeNav: WritableSignalLike<'dashboard' | 'logs' | 'endpoints' | 'settings'>;
+  activeNav: WritableSignalLike<'dashboard' | 'logs' | 'endpoints'>;
   globalConfig: WritableSignalLike<GlobalConfig>;
   globalConfigDrawerOpen: WritableSignalLike<boolean>;
   globalConfigError: () => string | null;

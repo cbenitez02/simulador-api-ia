@@ -6,7 +6,6 @@ import {
   LucideHandMetal,
   LucideLayoutGrid,
   LucidePlus,
-  LucideSettings,
 } from '@lucide/angular';
 
 import type { SidebarProjectRow, WorkspaceNavId } from '../../../workspace-shell/models/workspace-shell.model';
@@ -16,15 +15,7 @@ import type { SidebarProjectRow, WorkspaceNavId } from '../../../workspace-shell
   templateUrl: './main-dashboard-sidebar.component.html',
   styleUrls: ['./main-dashboard-sidebar.component.css'],
   standalone: true,
-  imports: [
-    LucideArrowRightLeft,
-    LucideHandMetal,
-    LucideCopy,
-    LucideFileText,
-    LucideLayoutGrid,
-    LucidePlus,
-    LucideSettings,
-  ],
+  imports: [LucideArrowRightLeft, LucideHandMetal, LucideCopy, LucideFileText, LucideLayoutGrid, LucidePlus],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardSidebarComponent {

@@ -20,6 +20,14 @@ export interface UtilitySidebarRequestItem {
   timeLabel: string;
 }
 
+interface UtilityQuickAction {
+  id: 'create' | 'test' | 'export' | 'import';
+  title: string;
+  subtitle: string;
+  icon: 'plus' | 'play' | 'download' | 'upload';
+  disabled?: boolean;
+}
+
 @Component({
   selector: 'app-main-dashboard-utility-sidebar',
   templateUrl: './main-dashboard-utility-sidebar.component.html',
@@ -37,7 +45,7 @@ export class MainDashboardUtilitySidebarComponent {
   readonly importEndpoints = output<void>();
   readonly editGlobalConfig = output<void>();
 
-  protected readonly quickActions = [
+  protected readonly quickActions: UtilityQuickAction[] = [
     {
       id: 'create',
       title: 'Create endpoint',
@@ -47,8 +55,9 @@ export class MainDashboardUtilitySidebarComponent {
     {
       id: 'test',
       title: 'Test all endpoints',
-      subtitle: 'Run health check on all',
+      subtitle: 'Coming soon — bulk testing is not available yet',
       icon: 'play' as const,
+      disabled: true,
     },
     {
       id: 'export',
@@ -109,6 +118,11 @@ export class MainDashboardUtilitySidebarComponent {
   });
 
   protected onQuickAction(id: string): void {
+    const action = this.quickActions.find((item) => item.id === id);
+    if (action?.disabled) {
+      return;
+    }
+
     switch (id) {
       case 'create':
         this.createEndpoint.emit();

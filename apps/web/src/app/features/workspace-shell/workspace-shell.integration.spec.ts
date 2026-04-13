@@ -17,8 +17,8 @@ setupAngularVitest();
 type WorkspaceShellHarness = WorkspaceShellComponent & {
   projects: () => Array<{ name: string; description: string; mockUrl: string; endpoints: Array<{ path: string }> }>;
   activeNav: {
-    (): 'dashboard' | 'logs' | 'endpoints' | 'settings';
-    set(value: 'dashboard' | 'logs' | 'endpoints' | 'settings'): void;
+    (): 'dashboard' | 'logs' | 'endpoints';
+    set(value: 'dashboard' | 'logs' | 'endpoints'): void;
   };
   selectedProjectId: () => string;
   selectedEndpointId: () => string | null;
@@ -26,7 +26,7 @@ type WorkspaceShellHarness = WorkspaceShellComponent & {
   createProjectError: () => string | null;
   createProjectPartialState: () => { createdProjectId: string; endpointPrompt: string } | null;
   selectedLog: { (): ApiLogEntry | null; set(value: ApiLogEntry | null): void };
-  selectNav(value: 'dashboard' | 'logs' | 'endpoints' | 'settings'): void;
+  selectNav(value: 'dashboard' | 'logs' | 'endpoints'): void;
   activeProject: () => {
     name: string;
     description: string;

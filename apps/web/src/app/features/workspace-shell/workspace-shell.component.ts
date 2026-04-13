@@ -15,6 +15,7 @@ import { CreateEndpointPageComponent } from '../endpoints/components/create-endp
 import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { EndpointsPageComponent } from '../endpoints/endpoints-page.component';
+import type { EndpointDraft } from '../endpoints/models/endpoint-draft.model';
 import { GlobalConfigDrawerComponent } from '../global-config/components/global-config-drawer/global-config-drawer.component';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import { createDefaultGlobalConfig, type GlobalConfig } from '../global-config/models/global-config.model';
@@ -28,6 +29,15 @@ import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/componen
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type { CreateProjectAiFlowState, SidebarProjectRow, WorkspaceNavId } from './models/workspace-shell.model';
+
+interface ExportedWorkspaceProjectConfig {
+  version: 1;
+  exportedAt: string;
+  projectId: string;
+  projectSlug: string;
+  globalConfig: GlobalConfig;
+  endpoints: EndpointDraft[];
+}
 
 @Component({
   selector: 'app-workspace-shell',
@@ -153,11 +163,6 @@ export class WorkspaceShellComponent {
     return this.endpoints().find((e) => e.id === id) ?? null;
   });
 
-  protected readonly placeholderTitle = computed(() => (this.activeNav() === 'settings' ? 'Settings' : ''));
-  protected readonly placeholderSub = computed(() =>
-    this.activeNav() === 'settings' ? 'Workspace and simulator preferences.' : '',
-  );
-  protected readonly placeholderLabel = computed(() => this.placeholderTitle() || 'Section');
   protected readonly projectModalOpen = computed(() => this.createProjectModalOpen() || this.editProjectModalOpen());
   protected readonly projectModalMode = computed<ProjectModalMode>(() =>
     this.editProjectModalOpen() ? 'edit' : 'create',
@@ -384,9 +389,26 @@ export class WorkspaceShellComponent {
 
   protected testAllEndpoints(): void {}
 
-  protected exportConfig(): void {}
+  protected exportConfig(): void {
+    const project = this.activeProject();
+    if (!project || this.endpointMutationPending()) return;
+    void this.exportProjectConfiguration(project.id, project.slug);
+  }
 
-  protected importEndpoints(): void {}
+  protected importEndpoints(): void {
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    if (!projectId || this.endpointMutationPending()) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      void this.importProjectEndpoints(projectId, file);
+    };
+    input.click();
+  }
 
   protected editGlobalConfig(): void {
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
@@ -608,6 +630,67 @@ export class WorkspaceShellComponent {
       await this.refreshProject(projectId);
     } catch (error) {
       this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not delete endpoint.');
+    } finally {
+      this.endpointMutationPending.set(false);
+    }
+  }
+
+  private async exportProjectConfiguration(projectId: string, projectSlug: string): Promise<void> {
+    this.endpointMutationPending.set(true);
+    this.endpointMutationError.set(null);
+
+    try {
+      const globalConfig = await this.globalConfigRepository.getConfig(projectId);
+      const endpoints = await Promise.all(
+        this.endpoints().map((endpoint) => this.endpointsRepository.loadDraft(projectId, endpoint.id)),
+      );
+
+      const payload: ExportedWorkspaceProjectConfig = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        projectId,
+        projectSlug,
+        globalConfig,
+        endpoints,
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${projectSlug}-config.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not export project config.');
+    } finally {
+      this.endpointMutationPending.set(false);
+    }
+  }
+
+  private async importProjectEndpoints(projectId: string, file: File): Promise<void> {
+    this.endpointMutationPending.set(true);
+    this.endpointMutationError.set(null);
+
+    try {
+      const rawText = await file.text();
+      const parsed = JSON.parse(rawText) as Partial<ExportedWorkspaceProjectConfig>;
+
+      if (!Array.isArray(parsed.endpoints)) {
+        throw new Error('Invalid import file: endpoints array is required.');
+      }
+
+      if (parsed.globalConfig) {
+        await this.globalConfigRepository.saveConfig(projectId, parsed.globalConfig);
+      }
+
+      for (const endpoint of parsed.endpoints) {
+        await this.endpointsRepository.saveEndpoint(projectId, endpoint, null);
+      }
+
+      await this.refreshProject(projectId);
+    } catch (error) {
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not import endpoints.');
     } finally {
       this.endpointMutationPending.set(false);
     }
