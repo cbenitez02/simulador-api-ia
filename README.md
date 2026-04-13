@@ -51,6 +51,8 @@ Para una checklist operativa de despliegue y validación de arranque, ver `docs/
 
 Para una auditoría puntual del estado actual de las validaciones backend en CI, ver `docs/backend-ci-audit.md`.
 
+Para las reglas mínimas de merge y release-readiness del backend, ver `docs/backend-merge-gates.md`.
+
 ### Backend
 
 El backend carga variables desde `apps/backend/.env`.
