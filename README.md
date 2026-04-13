@@ -45,6 +45,8 @@ pnpm install
 
 ## Variables de entorno
 
+Para una auditoría completa del contrato runtime actual y de los supuestos locales todavía presentes, ver `docs/runtime-config-audit.md`.
+
 ### Backend
 
 El backend carga variables desde `apps/backend/.env`.
