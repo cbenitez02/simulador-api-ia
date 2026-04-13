@@ -222,7 +222,6 @@ Before handing an environment to QA, stakeholders, or users, confirm:
 
 ## 6. Known current limitations
 
-- backend startup log still prints a localhost bind URL, which is not necessarily the public URL of the deployment
 - frontend auth currently depends on browser-side Clerk initialization and the current management auth transport model
 - mock runtime remains public in this phase by product decision
 

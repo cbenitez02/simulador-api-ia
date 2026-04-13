@@ -53,7 +53,7 @@ Source of truth in code:
 - `DATABASE_URL` is the only truly mandatory variable today.
 - AI is intentionally **lazy-configured**: missing `OPENAI_API_KEY` does not block backend startup.
 - `MOCK_BASE_URL` is the most important **non-local risk** because it influences URLs surfaced to users.
-- `server.ts` logs `http://localhost:${env.PORT}` regardless of public host/proxy reality. That is acceptable for local DX, but misleading in deployed environments.
+- `server.ts` now logs the listen port only, avoiding any implication that localhost is the public deployment origin.
 
 ---
 
@@ -210,7 +210,7 @@ These require extra care because they affect security, public URLs, or cost:
 
 - `apps/backend/src/config/env.ts` — backend env schema and defaults
 - `apps/backend/src/lib/prisma.ts` — hard dependency on `DATABASE_URL`
-- `apps/backend/src/server.ts` — localhost startup log assumption
+- `apps/backend/src/server.ts` — startup logging now distinguishes listen port from public URL config
 - `apps/backend/src/management/ai/service.ts` — lazy `OPENAI_API_KEY` usage
 - `apps/backend/README.md` — backend env docs and current onboarding guidance
 - `apps/web/src/app/shared/config/app-runtime-config.ts` — frontend runtime config contract and localhost defaults
