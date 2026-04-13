@@ -42,6 +42,9 @@ jobs:
       - name: Lint
         run: pnpm --dir apps/backend lint
 
+      - name: Backend build
+        run: pnpm --dir apps/backend build
+
       - name: Unit + integration coverage
         env:
           OPENAI_API_KEY: test-key

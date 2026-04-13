@@ -23,12 +23,15 @@ export const clerkRequestIdentityAdapter: RequestIdentityAdapter = {
       return null;
     }
 
+    const email = readTrimmedHeader(req, 'x-clerk-email');
+    const displayName = readTrimmedHeader(req, 'x-clerk-display-name');
+
     return {
       provider: 'clerk',
       subject,
-      email: readTrimmedHeader(req, 'x-clerk-email'),
+      ...(email ? { email } : {}),
       emailVerified: parseBooleanHeader(req, 'x-clerk-email-verified'),
-      displayName: readTrimmedHeader(req, 'x-clerk-display-name'),
+      ...(displayName ? { displayName } : {}),
     };
   },
 };

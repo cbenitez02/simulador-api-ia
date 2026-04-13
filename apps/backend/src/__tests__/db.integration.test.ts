@@ -1,14 +1,14 @@
 import request from 'supertest';
 import type { Express } from 'express';
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from 'vitest';
-import type { PrismaClient } from '../generated/prisma/client.js';
+import type { Prisma, PrismaClient } from '../generated/prisma/client.js';
 
 const runDbTests = process.env.RUN_DB_TESTS === 'true';
 const describeDb = runDbTests ? describe : describe.skip;
 
 let app: Express;
 let prisma: PrismaClient;
-let prismaJsonNull: unknown;
+let prismaJsonNull: Prisma.NullableJsonNullValueInput;
 
 function authHeaders(overrides: Record<string, string> = {}) {
   return {

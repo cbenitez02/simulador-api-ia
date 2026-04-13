@@ -23,6 +23,7 @@ describe('global-config/service', () => {
       }),
       endpointLogs: new Map(),
       recentLogs: [],
+      mockBaseUrl: 'https://mock.example.com/base',
     });
 
     expect(defaults).toEqual({

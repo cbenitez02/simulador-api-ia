@@ -15,7 +15,6 @@ describe('mock-server/latency', () => {
         latencyMode: 'fixed',
         latencyMinMs: 300,
         latencyMaxMs: 900,
-        scope: 'all',
       }
     );
 
@@ -31,7 +30,6 @@ describe('mock-server/latency', () => {
         latencyMode: 'fixed',
         latencyMinMs: 0,
         latencyMaxMs: 0,
-        scope: 'all',
       }
     );
 

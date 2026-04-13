@@ -1,5 +1,6 @@
 import { requireWorkspaceAccess } from '../../auth/authorization.js';
 import { env } from '../../config/env.js';
+import { DEFAULT_GLOBAL_CONFIG_VALUES } from '../global-config/defaults.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
