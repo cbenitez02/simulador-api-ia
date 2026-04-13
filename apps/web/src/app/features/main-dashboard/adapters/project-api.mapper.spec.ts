@@ -150,6 +150,28 @@ describe('project-api.mapper', () => {
     expect(result.mockUrl).toBe('https://deploy.example.com/mock/generated-api');
   });
 
+  it('uses project endpoint counts to build placeholder dashboard rows before summary hydration', () => {
+    const result = mapCreatedProjectPlaceholder({
+      id: 'p3',
+      name: 'Generated API',
+      slug: 'generated-api',
+      description: '',
+      updatedAt: new Date().toISOString(),
+      _count: { endpoints: 2 },
+    });
+
+    expect(result.metrics.totalEndpoints).toBe(2);
+    expect(result.health.needsAttentionEndpoints).toBe(2);
+    expect(result.endpointRows).toEqual([
+      expect.objectContaining({ endpointId: 'p3-placeholder-1', path: 'Endpoint 1' }),
+      expect.objectContaining({ endpointId: 'p3-placeholder-2', path: 'Endpoint 2' }),
+    ]);
+    expect(result.endpoints).toEqual([
+      expect.objectContaining({ id: 'p3-placeholder-1', path: 'Endpoint 1' }),
+      expect.objectContaining({ id: 'p3-placeholder-2', path: 'Endpoint 2' }),
+    ]);
+  });
+
   it('maps summary endpoint rows into navigation-only previews explicitly derived on the frontend', () => {
     const preview = mapDashboardEndpointPreviewFromSummaryRow({
       endpointId: 'e1',

@@ -3,13 +3,11 @@ import { ApiClient } from '../../../shared/http/api-client';
 import type {
   CreateProjectDto,
   DashboardSummaryDto,
-  EndpointDto,
   ProjectDto,
   UpdateProjectDto,
 } from '../../../shared/http/api.types';
 import type { DashboardProject } from '../models/dashboard-project.model';
 import { mapCreatedProjectPlaceholder, mapDashboardProjectFromApi } from '../adapters/project-api.mapper';
-import { mapEndpointSummaryFromApi } from '../../endpoints/adapters/endpoint-api.mapper';
 
 @Injectable({ providedIn: 'root' })
 export class ProjectsRepository {
@@ -18,28 +16,7 @@ export class ProjectsRepository {
   async listProjects(): Promise<DashboardProject[]> {
     const projects = await this.api.get<ProjectDto[]>('/projects');
 
-    return Promise.all(
-      projects.map(async (project) => {
-        const endpoints = await this.api.get<EndpointDto[]>(`/projects/${project.id}/endpoints`);
-        return {
-          ...mapCreatedProjectPlaceholder(project),
-          endpoints: endpoints.map(mapEndpointSummaryFromApi),
-          metrics: {
-            totalEndpoints: endpoints.length,
-            totalScenarios: 0,
-            avgLatencyMs:
-              endpoints.length > 0
-                ? Math.round(
-                    endpoints.reduce((sum, endpoint) => sum + (endpoint.endpointConfig?.fixedDelayMs ?? 0), 0) /
-                      endpoints.length,
-                  )
-                : 0,
-            errorRatePct: 0,
-            totalRequests: 0,
-          },
-        };
-      }),
-    );
+    return projects.map(mapCreatedProjectPlaceholder);
   }
 
   async createProject(input: CreateProjectDto): Promise<DashboardProject> {

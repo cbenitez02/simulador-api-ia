@@ -79,7 +79,7 @@ export class WorkspaceShellComponent {
       id: p.id,
       name: p.name,
       mockUrl: p.mockUrl,
-      endpointCount: p.endpoints.length,
+      endpointCount: p.metrics.totalEndpoints,
     })),
   );
 

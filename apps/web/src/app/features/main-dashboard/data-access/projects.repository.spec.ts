@@ -70,30 +70,23 @@ describe('ProjectsRepository', () => {
     return runInInjectionContext(injector, () => new ProjectsRepository());
   }
 
-  it('loads projects and their endpoints for the sidebar list', async () => {
+  it('loads projects without endpoint fan-out and keeps placeholder counts for the sidebar list', async () => {
     const api = {
       get: vi.fn(async (path: string) => {
         if (path === '/projects') return [projectDto];
-        return [
-          {
-            id: 'e1',
-            projectId: 'p1',
-            method: 'GET',
-            path: '/users',
-            description: '',
-            statusCode: 200,
-            responseBody: [],
-          },
-        ];
+        throw new Error(`Unexpected GET ${path}`);
       }),
     };
 
     const repository = createRepository(api);
     const result = await repository.listProjects();
 
+    expect(api.get).toHaveBeenCalledTimes(1);
     expect(api.get).toHaveBeenCalledWith('/projects');
-    expect(api.get).toHaveBeenCalledWith('/projects/p1/endpoints');
+    expect(result[0]?.metrics.totalEndpoints).toBe(1);
+    expect(result[0]?.endpointRows).toHaveLength(1);
     expect(result[0]?.endpoints).toHaveLength(1);
+    expect(result[0]?.endpoints[0]?.path).toBe('Endpoint 1');
   });
 
   it('updates a project with a partial payload and remaps the refreshed project', async () => {

@@ -305,41 +305,6 @@ describe('WorkspaceShellComponent integration', () => {
         };
       }
 
-      if (path === '/projects/p1/endpoints') {
-        return [
-          {
-            id: 'e1',
-            projectId: 'p1',
-            method: 'GET',
-            path: '/users',
-            description: 'List users',
-            statusCode: 200,
-            responseBody: [{ id: 1 }],
-            endpointConfig: {
-              endpointId: 'e1',
-              latencyMode: 'fixed',
-              fixedDelayMs: 120,
-              minDelayMs: 0,
-              maxDelayMs: 500,
-              errorRate: 0,
-              useScenarioWeights: true,
-            },
-            scenarios: [
-              {
-                id: 's1',
-                endpointId: 'e1',
-                name: 'Success',
-                type: 'success',
-                statusCode: 200,
-                body: [{ id: 1 }],
-                delayMs: 120,
-                weight: 100,
-              },
-            ],
-          },
-        ];
-      }
-
       throw new Error(`Unexpected GET ${path}`);
     });
 
@@ -348,8 +313,8 @@ describe('WorkspaceShellComponent integration', () => {
 
     const content = await renderSnapshot(component, logsRepository);
     expect(api.get).toHaveBeenCalledWith('/projects');
-    expect(api.get).toHaveBeenCalledWith('/projects/p1/endpoints');
     expect(api.get).toHaveBeenCalledWith('/projects/p1/dashboard-summary');
+    expect(api.get).toHaveBeenCalledTimes(2);
     expect(content).toContain('Workspace project');
     expect(content).toContain('Live backend project');
     expect(content).toContain('https://mock.example.com/workspace-project');
@@ -372,7 +337,7 @@ describe('WorkspaceShellComponent integration', () => {
         ];
       }
 
-      if (path === '/projects/p1/endpoints') return [];
+      if (path === '/projects/p1/dashboard-summary') return createDashboardSummary(1);
 
       if (path === '/projects/p1/logs') {
         return {
@@ -437,7 +402,7 @@ describe('WorkspaceShellComponent integration', () => {
         ];
       }
 
-      if (path === '/projects/p1/endpoints') return [];
+      if (path === '/projects/p1/dashboard-summary') return createDashboardSummary(0);
       if (path === '/projects/p1/logs') return { items: [], nextCursor: null, serverTime: '2026-04-04T10:11:30.000Z' };
 
       throw new Error(`Unexpected GET ${path}`);
@@ -458,24 +423,6 @@ describe('WorkspaceShellComponent integration', () => {
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
         return projectExists ? [createProjectListItem(endpointCreated ? 1 : 0)] : [];
-      }
-
-      if (path === '/projects/p1/endpoints') {
-        return endpointCreated
-          ? [
-              {
-                id: 'e1',
-                projectId: 'p1',
-                method: 'POST',
-                path: '/users',
-                description: 'Create user',
-                statusCode: 201,
-                responseBody: { id: 'u1' },
-                endpointConfig: null,
-                scenarios: [],
-              },
-            ]
-          : [];
       }
 
       if (path === '/projects/p1/dashboard-summary') {
@@ -536,24 +483,6 @@ describe('WorkspaceShellComponent integration', () => {
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
         return projectExists ? [createProjectListItem(endpointCreated ? 1 : 0)] : [];
-      }
-
-      if (path === '/projects/p1/endpoints') {
-        return endpointCreated
-          ? [
-              {
-                id: 'e1',
-                projectId: 'p1',
-                method: 'POST',
-                path: '/users',
-                description: 'Create user',
-                statusCode: 201,
-                responseBody: { id: 'u1' },
-                endpointConfig: null,
-                scenarios: [],
-              },
-            ]
-          : [];
       }
 
       if (path === '/projects/p1/dashboard-summary') {
@@ -624,10 +553,6 @@ describe('WorkspaceShellComponent integration', () => {
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
         return projectExists ? [createProjectListItem(0)] : [];
-      }
-
-      if (path === '/projects/p1/endpoints') {
-        return [];
       }
 
       if (path === '/projects/p1/dashboard-summary') {

@@ -6,6 +6,31 @@ import { formatRelativeTime } from '../../../shared/utils/relative-time';
 
 const HTTP_METHODS = new Set<EndpointPreview['method']>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
+function buildPlaceholderEndpointPreview(projectId: string, index: number): EndpointPreview {
+  return {
+    id: `${projectId}-placeholder-${index + 1}`,
+    method: 'GET',
+    path: `Endpoint ${index + 1}`,
+    description: 'Loading endpoint details',
+    latencyMs: 0,
+    statusCode: 200,
+    responseBody: null,
+  };
+}
+
+function buildPlaceholderEndpointRow(projectId: string, index: number) {
+  return {
+    endpointId: `${projectId}-placeholder-${index + 1}`,
+    method: 'GET' as const,
+    path: `Endpoint ${index + 1}`,
+    description: 'Loading endpoint details',
+    scenarioCount: 0,
+    latencyMs: 0,
+    errorRatePct: 0,
+    status: 'needs-attention' as const,
+  };
+}
+
 function normalizeMethod(method: string): EndpointPreview['method'] {
   return HTTP_METHODS.has(method as EndpointPreview['method']) ? (method as EndpointPreview['method']) : 'GET';
 }
@@ -58,6 +83,13 @@ export function mapDashboardProjectFromApi(summary: DashboardSummaryDto): Dashbo
 
 export function mapCreatedProjectPlaceholder(project: ProjectDto): DashboardProject {
   const mockBaseUrl = getMockBaseUrl();
+  const placeholderCount = project._count.endpoints;
+  const placeholderEndpoints = Array.from({ length: placeholderCount }, (_, index) =>
+    buildPlaceholderEndpointPreview(project.id, index),
+  );
+  const placeholderEndpointRows = Array.from({ length: placeholderCount }, (_, index) =>
+    buildPlaceholderEndpointRow(project.id, index),
+  );
 
   return {
     id: project.id,
@@ -68,7 +100,7 @@ export function mapCreatedProjectPlaceholder(project: ProjectDto): DashboardProj
     description: project.description || 'Your mock API workspace.',
     lastUpdatedRelative: formatRelativeTime(project.updatedAt),
     metrics: {
-      totalEndpoints: 0,
+      totalEndpoints: placeholderCount,
       totalScenarios: 0,
       avgLatencyMs: 0,
       errorRatePct: 0,
@@ -76,12 +108,12 @@ export function mapCreatedProjectPlaceholder(project: ProjectDto): DashboardProj
     },
     health: {
       readyEndpoints: 0,
-      needsAttentionEndpoints: 0,
+      needsAttentionEndpoints: placeholderCount,
       errorScenarioEndpoints: 0,
       emptyScenarioEndpoints: 0,
       timeoutScenarioEndpoints: 0,
     },
-    endpointRows: [],
+    endpointRows: placeholderEndpointRows,
     recentRequests: [],
     configSummary: {
       latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
@@ -90,7 +122,7 @@ export function mapCreatedProjectPlaceholder(project: ProjectDto): DashboardProj
       logging: { level: 'basic' },
       scope: 'all',
     },
-    endpoints: [],
+    endpoints: placeholderEndpoints,
   };
 }
 

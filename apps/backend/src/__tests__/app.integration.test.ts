@@ -64,6 +64,7 @@ const prismaMock = {
     count: vi.fn(),
     create: vi.fn(),
     findMany: vi.fn(),
+    groupBy: vi.fn(),
     deleteMany: vi.fn(),
   },
   runtimeRateLimitBucket: {
@@ -536,21 +537,32 @@ describe('app integration', () => {
         _avg: { latencyMs: 120 },
       });
       prismaMock.apiLog.count.mockResolvedValueOnce(1);
-      prismaMock.apiLog.findMany
+      prismaMock.apiLog.findMany.mockResolvedValueOnce([
+        {
+          id: 'log-1',
+          method: 'GET',
+          path: '/users',
+          statusCode: 500,
+          latencyMs: 140,
+          scenarioType: 'error',
+          createdAt: new Date('2026-04-08T11:00:00.000Z'),
+        },
+      ]);
+      prismaMock.apiLog.groupBy
         .mockResolvedValueOnce([
           {
-            id: 'log-1',
             method: 'GET',
             path: '/users',
-            statusCode: 500,
-            latencyMs: 140,
-            scenarioType: 'error',
-            createdAt: new Date('2026-04-08T11:00:00.000Z'),
+            _count: { _all: 2 },
+            _avg: { latencyMs: 120 },
           },
         ])
         .mockResolvedValueOnce([
-          { method: 'GET', path: '/users', statusCode: 200, latencyMs: 100 },
-          { method: 'GET', path: '/users', statusCode: 500, latencyMs: 140 },
+          {
+            method: 'GET',
+            path: '/users',
+            _count: { _all: 1 },
+          },
         ]);
 
       const response = await request(app)
@@ -621,6 +633,8 @@ describe('app integration', () => {
         logging: { level: 'full' },
         scope: 'all',
       });
+      expect(prismaMock.apiLog.findMany).toHaveBeenCalledTimes(1);
+      expect(prismaMock.apiLog.groupBy).toHaveBeenCalledTimes(2);
     } finally {
       env.MOCK_BASE_URL = originalMockBaseUrl;
     }
@@ -653,7 +667,8 @@ describe('app integration', () => {
       _avg: { latencyMs: null },
     });
     prismaMock.apiLog.count.mockResolvedValueOnce(0);
-    prismaMock.apiLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    prismaMock.apiLog.findMany.mockResolvedValueOnce([]);
+    prismaMock.apiLog.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await request(app)
       .get('/api/v1/projects/p1/dashboard-summary')

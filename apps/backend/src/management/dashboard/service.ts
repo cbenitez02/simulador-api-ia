@@ -102,29 +102,32 @@ function normalizeProjectGlobalConfig(
 }
 
 function normalizeEndpointLogAggregates(
-  logRows: Array<{ method: string; path: string; statusCode: number; latencyMs: number }>
+  groupedRows: Array<{
+    method: string;
+    path: string;
+    _count: { _all: number };
+    _avg: { latencyMs: number | null };
+  }>,
+  groupedErrorRows: Array<{
+    method: string;
+    path: string;
+    _count: { _all: number };
+  }>
 ): Map<string, EndpointLogAggregate> {
   const aggregates = new Map<string, EndpointLogAggregate>();
+  const errorCounts = new Map(
+    groupedErrorRows.map((row) => [`${row.method} ${row.path}`, row._count._all])
+  );
 
-  for (const row of logRows) {
+  for (const row of groupedRows) {
     const key = `${row.method} ${row.path}`;
-    const current = aggregates.get(key) ?? {
-      method: row.method,
-      path: row.path,
-      totalRequests: 0,
-      errorRequests: 0,
-      avgLatencyMs: 0,
-    };
-
-    const totalRequests = current.totalRequests + 1;
-    const totalLatency = current.avgLatencyMs * current.totalRequests + row.latencyMs;
 
     aggregates.set(key, {
       method: row.method,
       path: row.path,
-      totalRequests,
-      errorRequests: current.errorRequests + (row.statusCode >= 400 ? 1 : 0),
-      avgLatencyMs: Math.round(totalLatency / totalRequests),
+      totalRequests: row._count._all,
+      errorRequests: errorCounts.get(key) ?? 0,
+      avgLatencyMs: row._avg.latencyMs === null ? 0 : Math.round(row._avg.latencyMs),
     });
   }
 
@@ -164,42 +167,48 @@ export async function getProjectDashboardSummary(
 
   requireWorkspaceAccess(actor, project.workspaceId);
 
-  const [trafficAggregate, errorRequests, recentLogs, endpointLogs] = await Promise.all([
-    prisma.apiLog.aggregate({
-      where: { projectId },
-      _count: { _all: true },
-      _avg: { latencyMs: true },
-    }),
-    prisma.apiLog.count({
-      where: {
-        projectId,
-        statusCode: { gte: 400 },
-      },
-    }),
-    prisma.apiLog.findMany({
-      where: { projectId },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 4,
-      select: {
-        id: true,
-        method: true,
-        path: true,
-        statusCode: true,
-        latencyMs: true,
-        scenarioType: true,
-        createdAt: true,
-      },
-    }),
-    prisma.apiLog.findMany({
-      where: { projectId },
-      select: {
-        method: true,
-        path: true,
-        statusCode: true,
-        latencyMs: true,
-      },
-    }),
-  ]);
+  const [trafficAggregate, errorRequests, recentLogs, endpointLogGroups, endpointErrorLogGroups] =
+    await Promise.all([
+      prisma.apiLog.aggregate({
+        where: { projectId },
+        _count: { _all: true },
+        _avg: { latencyMs: true },
+      }),
+      prisma.apiLog.count({
+        where: {
+          projectId,
+          statusCode: { gte: 400 },
+        },
+      }),
+      prisma.apiLog.findMany({
+        where: { projectId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 4,
+        select: {
+          id: true,
+          method: true,
+          path: true,
+          statusCode: true,
+          latencyMs: true,
+          scenarioType: true,
+          createdAt: true,
+        },
+      }),
+      prisma.apiLog.groupBy({
+        where: { projectId },
+        by: ['method', 'path'],
+        _count: { _all: true },
+        _avg: { latencyMs: true },
+      }),
+      prisma.apiLog.groupBy({
+        where: {
+          projectId,
+          statusCode: { gte: 400 },
+        },
+        by: ['method', 'path'],
+        _count: { _all: true },
+      }),
+    ]);
 
   return buildDashboardSummary({
     project: {
@@ -211,7 +220,7 @@ export async function getProjectDashboardSummary(
       avgLatencyMs: trafficAggregate._avg.latencyMs,
       errorRequests,
     }),
-    endpointLogs: normalizeEndpointLogAggregates(endpointLogs),
+    endpointLogs: normalizeEndpointLogAggregates(endpointLogGroups, endpointErrorLogGroups),
     recentLogs,
     mockBaseUrl: env.MOCK_BASE_URL,
   });
