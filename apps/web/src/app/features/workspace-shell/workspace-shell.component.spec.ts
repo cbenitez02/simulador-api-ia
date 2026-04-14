@@ -111,6 +111,11 @@ const emptyDashboardState = {
     timeoutScenarioEndpoints: 0,
   },
   endpointRows: [],
+  endpointRowsMeta: {
+    total: 0,
+    limit: 0,
+    hasMore: false,
+  },
   recentRequests: [],
   configSummary: {
     latency: { enabled: false, mode: 'fixed' as const, minMs: 0, maxMs: 1000 },

@@ -45,6 +45,11 @@ const projectFixture: DashboardProject = {
     timeoutScenarioEndpoints: 0,
   },
   endpointRows: [],
+  endpointRowsMeta: {
+    total: 0,
+    limit: 0,
+    hasMore: false,
+  },
   recentRequests: [
     {
       id: 'log-1',

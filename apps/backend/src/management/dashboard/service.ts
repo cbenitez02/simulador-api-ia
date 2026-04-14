@@ -7,6 +7,7 @@ import { AppError } from '../../middleware/error-handler.js';
 import {
   buildDashboardSummary,
   buildProjectTrafficAggregate,
+  resolveProjectStatus,
   type EndpointLogAggregate,
 } from './summary.js';
 import type { DashboardSummaryDto } from './schema.js';
@@ -22,7 +23,7 @@ type EndpointRecord = {
   method: string;
   path: string;
   description: string;
-  scenarios: Array<{ id: string; type: string }>;
+  scenarioCount: number;
   endpointConfig: {
     latencyMode: string;
     fixedDelayMs: number;
@@ -30,6 +31,8 @@ type EndpointRecord = {
     maxDelayMs: number;
   } | null;
 };
+
+const DASHBOARD_ENDPOINT_ROWS_PREVIEW_LIMIT = 10;
 
 type ProjectRecord = {
   id: string;
@@ -141,22 +144,6 @@ export async function getProjectDashboardSummary(
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      endpoints: {
-        orderBy: [{ method: 'asc' }, { path: 'asc' }],
-        include: {
-          scenarios: {
-            select: { id: true, type: true },
-          },
-          endpointConfig: {
-            select: {
-              latencyMode: true,
-              fixedDelayMs: true,
-              minDelayMs: true,
-              maxDelayMs: true,
-            },
-          },
-        },
-      },
       globalConfig: true,
     },
   });
@@ -167,59 +154,150 @@ export async function getProjectDashboardSummary(
 
   requireWorkspaceAccess(actor, project.workspaceId);
 
-  const [trafficAggregate, errorRequests, recentLogs, endpointLogGroups, endpointErrorLogGroups] =
-    await Promise.all([
-      prisma.apiLog.aggregate({
-        where: { projectId },
-        _count: { _all: true },
-        _avg: { latencyMs: true },
-      }),
-      prisma.apiLog.count({
-        where: {
-          projectId,
-          statusCode: { gte: 400 },
+  const [
+    endpointRows,
+    totalEndpoints,
+    totalScenarios,
+    readyEndpoints,
+    errorScenarioEndpoints,
+    emptyScenarioEndpoints,
+    timeoutScenarioEndpoints,
+    trafficAggregate,
+    errorRequests,
+    recentLogs,
+    endpointLogGroups,
+    endpointErrorLogGroups,
+  ] = await Promise.all([
+    prisma.endpoint.findMany({
+      where: { projectId },
+      orderBy: [{ method: 'asc' }, { path: 'asc' }],
+      take: DASHBOARD_ENDPOINT_ROWS_PREVIEW_LIMIT,
+      select: {
+        id: true,
+        method: true,
+        path: true,
+        description: true,
+        endpointConfig: {
+          select: {
+            latencyMode: true,
+            fixedDelayMs: true,
+            minDelayMs: true,
+            maxDelayMs: true,
+          },
         },
-      }),
-      prisma.apiLog.findMany({
-        where: { projectId },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: 4,
-        select: {
-          id: true,
-          method: true,
-          path: true,
-          statusCode: true,
-          latencyMs: true,
-          scenarioType: true,
-          createdAt: true,
+        _count: {
+          select: { scenarios: true },
         },
-      }),
-      prisma.apiLog.groupBy({
-        where: { projectId },
-        by: ['method', 'path'],
-        _count: { _all: true },
-        _avg: { latencyMs: true },
-      }),
-      prisma.apiLog.groupBy({
-        where: {
-          projectId,
-          statusCode: { gte: 400 },
-        },
-        by: ['method', 'path'],
-        _count: { _all: true },
-      }),
-    ]);
+      },
+    }),
+    prisma.endpoint.count({ where: { projectId } }),
+    prisma.scenario.count({ where: { endpoint: { projectId } } }),
+    prisma.endpoint.count({
+      where: {
+        projectId,
+        scenarios: { some: {} },
+      },
+    }),
+    prisma.endpoint.count({
+      where: {
+        projectId,
+        scenarios: { some: { type: 'error' } },
+      },
+    }),
+    prisma.endpoint.count({
+      where: {
+        projectId,
+        scenarios: { some: { type: 'empty' } },
+      },
+    }),
+    prisma.endpoint.count({
+      where: {
+        projectId,
+        scenarios: { some: { type: 'timeout' } },
+      },
+    }),
+    prisma.apiLog.aggregate({
+      where: { projectId },
+      _count: { _all: true },
+      _avg: { latencyMs: true },
+    }),
+    prisma.apiLog.count({
+      where: {
+        projectId,
+        statusCode: { gte: 400 },
+      },
+    }),
+    prisma.apiLog.findMany({
+      where: { projectId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 4,
+      select: {
+        id: true,
+        method: true,
+        path: true,
+        statusCode: true,
+        latencyMs: true,
+        scenarioType: true,
+        createdAt: true,
+      },
+    }),
+    prisma.apiLog.groupBy({
+      where: { projectId },
+      by: ['method', 'path'],
+      _count: { _all: true },
+      _avg: { latencyMs: true },
+    }),
+    prisma.apiLog.groupBy({
+      where: {
+        projectId,
+        statusCode: { gte: 400 },
+      },
+      by: ['method', 'path'],
+      _count: { _all: true },
+    }),
+  ]);
+
+  const needsAttentionEndpoints = totalEndpoints - readyEndpoints;
 
   return buildDashboardSummary({
     project: {
       ...project,
       globalConfig: normalizeProjectGlobalConfig(project.globalConfig),
     },
+    endpointRows: endpointRows.map((endpoint) => ({
+      id: endpoint.id,
+      method: endpoint.method,
+      path: endpoint.path,
+      description: endpoint.description,
+      scenarioCount: endpoint._count.scenarios,
+      endpointConfig: endpoint.endpointConfig,
+    })),
+    endpointRowsMeta: {
+      total: totalEndpoints,
+      limit: DASHBOARD_ENDPOINT_ROWS_PREVIEW_LIMIT,
+      hasMore: totalEndpoints > endpointRows.length,
+    },
     traffic: buildProjectTrafficAggregate({
       totalRequests: trafficAggregate._count._all,
       avgLatencyMs: trafficAggregate._avg.latencyMs,
       errorRequests,
     }),
+    totalScenarios,
+    health: {
+      readyEndpoints,
+      needsAttentionEndpoints,
+      errorScenarioEndpoints,
+      emptyScenarioEndpoints,
+      timeoutScenarioEndpoints,
+    },
+    projectStatus: resolveProjectStatus(
+      totalEndpoints === 0
+        ? []
+        : [
+            ...(readyEndpoints > 0 ? [{ status: 'ready' as const }] : []),
+            ...(needsAttentionEndpoints > 0 ? [{ status: 'needs-attention' as const }] : []),
+          ]
+    ),
     endpointLogs: normalizeEndpointLogAggregates(endpointLogGroups, endpointErrorLogGroups),
     recentLogs,
     mockBaseUrl: env.MOCK_BASE_URL,

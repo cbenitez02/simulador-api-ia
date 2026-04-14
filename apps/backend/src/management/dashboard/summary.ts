@@ -6,7 +6,7 @@ type EndpointRecord = {
   method: string;
   path: string;
   description: string;
-  scenarios: Array<{ id: string; type: string }>;
+  scenarioCount: number;
   endpointConfig: {
     latencyMode: string;
     fixedDelayMs: number;
@@ -21,7 +21,6 @@ type ProjectRecord = {
   description: string;
   slug: string;
   updatedAt: Date;
-  endpoints: EndpointRecord[];
   globalConfig: {
     latencyEnabled: boolean;
     latencyMinMs: number;
@@ -50,6 +49,10 @@ export type EndpointLogAggregate = {
   errorRequests: number;
   avgLatencyMs: number;
 };
+
+export type DashboardHealthSummary = DashboardSummaryDto['health'];
+
+export type DashboardEndpointRowsMeta = DashboardSummaryDto['endpointRowsMeta'];
 
 export type RecentLogRecord = {
   id: string;
@@ -144,16 +147,20 @@ export function buildProjectTrafficAggregate(input: {
 
 export function buildDashboardSummary(input: {
   project: ProjectRecord;
+  endpointRows: EndpointRecord[];
+  endpointRowsMeta: DashboardEndpointRowsMeta;
   traffic: ProjectTrafficAggregate;
+  totalScenarios: number;
+  health: DashboardHealthSummary;
+  projectStatus: DashboardSummaryDto['project']['status'];
   endpointLogs: Map<string, EndpointLogAggregate>;
   recentLogs: RecentLogRecord[];
   mockBaseUrl: string;
 }): DashboardSummaryDto {
   const projectConfig = input.project.globalConfig ?? DEFAULT_GLOBAL_CONFIG_VALUES;
 
-  const endpointRows = input.project.endpoints.map((endpoint) => {
-    const scenarioCount = endpoint.scenarios.length;
-    const status = resolveEndpointStatus(scenarioCount);
+  const endpointRows = input.endpointRows.map((endpoint) => {
+    const status = resolveEndpointStatus(endpoint.scenarioCount);
     const logAggregate = input.endpointLogs.get(`${endpoint.method} ${endpoint.path}`);
 
     return {
@@ -161,7 +168,7 @@ export function buildDashboardSummary(input: {
       method: endpoint.method,
       path: endpoint.path,
       description: endpoint.description,
-      scenarioCount,
+      scenarioCount: endpoint.scenarioCount,
       latencyMs: logAggregate?.avgLatencyMs ?? resolveLatencyFallback(endpoint.endpointConfig),
       errorRatePct: calculateErrorRatePct(
         logAggregate?.errorRequests ?? 0,
@@ -179,25 +186,18 @@ export function buildDashboardSummary(input: {
       slug: input.project.slug,
       mockUrl: joinMockProjectUrl(input.mockBaseUrl, input.project.slug),
       updatedAt: input.project.updatedAt.toISOString(),
-      status: resolveProjectStatus(endpointRows.map((row) => ({ status: row.status }))),
+      status: input.projectStatus,
     },
     metrics: {
-      totalEndpoints: endpointRows.length,
-      totalScenarios: input.project.endpoints.reduce(
-        (total, endpoint) => total + endpoint.scenarios.length,
-        0
-      ),
+      totalEndpoints: input.endpointRowsMeta.total,
+      totalScenarios: input.totalScenarios,
       avgLatencyMs: input.traffic.avgLatencyMs,
       errorRatePct: input.traffic.errorRatePct,
       totalRequests: input.traffic.totalRequests,
     },
-    health: buildHealthBuckets(
-      input.project.endpoints.map((endpoint) => ({
-        status: resolveEndpointStatus(endpoint.scenarios.length),
-        scenarioTypes: endpoint.scenarios.map((scenario) => scenario.type),
-      }))
-    ),
+    health: input.health,
     endpointRows,
+    endpointRowsMeta: input.endpointRowsMeta,
     recentRequests: input.recentLogs.map((log) => ({
       id: log.id,
       method: log.method,

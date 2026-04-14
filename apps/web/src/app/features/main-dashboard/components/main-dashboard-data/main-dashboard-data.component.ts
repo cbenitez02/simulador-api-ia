@@ -39,6 +39,7 @@ export class MainDashboardDataComponent {
   readonly project = input.required<DashboardProject>();
 
   readonly openLogs = output<void>();
+  readonly openEndpoints = output<void>();
   readonly createEndpoint = output<void>();
   readonly editProjectRequested = output<void>();
   readonly deleteProjectRequested = output<void>();
@@ -46,6 +47,7 @@ export class MainDashboardDataComponent {
   protected readonly metrics = computed(() => this.project().metrics);
   protected readonly health = computed(() => this.project().health);
   protected readonly endpointRows = computed(() => this.project().endpointRows);
+  protected readonly endpointRowsMeta = computed(() => this.project().endpointRowsMeta);
   protected readonly projectStatusLabel = computed(() => {
     switch (this.project().status) {
       case 'empty':

@@ -41,6 +41,18 @@ function buildCursorFilter(query: ListProjectLogsQuery) {
 
   const cursorDate = new Date(query.cursorCreatedAt);
 
+  if (query.direction === 'older') {
+    return {
+      OR: [
+        { createdAt: { lt: cursorDate } },
+        {
+          createdAt: cursorDate,
+          id: { lt: query.cursorId },
+        },
+      ],
+    };
+  }
+
   return {
     OR: [
       { createdAt: { gt: cursorDate } },
@@ -50,6 +62,21 @@ function buildCursorFilter(query: ListProjectLogsQuery) {
       },
     ],
   };
+}
+
+function buildStatusFilter(query: ListProjectLogsQuery) {
+  switch (query.statusBucket) {
+    case '2xx':
+      return { gte: 200, lt: 300 };
+    case '3xx':
+      return { gte: 300, lt: 400 };
+    case '4xx':
+      return { gte: 400, lt: 500 };
+    case '5xx':
+      return { gte: 500, lt: 600 };
+    default:
+      return undefined;
+  }
 }
 
 function toCursor(log: { createdAt: Date; id: string } | null): ApiLogCursor | null {
@@ -110,19 +137,25 @@ export async function listProjectLogs(
   await authorizeProjectAccess(actor, projectId);
 
   const cursorFilter = buildCursorFilter(query);
+  const statusFilter = buildStatusFilter(query);
 
   const items = await prisma.apiLog.findMany({
     where: {
       projectId,
+      ...(query.method ? { method: query.method } : {}),
+      ...(query.path ? { path: { contains: query.path, mode: 'insensitive' as const } } : {}),
+      ...(statusFilter ? { statusCode: statusFilter } : {}),
       ...(cursorFilter.OR ? { OR: cursorFilter.OR } : {}),
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: query.limit,
   });
 
+  const cursorItem = query.direction === 'newer' ? (items[0] ?? null) : (items.at(-1) ?? null);
+
   return {
     items: items.map(toProjectLogItem),
-    nextCursor: toCursor(items[0] ?? null),
+    nextCursor: toCursor(cursorItem),
     serverTime: new Date().toISOString(),
   };
 }

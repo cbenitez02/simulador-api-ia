@@ -438,6 +438,10 @@ export class WorkspaceShellComponent {
     this.activeNav.set('logs');
   }
 
+  protected openEndpoints(): void {
+    this.activeNav.set('endpoints');
+  }
+
   protected testAllEndpoints(): void {}
 
   protected exportConfig(): void {

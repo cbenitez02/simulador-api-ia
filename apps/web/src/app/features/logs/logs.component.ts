@@ -11,12 +11,12 @@ import {
 } from '@angular/core';
 import { LucidePause, LucidePlay, LucideRadio, LucideRefreshCw, LucideSearch, LucideTrash2 } from '@lucide/angular';
 import { LogsListComponent } from './components/logs-list/logs-list.component';
-import type { ApiLogCursor, ApiLogEntry } from './models/api-log.model';
+import type { ApiLogCursor, ApiLogEntry, ListLogsQuery } from './models/api-log.model';
 import type { HttpMethod } from '../../shared/models/endpoint-preview.model';
 import { LogsRepository } from './data-access/logs.repository';
 
 type MethodFilter = 'all' | HttpMethod;
-type StatusBand = 'all' | '2xx' | '4xx' | '5xx';
+type StatusBand = 'all' | '2xx' | '3xx' | '4xx' | '5xx';
 type LiveStatus = 'off' | 'live' | 'paused';
 
 const LIVE_POLL_INTERVAL_MS = 5000;
@@ -41,6 +41,10 @@ function mergeEntries(current: ApiLogEntry[], incoming: ApiLogEntry[]): ApiLogEn
   return [...byId.values()].sort(compareEntries);
 }
 
+function toCursor(entry: ApiLogEntry | null): ApiLogCursor | null {
+  return entry ? { createdAt: entry.createdAt, id: entry.id } : null;
+}
+
 function reconcileSelection(selected: ApiLogEntry | null, entries: ApiLogEntry[]): ApiLogEntry | null {
   if (!selected) {
     return null;
@@ -62,6 +66,7 @@ export class LogsComponent {
   private liveIntervalId: ReturnType<typeof setInterval> | null = null;
   private activeProjectId: string | null = null;
   private pollInFlight = false;
+  private olderLoadInFlight = false;
 
   /** Workspace project; drives which mock log lines are shown. */
   readonly projectId = input('');
@@ -71,6 +76,7 @@ export class LogsComponent {
 
   protected readonly entries = signal<ApiLogEntry[]>([]);
   protected readonly loading = signal(false);
+  protected readonly loadingOlder = signal(false);
   protected readonly requestErrorMessage = signal<string | null>(null);
   protected readonly searchQuery = signal('');
   protected readonly methodFilter = signal<MethodFilter>('all');
@@ -79,7 +85,9 @@ export class LogsComponent {
   protected readonly liveStatus = signal<LiveStatus>('off');
   protected readonly lastSuccessfulUpdate = signal<string | null>(null);
   protected readonly clearConfirmOpen = signal(false);
-  private readonly latestCursor = signal<ApiLogCursor | null>(null);
+  protected readonly olderHistoryAvailable = signal(false);
+  private readonly newerCursor = signal<ApiLogCursor | null>(null);
+  private readonly olderCursor = signal<ApiLogCursor | null>(null);
 
   protected readonly selectedId = computed(() => this.selectedLog()?.id ?? null);
   protected readonly liveActive = computed(() => this.liveStatus() === 'live');
@@ -92,31 +100,19 @@ export class LogsComponent {
   );
 
   protected readonly endpointOptions = computed(() => {
-    const paths = new Set(this.entries().map((e) => e.path));
-    return [...paths].sort((a, b) => a.localeCompare(b));
+    const paths = new Set(this.entries().map((entry) => entry.path));
+    return [...paths].sort((left, right) => left.localeCompare(right));
   });
 
   protected readonly filteredEntries = computed(() => {
-    const q = this.searchQuery().trim().toLowerCase();
-    const mf = this.methodFilter();
-    const sf = this.statusFilter();
-    const ef = this.endpointFilter();
+    const query = this.searchQuery().trim().toLowerCase();
 
-    return this.entries().filter((e) => {
-      if (mf !== 'all' && e.method !== mf) return false;
-      if (ef !== 'all' && e.path !== ef) return false;
-      if (sf !== 'all') {
-        const c = e.statusCode;
-        if (sf === '2xx' && (c < 200 || c >= 300)) return false;
-        if (sf === '4xx' && (c < 400 || c >= 500)) return false;
-        if (sf === '5xx' && (c < 500 || c >= 600)) return false;
+    return this.entries().filter((entry) => {
+      if (!query) {
+        return true;
       }
-      if (q) {
-        const pathMatch = e.path.toLowerCase().includes(q);
-        const statusMatch = String(e.statusCode).includes(q);
-        if (!pathMatch && !statusMatch) return false;
-      }
-      return true;
+
+      return entry.path.toLowerCase().includes(query) || String(entry.statusCode).includes(query);
     });
   });
 
@@ -133,10 +129,11 @@ export class LogsComponent {
     });
 
     effect(() => {
-      const sel = this.selectedLog();
-      const filtered = this.filteredEntries();
+      const selection = this.selectedLog();
+      const entries = this.entries();
+
       untracked(() => {
-        if (sel && !filtered.some((e) => e.id === sel.id)) {
+        if (selection && !entries.some((entry) => entry.id === selection.id)) {
           this.selectedLog.set(null);
         }
       });
@@ -152,27 +149,30 @@ export class LogsComponent {
   });
 
   protected onSearchInput(ev: Event): void {
-    const v = (ev.target as HTMLInputElement).value;
-    this.searchQuery.set(v);
+    const value = (ev.target as HTMLInputElement).value;
+    this.searchQuery.set(value);
   }
 
   protected onMethodChange(ev: Event): void {
-    const v = (ev.target as HTMLSelectElement).value as MethodFilter;
-    this.methodFilter.set(v);
+    const value = (ev.target as HTMLSelectElement).value as MethodFilter;
+    this.methodFilter.set(value);
+    void this.reloadForServerFilters();
   }
 
   protected onStatusChange(ev: Event): void {
-    const v = (ev.target as HTMLSelectElement).value as StatusBand;
-    this.statusFilter.set(v);
+    const value = (ev.target as HTMLSelectElement).value as StatusBand;
+    this.statusFilter.set(value);
+    void this.reloadForServerFilters();
   }
 
   protected onEndpointChange(ev: Event): void {
-    const v = (ev.target as HTMLSelectElement).value;
-    this.endpointFilter.set(v);
+    const value = (ev.target as HTMLSelectElement).value;
+    this.endpointFilter.set(value);
+    void this.reloadForServerFilters();
   }
 
   protected selectEntry(id: string): void {
-    const entry = this.entries().find((e) => e.id === id) ?? null;
+    const entry = this.entries().find((candidate) => candidate.id === id) ?? null;
     this.selectedLog.set(entry);
   }
 
@@ -203,6 +203,10 @@ export class LogsComponent {
     void this.refreshProjectLogs();
   }
 
+  protected loadOlderLogs(): void {
+    void this.loadOlderProjectLogs();
+  }
+
   protected requestClearLogs(): void {
     this.clearConfirmOpen.set(true);
   }
@@ -215,6 +219,14 @@ export class LogsComponent {
     void this.clearRemoteLogs();
   }
 
+  private buildBaseQuery(): ListLogsQuery {
+    return {
+      ...(this.methodFilter() !== 'all' ? { method: this.methodFilter() } : {}),
+      ...(this.statusFilter() !== 'all' ? { statusBucket: this.statusFilter() } : {}),
+      ...(this.endpointFilter() !== 'all' ? { path: this.endpointFilter() } : {}),
+    };
+  }
+
   private async loadProject(projectId: string): Promise<void> {
     this.stopPolling();
     this.liveStatus.set('off');
@@ -225,9 +237,21 @@ export class LogsComponent {
     this.endpointFilter.set('all');
     this.selectedLog.set(null);
     this.entries.set([]);
-    this.latestCursor.set(null);
+    this.newerCursor.set(null);
+    this.olderCursor.set(null);
+    this.olderHistoryAvailable.set(false);
     this.lastSuccessfulUpdate.set(null);
     await this.loadLogs(projectId, false);
+  }
+
+  private async reloadForServerFilters(): Promise<void> {
+    const projectId = this.projectId();
+
+    if (!projectId) {
+      return;
+    }
+
+    await this.loadLogs(projectId, true);
   }
 
   private async loadLogs(projectId: string, preserveContext: boolean): Promise<void> {
@@ -237,9 +261,11 @@ export class LogsComponent {
     const previousSelection = preserveContext ? this.selectedLog() : null;
 
     try {
-      const response = await this.logsRepository.listLogs(projectId);
+      const response = await this.logsRepository.listLogs(projectId, this.buildBaseQuery());
       this.entries.set(response.items);
-      this.latestCursor.set(response.nextCursor);
+      this.newerCursor.set(toCursor(response.items[0] ?? null));
+      this.olderCursor.set(response.nextCursor);
+      this.olderHistoryAvailable.set(response.items.length > 0);
       this.lastSuccessfulUpdate.set(response.serverTime);
 
       if (preserveContext) {
@@ -267,6 +293,41 @@ export class LogsComponent {
     await this.loadLogs(projectId, true);
   }
 
+  private async loadOlderProjectLogs(): Promise<void> {
+    const projectId = this.projectId();
+    const cursor = this.olderCursor();
+
+    if (!projectId || !cursor || this.loading() || this.olderLoadInFlight || !this.olderHistoryAvailable()) {
+      return;
+    }
+
+    this.olderLoadInFlight = true;
+    this.loadingOlder.set(true);
+    this.requestErrorMessage.set(null);
+
+    try {
+      const response = await this.logsRepository.listLogs(projectId, {
+        ...this.buildBaseQuery(),
+        direction: 'older',
+        cursorCreatedAt: cursor.createdAt,
+        cursorId: cursor.id,
+      });
+
+      const mergedEntries = mergeEntries(this.entries(), response.items);
+      this.entries.set(mergedEntries);
+      this.newerCursor.set(toCursor(mergedEntries[0] ?? null));
+      this.olderCursor.set(response.nextCursor);
+      this.olderHistoryAvailable.set(response.items.length > 0);
+      this.lastSuccessfulUpdate.set(response.serverTime);
+      this.selectedLog.set(reconcileSelection(this.selectedLog(), mergedEntries));
+    } catch (error) {
+      this.requestErrorMessage.set(error instanceof Error ? error.message : 'Could not load older logs.');
+    } finally {
+      this.loadingOlder.set(false);
+      this.olderLoadInFlight = false;
+    }
+  }
+
   private startPolling(): void {
     this.stopPolling();
 
@@ -284,9 +345,9 @@ export class LogsComponent {
 
   private async pollForNewLogs(): Promise<void> {
     const projectId = this.projectId();
-    const cursor = this.latestCursor();
+    const cursor = this.newerCursor();
 
-    if (!projectId || this.liveStatus() !== 'live' || this.pollInFlight || !cursor) {
+    if (!projectId || this.liveStatus() !== 'live' || this.pollInFlight) {
       return;
     }
 
@@ -294,13 +355,23 @@ export class LogsComponent {
 
     try {
       const response = await this.logsRepository.listLogs(projectId, {
-        cursorCreatedAt: cursor.createdAt,
-        cursorId: cursor.id,
+        ...this.buildBaseQuery(),
+        ...(cursor
+          ? {
+              direction: 'newer',
+              cursorCreatedAt: cursor.createdAt,
+              cursorId: cursor.id,
+            }
+          : {}),
       });
 
       const mergedEntries = mergeEntries(this.entries(), response.items);
       this.entries.set(mergedEntries);
-      this.latestCursor.set(response.nextCursor ?? this.latestCursor());
+      this.newerCursor.set(response.nextCursor ?? this.newerCursor() ?? toCursor(mergedEntries[0] ?? null));
+      this.olderCursor.set(this.olderCursor() ?? toCursor(mergedEntries.at(-1) ?? null));
+      this.olderHistoryAvailable.set(
+        mergedEntries.length > 0 && (this.olderHistoryAvailable() || response.items.length > 0),
+      );
       this.lastSuccessfulUpdate.set(response.serverTime);
       this.selectedLog.set(reconcileSelection(this.selectedLog(), mergedEntries));
       this.requestErrorMessage.set(null);
@@ -314,11 +385,14 @@ export class LogsComponent {
   private async clearRemoteLogs(): Promise<void> {
     this.loading.set(true);
     this.requestErrorMessage.set(null);
+
     try {
       await this.logsRepository.clearLogs(this.projectId());
       this.entries.set([]);
       this.selectedLog.set(null);
-      this.latestCursor.set(null);
+      this.newerCursor.set(null);
+      this.olderCursor.set(null);
+      this.olderHistoryAvailable.set(false);
       this.lastSuccessfulUpdate.set(new Date().toISOString());
       this.clearConfirmOpen.set(false);
     } catch (error) {

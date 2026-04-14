@@ -621,7 +621,7 @@ type LogsComponentHarness = {
     (): 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     set(value: 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'): void;
   };
-  statusFilter: { (): 'all' | '2xx' | '4xx' | '5xx'; set(value: 'all' | '2xx' | '4xx' | '5xx'): void };
+  statusFilter: { (): 'all' | '2xx' | '3xx' | '4xx' | '5xx'; set(value: 'all' | '2xx' | '3xx' | '4xx' | '5xx'): void };
   endpointFilter: { (): string; set(value: string): void };
   selectedLog: { (): ApiLogEntry | null; set(value: ApiLogEntry | null): void };
   liveStatus: () => 'off' | 'live' | 'paused';
@@ -780,6 +780,7 @@ describe('LogsComponent integration', () => {
     await flushAsyncWork();
 
     expect(listLogs).toHaveBeenNthCalledWith(2, 'p1', {
+      direction: 'newer',
       cursorCreatedAt: '2026-04-08T10:00:02.000Z',
       cursorId: 'log-2',
     });
@@ -795,6 +796,7 @@ describe('LogsComponent integration', () => {
     await flushAsyncWork();
 
     expect(listLogs).toHaveBeenNthCalledWith(3, 'p1', {
+      direction: 'newer',
       cursorCreatedAt: '2026-04-08T10:00:04.000Z',
       cursorId: 'log-3',
     });
