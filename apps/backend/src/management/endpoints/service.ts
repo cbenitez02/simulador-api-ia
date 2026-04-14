@@ -3,6 +3,7 @@ import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
 import { AppError } from '../../middleware/error-handler.js';
+import { writeAuditEvent } from '../audit-events/service.js';
 import type {
   CreateEndpointInput,
   ListEndpointsQueryInput,
@@ -188,6 +189,25 @@ export async function createEndpoint(
       },
     });
 
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { workspaceId: true },
+    });
+
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId: project.workspaceId ?? '',
+      projectId,
+      resourceType: 'endpoint',
+      resourceId: endpoint.id,
+      action: 'created',
+      summary: `Created endpoint ${endpoint.method} ${endpoint.path}`,
+      metadata: {
+        method: endpoint.method,
+        endpointPath: endpoint.path,
+      },
+    });
+
     return tx.endpoint.findUniqueOrThrow({
       where: { id: endpoint.id },
       include: {
@@ -215,19 +235,40 @@ export async function updateEndpoint(
     throw new AppError(404, 'Endpoint not found');
   }
 
-  return prisma.endpoint.update({
-    where: { id: endpointId },
-    data: {
-      ...(input.description !== undefined ? { description: input.description } : {}),
-      ...(input.statusCode !== undefined ? { statusCode: input.statusCode } : {}),
-      ...(input.responseBody !== undefined
-        ? { responseBody: toPrismaJson(input.responseBody) }
-        : {}),
-    },
-    include: {
-      endpointConfig: true,
-      scenarios: true,
-    },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.endpoint.update({
+      where: { id: endpointId },
+      data: {
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.statusCode !== undefined ? { statusCode: input.statusCode } : {}),
+        ...(input.responseBody !== undefined
+          ? { responseBody: toPrismaJson(input.responseBody) }
+          : {}),
+      },
+      include: {
+        endpointConfig: true,
+        scenarios: true,
+        project: {
+          select: { workspaceId: true },
+        },
+      },
+    });
+
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId: updated.project.workspaceId ?? '',
+      projectId,
+      resourceType: 'endpoint',
+      resourceId: updated.id,
+      action: 'updated',
+      summary: `Updated endpoint ${updated.method} ${updated.path}`,
+      metadata: {
+        method: updated.method,
+        endpointPath: updated.path,
+      },
+    });
+
+    return updated;
   });
 }
 
@@ -247,5 +288,33 @@ export async function deleteEndpoint(
     throw new AppError(404, 'Endpoint not found');
   }
 
-  await prisma.endpoint.delete({ where: { id: endpointId } });
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.endpoint.findUniqueOrThrow({
+      where: { id: endpointId },
+      select: {
+        id: true,
+        method: true,
+        path: true,
+        project: {
+          select: { workspaceId: true },
+        },
+      },
+    });
+
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId: existing.project.workspaceId ?? '',
+      projectId,
+      resourceType: 'endpoint',
+      resourceId: existing.id,
+      action: 'deleted',
+      summary: `Deleted endpoint ${existing.method} ${existing.path}`,
+      metadata: {
+        method: existing.method,
+        endpointPath: existing.path,
+      },
+    });
+
+    await tx.endpoint.delete({ where: { id: endpointId } });
+  });
 }

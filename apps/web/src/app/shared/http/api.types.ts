@@ -214,6 +214,34 @@ export interface ApiLogListDto {
   serverTime: string;
 }
 
+export type ApiAuditEventResourceTypeDto = 'project' | 'endpoint' | 'scenario' | 'global-config' | 'endpoint-config';
+export type ApiAuditEventActionDto = 'created' | 'updated' | 'deleted';
+
+export interface ApiAuditActorDto {
+  userId: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+export interface ApiAuditEventDto {
+  id: string;
+  actor: ApiAuditActorDto;
+  workspaceId: string;
+  projectId: string;
+  resourceType: ApiAuditEventResourceTypeDto;
+  resourceId: string;
+  action: ApiAuditEventActionDto;
+  summary: string;
+  metadata: unknown;
+  createdAt: string;
+}
+
+export interface ApiAuditEventListDto {
+  items: ApiAuditEventDto[];
+  nextCursor: ApiLogCursorDto | null;
+  serverTime: string;
+}
+
 export type DashboardProjectStatusDto = 'empty' | 'attention' | 'running';
 export type DashboardEndpointStatusDto = 'ready' | 'needs-attention';
 

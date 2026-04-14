@@ -1,5 +1,5 @@
 /** Secciones principales del workspace (barra lateral + área central). */
-export type WorkspaceNavId = 'dashboard' | 'endpoints' | 'logs';
+export type WorkspaceNavId = 'dashboard' | 'endpoints' | 'logs' | 'history';
 
 export interface SidebarProjectRow {
   id: string;

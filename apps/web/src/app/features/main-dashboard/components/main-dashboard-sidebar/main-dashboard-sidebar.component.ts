@@ -4,6 +4,7 @@ import {
   LucideCopy,
   LucideFileText,
   LucideHandMetal,
+  LucideHistory,
   LucideLayoutGrid,
   LucidePlus,
 } from '@lucide/angular';
@@ -19,7 +20,15 @@ import type {
   templateUrl: './main-dashboard-sidebar.component.html',
   styleUrls: ['./main-dashboard-sidebar.component.css'],
   standalone: true,
-  imports: [LucideArrowRightLeft, LucideHandMetal, LucideCopy, LucideFileText, LucideLayoutGrid, LucidePlus],
+  imports: [
+    LucideArrowRightLeft,
+    LucideHandMetal,
+    LucideHistory,
+    LucideCopy,
+    LucideFileText,
+    LucideLayoutGrid,
+    LucidePlus,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardSidebarComponent {

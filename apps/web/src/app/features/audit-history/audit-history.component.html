@@ -1,0 +1,36 @@
+<section class="audit-history" aria-label="Audit history">
+  <header class="audit-history__head">
+    <div>
+      <h1 class="audit-history__title">Audit history</h1>
+      <p class="audit-history__sub">Recent management changes for this project.</p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <p class="audit-history__status">Loading audit history...</p>
+  } @else if (errorMessage(); as errorMessage) {
+    <p class="audit-history__status audit-history__status--error">{{ errorMessage }}</p>
+  } @else if (entries().length === 0) {
+    <p class="audit-history__status">{{ emptyStateMessage() }}</p>
+  } @else {
+    <ul class="audit-history__list">
+      @for (entry of entries(); track entry.id) {
+        <li class="audit-history__row">
+          <div class="audit-history__meta">
+            <span class="audit-history__time">{{ entry.timeLabel }}</span>
+            <span class="audit-history__actor">{{ entry.actorLabel }}</span>
+            <span class="audit-history__action">{{ entry.action }}</span>
+            <span class="audit-history__resource">{{ entry.resourceLabel }}</span>
+          </div>
+          <p class="audit-history__summary">{{ entry.summary }}</p>
+        </li>
+      }
+    </ul>
+
+    @if (olderHistoryAvailable()) {
+      <button type="button" class="audit-history__load-more" (click)="loadOlder()" [disabled]="loadingOlder()">
+        {{ loadingOlder() ? 'Loading…' : 'Load older history' }}
+      </button>
+    }
+  }
+</section>

@@ -8,6 +8,7 @@ import {
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
+import { writeAuditEvent } from '../audit-events/service.js';
 import { buildBaseSlug, resolveNextAvailableSlug } from './slug.js';
 import type { CreateProjectInput, ListProjectsQueryInput, UpdateProjectInput } from './schema.js';
 
@@ -131,6 +132,20 @@ export async function createProject(actor: AuthenticatedActor, input: CreateProj
       },
     });
 
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId,
+      projectId: createdProject.id,
+      resourceType: 'project',
+      resourceId: createdProject.id,
+      action: 'created',
+      summary: `Created project ${createdProject.name}`,
+      metadata: {
+        projectName: createdProject.name,
+        projectSlug: createdProject.slug,
+      },
+    });
+
     const project = await tx.project.findUniqueOrThrow({
       where: { id: createdProject.id },
       include: {
@@ -155,18 +170,35 @@ export async function updateProject(
 ) {
   await authorizeProjectAccess(actor, projectId, 'mutate');
 
-  const project = await prisma.project.update({
-    where: { id: projectId },
-    data: {
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.description !== undefined ? { description: input.description } : {}),
-    },
-    include: {
-      globalConfig: true,
-      _count: {
-        select: { endpoints: true },
+  const project = await prisma.$transaction(async (tx) => {
+    const updatedProject = await tx.project.update({
+      where: { id: projectId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
       },
-    },
+      include: {
+        globalConfig: true,
+        _count: {
+          select: { endpoints: true },
+        },
+      },
+    });
+
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId: updatedProject.workspaceId ?? '',
+      projectId: updatedProject.id,
+      resourceType: 'project',
+      resourceId: updatedProject.id,
+      action: 'updated',
+      summary: `Updated project ${updatedProject.name}`,
+      metadata: {
+        projectName: updatedProject.name,
+      },
+    });
+
+    return updatedProject;
   });
 
   return {
@@ -176,7 +208,30 @@ export async function updateProject(
 }
 
 export async function deleteProject(actor: AuthenticatedActor, projectId: string): Promise<void> {
-  await authorizeProjectAccess(actor, projectId, 'mutate');
+  const authorizedProject = await authorizeProjectAccess(actor, projectId, 'mutate');
 
-  await prisma.project.delete({ where: { id: projectId } });
+  await prisma.$transaction(async (tx) => {
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId: authorizedProject.workspaceId ?? '',
+      projectId: project.id,
+      resourceType: 'project',
+      resourceId: project.id,
+      action: 'deleted',
+      summary: `Deleted project ${project.name}`,
+      metadata: {
+        projectName: project.name,
+      },
+    });
+
+    await tx.project.delete({ where: { id: projectId } });
+  });
 }
