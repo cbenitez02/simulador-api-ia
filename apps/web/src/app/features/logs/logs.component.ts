@@ -220,10 +220,14 @@ export class LogsComponent {
   }
 
   private buildBaseQuery(): ListLogsQuery {
+    const method = this.methodFilter();
+    const statusBucket = this.statusFilter();
+    const path = this.endpointFilter();
+
     return {
-      ...(this.methodFilter() !== 'all' ? { method: this.methodFilter() } : {}),
-      ...(this.statusFilter() !== 'all' ? { statusBucket: this.statusFilter() } : {}),
-      ...(this.endpointFilter() !== 'all' ? { path: this.endpointFilter() } : {}),
+      ...(method !== 'all' ? { method } : {}),
+      ...(statusBucket !== 'all' ? { statusBucket } : {}),
+      ...(path !== 'all' ? { path } : {}),
     };
   }
 

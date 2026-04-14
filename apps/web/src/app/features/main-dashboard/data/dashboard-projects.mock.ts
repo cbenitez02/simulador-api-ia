@@ -75,6 +75,11 @@ export const MOCK_DASHBOARD_PROJECTS: DashboardProject[] = [
         status: 'ready',
       },
     ],
+    endpointRowsMeta: {
+      total: 5,
+      limit: 5,
+      hasMore: false,
+    },
     recentRequests: [],
     configSummary: {
       latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
@@ -201,6 +206,11 @@ export const MOCK_DASHBOARD_PROJECTS: DashboardProject[] = [
         status: 'ready',
       },
     ],
+    endpointRowsMeta: {
+      total: 3,
+      limit: 3,
+      hasMore: false,
+    },
     recentRequests: [],
     configSummary: {
       latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
@@ -294,6 +304,11 @@ export const MOCK_DASHBOARD_PROJECTS: DashboardProject[] = [
         status: 'ready',
       },
     ],
+    endpointRowsMeta: {
+      total: 2,
+      limit: 2,
+      hasMore: false,
+    },
     recentRequests: [],
     configSummary: {
       latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
@@ -366,6 +381,11 @@ export const DEMO_DASHBOARD_PROJECT: DashboardProject = {
       status: 'ready',
     },
   ],
+  endpointRowsMeta: {
+    total: 1,
+    limit: 1,
+    hasMore: false,
+  },
   recentRequests: [],
   configSummary: {
     latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
