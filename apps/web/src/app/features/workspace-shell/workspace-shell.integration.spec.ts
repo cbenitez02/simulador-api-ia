@@ -229,6 +229,8 @@ describe('WorkspaceShellComponent integration', () => {
     };
   }
 
+  const projectListPath = '/projects?limit=25&offset=0';
+
   function createComponent() {
     const injector = Injector.create({
       providers: [
@@ -251,7 +253,7 @@ describe('WorkspaceShellComponent integration', () => {
 
   it('renders backend projects in the dashboard and selects the first project automatically', async () => {
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return {
           items: [
             {
@@ -341,7 +343,7 @@ describe('WorkspaceShellComponent integration', () => {
     await flushAsyncWork();
 
     const content = await renderSnapshot(component, logsRepository);
-    expect(api.get).toHaveBeenCalledWith('/projects');
+    expect(api.get).toHaveBeenCalledWith(projectListPath);
     expect(api.get).toHaveBeenCalledWith('/projects/p1/dashboard-summary');
     expect(api.get).toHaveBeenCalledTimes(2);
     expect(content).toContain('Workspace project');
@@ -353,7 +355,7 @@ describe('WorkspaceShellComponent integration', () => {
 
   it('renders backend logs and shows the detail sidebar after selecting a log entry', async () => {
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return createProjectListResponse(1);
       }
 
@@ -409,7 +411,7 @@ describe('WorkspaceShellComponent integration', () => {
 
   it('shows an empty state when the selected project has no logs', async () => {
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return createProjectListResponse(0);
       }
 
@@ -432,7 +434,7 @@ describe('WorkspaceShellComponent integration', () => {
     let endpointCreated = false;
 
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return projectExists
           ? createProjectListResponse(endpointCreated ? 1 : 0)
           : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
@@ -494,7 +496,7 @@ describe('WorkspaceShellComponent integration', () => {
     let endpointCreated = false;
 
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return projectExists
           ? createProjectListResponse(endpointCreated ? 1 : 0)
           : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
@@ -566,7 +568,7 @@ describe('WorkspaceShellComponent integration', () => {
     let projectExists = false;
 
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return projectExists
           ? createProjectListResponse(0)
           : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
