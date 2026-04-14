@@ -8,6 +8,7 @@
       <button
         type="button"
         class="endpoints-page__create"
+        [disabled]="!canMutate()"
         (click)="createEndpoint.emit()"
         aria-label="Create new endpoint"
       >

@@ -6,6 +6,16 @@ export const dashboardScenarioTypeSchema = z.enum(['success', 'error', 'timeout'
 export const dashboardLatencyModeSchema = z.enum(['fixed', 'range']);
 export const dashboardLoggingLevelSchema = z.enum(['basic', 'full', 'off']);
 export const dashboardScopeSchema = z.enum(['all', 'unset']);
+export const workspaceRoleSchema = z.enum(['owner', 'editor', 'viewer']);
+export const workspaceCapabilitiesSchema = z.object({
+  canEdit: z.boolean(),
+  canManageMembers: z.boolean(),
+});
+export const workspaceSummarySchema = z.object({
+  id: z.string(),
+  role: workspaceRoleSchema,
+  capabilities: workspaceCapabilitiesSchema,
+});
 
 export const dashboardProjectParamsSchema = z.object({
   projectId: z.string().min(1),
@@ -18,6 +28,7 @@ export const dashboardSummarySchema = z.object({
     description: z.string(),
     slug: z.string(),
     mockUrl: z.string(),
+    workspace: workspaceSummarySchema,
     updatedAt: z.string().datetime(),
     status: dashboardProjectStatusSchema,
   }),

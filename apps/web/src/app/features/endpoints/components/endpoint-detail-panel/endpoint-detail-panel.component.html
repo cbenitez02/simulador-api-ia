@@ -5,12 +5,20 @@
         <app-http-method-badge [method]="ep.method" appearance="emphasis" />
         <h2 class="detail__title">Endpoint Details</h2>
         <div class="detail__head-actions">
-          <button type="button" class="detail__icon-btn" (click)="onEdit()" aria-label="Edit endpoint" title="Edit">
+          <button
+            type="button"
+            class="detail__icon-btn"
+            [disabled]="!canMutate()"
+            (click)="onEdit()"
+            aria-label="Edit endpoint"
+            title="Edit"
+          >
             <svg lucidePencil [size]="18" strokeWidth="1.75"></svg>
           </button>
           <button
             type="button"
             class="detail__icon-btn detail__icon-btn--danger"
+            [disabled]="!canMutate()"
             (click)="openDeleteConfirm()"
             aria-label="Delete endpoint"
             title="Delete"
@@ -124,7 +132,7 @@
       </div>
 
       <footer class="detail__footer">
-        <button type="button" class="detail__test-btn" (click)="onTestEndpoint()">
+        <button type="button" class="detail__test-btn" [disabled]="!canMutate()" (click)="onTestEndpoint()">
           <svg lucideCirclePlay [size]="18" strokeWidth="1.75"></svg>
           Test Endpoint
         </button>

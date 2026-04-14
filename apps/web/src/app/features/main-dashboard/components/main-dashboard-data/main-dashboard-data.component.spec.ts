@@ -22,6 +22,11 @@ const projectFixture: DashboardProject = {
   id: 'p1',
   name: 'Users API',
   slug: 'users-api',
+  workspace: {
+    id: 'workspace-1',
+    role: 'owner',
+    capabilities: { canEdit: true, canManageMembers: true },
+  },
   status: 'attention',
   mockUrl: 'https://mock.example.com/users-api',
   description: 'Real dashboard project',

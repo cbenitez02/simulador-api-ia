@@ -1,4 +1,4 @@
-import { requireWorkspaceAccess } from '../../auth/authorization.js';
+import { requireWorkspaceAccess, resolveWorkspaceAccess } from '../../auth/authorization.js';
 import { env } from '../../config/env.js';
 import { DEFAULT_GLOBAL_CONFIG_VALUES } from '../global-config/defaults.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
@@ -262,6 +262,7 @@ export async function getProjectDashboardSummary(
   return buildDashboardSummary({
     project: {
       ...project,
+      workspace: resolveWorkspaceAccess(actor, project.workspaceId),
       globalConfig: normalizeProjectGlobalConfig(project.globalConfig),
     },
     endpointRows: endpointRows.map((endpoint) => ({

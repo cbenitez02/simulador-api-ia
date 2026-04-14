@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
   LucideClock,
   LucideDownload,
@@ -10,6 +11,8 @@ import {
 } from '@lucide/angular';
 
 import type { DashboardProject } from '../../models/dashboard-project.model';
+import type { WorkspaceRoleDto } from '../../../../shared/http/api.types';
+import type { WorkspaceMember } from '../../../workspace-members/models/workspace-member.model';
 
 export interface UtilitySidebarRequestItem {
   id: string;
@@ -33,17 +36,33 @@ interface UtilityQuickAction {
   templateUrl: './main-dashboard-utility-sidebar.component.html',
   styleUrls: ['./main-dashboard-utility-sidebar.component.css'],
   standalone: true,
-  imports: [LucideClock, LucideDownload, LucideGitBranch, LucidePlay, LucidePlus, LucideSettings, LucideUpload],
+  imports: [
+    FormsModule,
+    LucideClock,
+    LucideDownload,
+    LucideGitBranch,
+    LucidePlay,
+    LucidePlus,
+    LucideSettings,
+    LucideUpload,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardUtilitySidebarComponent {
   readonly project = input.required<DashboardProject>();
+  readonly canMutate = input(true);
+  readonly workspaceMembers = input<WorkspaceMember[]>([]);
+  readonly workspaceMembersLoading = input(false);
+  readonly workspaceMembersError = input<string | null>(null);
+  readonly workspaceMemberMutationPending = input(false);
 
   readonly createEndpoint = output<void>();
   readonly testAllEndpoints = output<void>();
   readonly exportConfig = output<void>();
   readonly importEndpoints = output<void>();
   readonly editGlobalConfig = output<void>();
+  readonly addWorkspaceMember = output<{ email: string; role: WorkspaceRoleDto }>();
+  readonly removeWorkspaceMember = output<string>();
 
   protected readonly quickActions: UtilityQuickAction[] = [
     {
@@ -117,6 +136,34 @@ export class MainDashboardUtilitySidebarComponent {
     ];
   });
 
+  protected readonly workspaceRoleLabel = computed(() => {
+    switch (this.project().workspace.role) {
+      case 'owner':
+        return 'Owner';
+      case 'editor':
+        return 'Editor';
+      default:
+        return 'Viewer';
+    }
+  });
+
+  protected readonly canManageMembers = computed(() => this.project().workspace.capabilities.canManageMembers);
+
+  protected addMember(email: string, role: string): void {
+    if (!this.canManageMembers() || this.workspaceMemberMutationPending()) return;
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) return;
+
+    const nextRole: WorkspaceRoleDto = role === 'owner' || role === 'editor' ? role : 'viewer';
+    this.addWorkspaceMember.emit({ email: normalizedEmail, role: nextRole });
+  }
+
+  protected onRemoveMember(memberUserId: string): void {
+    if (!this.canManageMembers() || this.workspaceMemberMutationPending()) return;
+    this.removeWorkspaceMember.emit(memberUserId);
+  }
+
   protected onQuickAction(id: string): void {
     const action = this.quickActions.find((item) => item.id === id);
     if (action?.disabled) {
@@ -125,15 +172,18 @@ export class MainDashboardUtilitySidebarComponent {
 
     switch (id) {
       case 'create':
+        if (!this.canMutate()) return;
         this.createEndpoint.emit();
         break;
       case 'test':
         this.testAllEndpoints.emit();
         break;
       case 'export':
+        if (!this.canMutate()) return;
         this.exportConfig.emit();
         break;
       case 'import':
+        if (!this.canMutate()) return;
         this.importEndpoints.emit();
         break;
       default:

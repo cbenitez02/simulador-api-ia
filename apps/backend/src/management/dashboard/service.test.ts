@@ -14,6 +14,11 @@ describe('dashboard/service', () => {
         name: 'Users API',
         description: 'Real dashboard data',
         slug: 'users-api',
+        workspace: {
+          id: 'workspace-1',
+          role: 'owner',
+          capabilities: { canEdit: true, canManageMembers: true },
+        },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: {
           latencyEnabled: true,
@@ -168,6 +173,11 @@ describe('dashboard/service', () => {
         name: 'Empty API',
         description: '',
         slug: 'empty-api',
+        workspace: {
+          id: 'workspace-1',
+          role: 'viewer',
+          capabilities: { canEdit: false, canManageMembers: false },
+        },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: null,
       },

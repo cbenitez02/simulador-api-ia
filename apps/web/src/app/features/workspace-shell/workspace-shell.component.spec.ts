@@ -8,6 +8,8 @@ import type { GlobalConfig } from '../global-config/models/global-config.model';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
+import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
+import type { WorkspaceMember } from '../workspace-members/models/workspace-member.model';
 import type {
   CreateProjectWithEndpointPayload,
   EditProjectModalPayload,
@@ -61,7 +63,10 @@ type WorkspaceShellTestApi = {
   openDeleteProjectDialog(): void;
   closeDeleteProjectDialog(): void;
   confirmDeleteProject(): void;
+  createEndpoint(): void;
   onGlobalConfigSaved(config: GlobalConfig): void;
+  addWorkspaceMember(input: { email: string; role: 'owner' | 'editor' | 'viewer' }): void;
+  removeWorkspaceMember(memberUserId: string): void;
   onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void;
   retryCreateProjectEndpointGeneration(): void;
   continueCreateProjectManually(): void;
@@ -130,6 +135,11 @@ const projectFixture: DashboardProject = {
   id: 'project-1',
   name: 'Workspace project',
   slug: 'project-1',
+  workspace: {
+    id: 'workspace-1',
+    role: 'owner',
+    capabilities: { canEdit: true, canManageMembers: true },
+  },
   status: 'running',
   mockUrl: 'https://mock.example.com/project-1',
   description: 'Live backend project',
@@ -142,6 +152,11 @@ const secondProjectFixture: DashboardProject = {
   id: 'project-2',
   name: 'Billing API',
   slug: 'project-2',
+  workspace: {
+    id: 'workspace-2',
+    role: 'editor',
+    capabilities: { canEdit: true, canManageMembers: false },
+  },
   status: 'empty',
   mockUrl: 'https://mock.example.com/project-2',
   description: 'Second project',
@@ -205,6 +220,12 @@ describe('WorkspaceShellComponent', () => {
     saveConfig: vi.fn(),
   };
 
+  const workspaceMembersRepository = {
+    listMembers: vi.fn(),
+    addMember: vi.fn(),
+    removeMember: vi.fn(),
+  };
+
   const authSession = {
     snapshot: signal({
       state: 'authenticated',
@@ -236,6 +257,7 @@ describe('WorkspaceShellComponent', () => {
         { provide: ProjectsRepository, useValue: projectsRepository },
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
+        { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
       ],
     });
@@ -254,6 +276,9 @@ describe('WorkspaceShellComponent', () => {
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
+    workspaceMembersRepository.listMembers.mockReset();
+    workspaceMembersRepository.addMember.mockReset();
+    workspaceMembersRepository.removeMember.mockReset();
     authSession.bootstrap.mockReset();
     authSession.openSignIn.mockReset();
     authSession.signOut.mockReset();
@@ -278,6 +303,7 @@ describe('WorkspaceShellComponent', () => {
       reason: null,
     });
     authSession.accessState.set('ready');
+    workspaceMembersRepository.listMembers.mockResolvedValue([] as WorkspaceMember[]);
 
     projectsRepository.getProject.mockImplementation(async (projectId: string) =>
       projectId === secondProjectFixture.id ? secondProjectFixture : projectFixture,
@@ -294,6 +320,88 @@ describe('WorkspaceShellComponent', () => {
     expect(component.projectsError()).toBe('Backend unavailable');
     expect(component.projects()).toEqual([]);
     expect(component.selectedProjectId()).toBe('');
+  });
+
+  it('blocks viewer-only mutations from the current workspace slice', async () => {
+    projectsRepository.listProjects.mockResolvedValue(
+      pagedProjectsResult([
+        {
+          ...projectFixture,
+          workspace: {
+            id: 'workspace-1',
+            role: 'viewer',
+            capabilities: { canEdit: false, canManageMembers: false },
+          },
+        },
+      ]),
+    );
+    projectsRepository.getProject.mockResolvedValue({
+      ...projectFixture,
+      workspace: {
+        id: 'workspace-1',
+        role: 'viewer',
+        capabilities: { canEdit: false, canManageMembers: false },
+      },
+    });
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.openEditProjectModal();
+    component.openDeleteProjectDialog();
+    component.createEndpoint();
+    component.editGlobalConfig();
+    component.onGlobalConfigSaved(normalizedConfigFixture);
+
+    expect(component.editProjectModalOpen()).toBe(false);
+    expect(component.deleteProjectDialogOpen()).toBe(false);
+    expect(component.createEndpointFlowOpen()).toBe(false);
+    expect(component.globalConfigDrawerOpen()).toBe(false);
+    expect(globalConfigRepository.saveConfig).not.toHaveBeenCalled();
+  });
+
+  it('only allows owners to mutate workspace members', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectsRepository.getProject.mockResolvedValue(projectFixture);
+    workspaceMembersRepository.addMember.mockResolvedValue({
+      userId: 'user-2',
+      email: 'editor@example.com',
+      displayName: 'Editor User',
+      role: 'editor',
+      createdAt: '2026-04-08T10:00:00.000Z',
+    });
+    workspaceMembersRepository.removeMember.mockResolvedValue(undefined);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.addWorkspaceMember({ email: 'editor@example.com', role: 'editor' });
+    await flushAsyncWork();
+    component.removeWorkspaceMember('user-2');
+    await flushAsyncWork();
+
+    expect(workspaceMembersRepository.addMember).toHaveBeenCalledWith('workspace-1', {
+      email: 'editor@example.com',
+      role: 'editor',
+    });
+    expect(workspaceMembersRepository.removeMember).toHaveBeenCalledWith('workspace-1', 'user-2');
+
+    projectsRepository.getProject.mockResolvedValue({
+      ...projectFixture,
+      workspace: {
+        id: 'workspace-1',
+        role: 'editor',
+        capabilities: { canEdit: true, canManageMembers: false },
+      },
+    });
+    const editorComponent = createComponent();
+    await flushAsyncWork();
+
+    editorComponent.addWorkspaceMember({ email: 'viewer@example.com', role: 'viewer' });
+    editorComponent.removeWorkspaceMember('user-2');
+
+    expect(workspaceMembersRepository.addMember).toHaveBeenCalledTimes(1);
+    expect(workspaceMembersRepository.removeMember).toHaveBeenCalledTimes(1);
   });
 
   it('hydrates the initially selected project with the real dashboard summary after loading the sidebar list', async () => {

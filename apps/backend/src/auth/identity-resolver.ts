@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import type { AuthenticatedActor, ResolvedExternalIdentity } from './types.js';
+import type { AuthenticatedActor, ResolvedExternalIdentity, WorkspaceRole } from './types.js';
 
 type ExternalIdentityRecord = {
   provider: string;
@@ -11,6 +11,10 @@ type ExternalIdentityRecord = {
     personalWorkspace: { id: string } | null;
   };
 };
+
+function normalizeWorkspaceRole(role: string): WorkspaceRole {
+  return role === 'owner' || role === 'editor' ? role : 'viewer';
+}
 
 const actorIdentityInclude = {
   user: {
@@ -46,7 +50,7 @@ function toActor(
     },
     workspaceMemberships: record.user.memberships.map((membership) => ({
       workspaceId: membership.workspaceId,
-      role: membership.role,
+      role: normalizeWorkspaceRole(membership.role),
     })),
   };
 }

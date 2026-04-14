@@ -40,6 +40,7 @@ export class EndpointDetailPanelComponent {
   readonly selectedEndpoint = input<EndpointPreview | null>(null);
   /** Base URL without trailing slash, e.g. https://mock.apisim.dev/v1 */
   readonly baseUrl = input<string>('');
+  readonly canMutate = input(true);
 
   readonly closed = output<void>();
   readonly testEndpoint = output<void>();
@@ -111,11 +112,13 @@ export class EndpointDetailPanelComponent {
   }
 
   protected onEdit(): void {
+    if (!this.canMutate()) return;
     const ep = this.selectedEndpoint();
     if (ep) this.editRequested.emit(ep);
   }
 
   protected openDeleteConfirm(): void {
+    if (!this.canMutate()) return;
     if (!this.selectedEndpoint()) return;
     this.deleteConfirmOpen.set(true);
   }

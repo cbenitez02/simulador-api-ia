@@ -10,6 +10,7 @@ import { LogsComponent } from '../logs/logs.component';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
+import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 
 setupAngularVitest();
@@ -97,6 +98,12 @@ describe('WorkspaceShellComponent integration', () => {
     saveConfig: vi.fn(),
   };
 
+  const workspaceMembersRepository = {
+    listMembers: vi.fn(),
+    addMember: vi.fn(),
+    removeMember: vi.fn(),
+  };
+
   const authSession = {
     snapshot: signal({
       state: 'authenticated',
@@ -133,6 +140,9 @@ describe('WorkspaceShellComponent integration', () => {
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
+    workspaceMembersRepository.listMembers.mockReset();
+    workspaceMembersRepository.addMember.mockReset();
+    workspaceMembersRepository.removeMember.mockReset();
     authSession.bootstrap.mockReset();
     authSession.openSignIn.mockReset();
     authSession.signOut.mockReset();
@@ -157,6 +167,7 @@ describe('WorkspaceShellComponent integration', () => {
       reason: null,
     });
     authSession.accessState.set('ready');
+    workspaceMembersRepository.listMembers.mockResolvedValue([]);
   });
 
   function createProjectListItem(endpointCount: number) {
@@ -166,6 +177,11 @@ describe('WorkspaceShellComponent integration', () => {
       slug: 'generated-project',
       description: 'AI assisted workspace',
       updatedAt: new Date().toISOString(),
+      workspace: {
+        id: 'workspace-1',
+        role: 'owner',
+        capabilities: { canEdit: true, canManageMembers: true },
+      },
       _count: { endpoints: endpointCount },
     };
   }
@@ -187,6 +203,11 @@ describe('WorkspaceShellComponent integration', () => {
         slug: 'generated-project',
         description: 'AI assisted workspace',
         mockUrl: 'https://mock.example.com/generated-project',
+        workspace: {
+          id: 'workspace-1',
+          role: 'owner',
+          capabilities: { canEdit: true, canManageMembers: true },
+        },
         updatedAt: new Date().toISOString(),
         status: hasEndpoint ? 'running' : 'empty',
       },
@@ -239,6 +260,7 @@ describe('WorkspaceShellComponent integration', () => {
         { provide: ApiClient, useValue: api },
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
+        { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
       ],
     });
@@ -262,6 +284,11 @@ describe('WorkspaceShellComponent integration', () => {
               slug: 'workspace-project',
               description: 'Live backend project',
               updatedAt: new Date().toISOString(),
+              workspace: {
+                id: 'workspace-1',
+                role: 'owner',
+                capabilities: { canEdit: true, canManageMembers: true },
+              },
               _count: { endpoints: 1 },
             },
           ],
@@ -296,6 +323,11 @@ describe('WorkspaceShellComponent integration', () => {
             slug: 'workspace-project',
             description: 'Live backend project',
             mockUrl: 'https://mock.example.com/workspace-project',
+            workspace: {
+              id: 'workspace-1',
+              role: 'owner',
+              capabilities: { canEdit: true, canManageMembers: true },
+            },
             updatedAt: new Date().toISOString(),
             status: 'running',
           },

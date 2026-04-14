@@ -1,4 +1,5 @@
 import type { EndpointPreview } from '../../../shared/models/endpoint-preview.model';
+import type { WorkspaceCapabilitiesDto, WorkspaceRoleDto } from '../../../shared/http/api.types';
 
 export type DashboardProjectStatus = 'empty' | 'attention' | 'running';
 export type DashboardEndpointStatus = 'ready' | 'needs-attention';
@@ -69,10 +70,17 @@ export interface DashboardEndpointRowsMeta {
   hasMore: boolean;
 }
 
+export interface DashboardWorkspaceSummary {
+  id: string;
+  role: WorkspaceRoleDto;
+  capabilities: WorkspaceCapabilitiesDto;
+}
+
 export interface DashboardProject {
   id: string;
   name: string;
   slug: string;
+  workspace: DashboardWorkspaceSummary;
   status: DashboardProjectStatus;
   mockUrl: string;
   /** Short line for dashboard hero */

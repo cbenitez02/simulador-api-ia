@@ -2,6 +2,7 @@ import {
   getAccessibleWorkspaceIds,
   authorizeProjectAccess,
   requireWorkspaceAccess,
+  resolveWorkspaceAccess,
   resolveDefaultWorkspaceId,
 } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
@@ -71,7 +72,10 @@ export async function listProjects(
   ]);
 
   return {
-    items,
+    items: items.map((project) => ({
+      ...project,
+      workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+    })),
     page: {
       limit: query.limit,
       offset: query.offset,
@@ -101,7 +105,10 @@ export async function getProjectById(actor: AuthenticatedActor, projectId: strin
 
   requireWorkspaceAccess(actor, project.workspaceId);
 
-  return project;
+  return {
+    ...project,
+    workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+  };
 }
 
 export async function createProject(actor: AuthenticatedActor, input: CreateProjectInput) {
@@ -124,7 +131,7 @@ export async function createProject(actor: AuthenticatedActor, input: CreateProj
       },
     });
 
-    return tx.project.findUniqueOrThrow({
+    const project = await tx.project.findUniqueOrThrow({
       where: { id: createdProject.id },
       include: {
         globalConfig: true,
@@ -133,6 +140,11 @@ export async function createProject(actor: AuthenticatedActor, input: CreateProj
         },
       },
     });
+
+    return {
+      ...project,
+      workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+    };
   });
 }
 
@@ -141,9 +153,9 @@ export async function updateProject(
   projectId: string,
   input: UpdateProjectInput
 ) {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
-  return prisma.project.update({
+  const project = await prisma.project.update({
     where: { id: projectId },
     data: {
       ...(input.name !== undefined ? { name: input.name } : {}),
@@ -156,10 +168,15 @@ export async function updateProject(
       },
     },
   });
+
+  return {
+    ...project,
+    workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+  };
 }
 
 export async function deleteProject(actor: AuthenticatedActor, projectId: string): Promise<void> {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   await prisma.project.delete({ where: { id: projectId } });
 }

@@ -16,6 +16,7 @@ import { logsRouter } from './management/logs/router.js';
 import { projectsRouter } from './management/projects/router.js';
 import { scenariosRouter } from './management/scenarios/router.js';
 import { opsRouter } from './management/ops/router.js';
+import { workspaceMembersRouter } from './management/workspace-members/router.js';
 import { mockRouter } from './mock-server/mock.router.js';
 
 export const app = express();
@@ -43,6 +44,7 @@ app.use('/api/v1/endpoints/:endpointId/scenarios', scenariosRouter);
 app.use('/api/v1/endpoints/:endpointId/config', endpointConfigRouter);
 app.use('/api/v1/projects/:projectId/config', globalConfigRouter);
 app.use('/api/v1/projects/:projectId/logs', logsRouter);
+app.use('/api/v1/workspaces/:workspaceId/members', workspaceMembersRouter);
 app.use('/mock', mockRouter);
 
 app.use(errorHandler);

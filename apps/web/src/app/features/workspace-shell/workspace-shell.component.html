@@ -119,6 +119,7 @@
   @if (activeProject(); as project) {
     <app-main-dashboard-data
       [project]="project"
+      [canMutate]="canMutateActiveWorkspace()"
       (createEndpoint)="createEndpoint()"
       (openLogs)="openLogs()"
       (openEndpoints)="openEndpoints()"
@@ -147,6 +148,7 @@
       [sortOption]="endpointListState().sort"
       [loading]="endpointListLoading()"
       [hasMore]="endpointListState().hasMore"
+      [canMutate]="canMutateActiveWorkspace()"
       (endpointSelect)="selectEndpoint($event)"
       (createEndpoint)="createEndpoint()"
       (searchQueryChange)="updateEndpointSearch($event)"
@@ -161,17 +163,25 @@
   @if (activeProject(); as project) {
     <app-main-dashboard-utility-sidebar
       [project]="project"
+      [canMutate]="canMutateActiveWorkspace()"
+      [workspaceMembers]="workspaceMembers()"
+      [workspaceMembersLoading]="workspaceMembersLoading()"
+      [workspaceMembersError]="workspaceMembersError()"
+      [workspaceMemberMutationPending]="workspaceMemberMutationPending()"
       (createEndpoint)="createEndpoint()"
       (testAllEndpoints)="testAllEndpoints()"
       (exportConfig)="exportConfig()"
       (importEndpoints)="importEndpoints()"
       (editGlobalConfig)="editGlobalConfig()"
+      (addWorkspaceMember)="addWorkspaceMember($event)"
+      (removeWorkspaceMember)="removeWorkspaceMember($event)"
     />
   }
 } @else if (activeNav() === 'endpoints' && !createEndpointFlowOpen() && hasProjects()) {
   <app-endpoint-detail-panel
     [selectedEndpoint]="selectedEndpoint()"
     [baseUrl]="apiBaseUrl()"
+    [canMutate]="canMutateActiveWorkspace()"
     (closed)="clearEndpointSelection()"
     (editRequested)="editEndpoint($event)"
     (deleteRequested)="deleteEndpoint($event)"
