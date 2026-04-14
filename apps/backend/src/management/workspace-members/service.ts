@@ -1,5 +1,5 @@
 import { requireWorkspaceAccess } from '../../auth/authorization.js';
-import type { AuthenticatedActor } from '../../auth/types.js';
+import type { AuthenticatedActor, WorkspaceRole } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
 import type { AddWorkspaceMemberInput } from './schema.js';
@@ -17,6 +17,10 @@ function toWorkspaceMemberDto(member: {
     role: member.role,
     createdAt: member.createdAt.toISOString(),
   };
+}
+
+function normalizeWorkspaceRole(role: string): WorkspaceRole {
+  return role === 'owner' || role === 'editor' ? role : 'viewer';
 }
 
 export async function listWorkspaceMembers(actor: AuthenticatedActor, workspaceId: string) {
@@ -111,7 +115,10 @@ export async function addWorkspaceMember(
     },
   });
 
-  return toWorkspaceMemberDto(membership);
+  return toWorkspaceMemberDto({
+    ...membership,
+    role: normalizeWorkspaceRole(membership.role),
+  });
 }
 
 export async function removeWorkspaceMember(

@@ -12,6 +12,14 @@ describe('global-config/service', () => {
         name: 'Users API',
         description: '',
         slug: 'users-api',
+        workspace: {
+          id: 'workspace-1',
+          role: 'owner',
+          capabilities: {
+            canEdit: true,
+            canManageMembers: true,
+          },
+        },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: null,
       },
