@@ -8,6 +8,14 @@ export interface SidebarProjectRow {
   endpointCount: number;
 }
 
+export interface SidebarProjectPaginationState {
+  loaded: number;
+  total: number;
+  hasMore: boolean;
+  loadingMore: boolean;
+  errorMessage: string | null;
+}
+
 export interface PaginationState {
   limit: number;
   offset: number;

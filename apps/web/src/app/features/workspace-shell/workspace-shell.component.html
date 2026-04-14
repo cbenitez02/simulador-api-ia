@@ -4,10 +4,12 @@
   [activeNav]="activeNav()"
   [loading]="projectsLoading()"
   [errorMessage]="projectsError()"
+  [pagination]="sidebarProjectPagination()"
   (projectSelect)="selectProject($event)"
   (navSelect)="selectNav($event)"
   (createProjectRequested)="openCreateProjectModal()"
   (retryRequested)="retryLoadProjects()"
+  (loadMoreRequested)="loadMoreProjects()"
 />
 
 @if (createEndpointFlowOpen()) {

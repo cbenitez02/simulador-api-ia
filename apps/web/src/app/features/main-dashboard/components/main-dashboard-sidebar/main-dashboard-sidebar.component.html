@@ -51,6 +51,31 @@
             </li>
           }
         </ul>
+
+        @if (pagination().total > projects().length || pagination().errorMessage) {
+          <div class="sidebar__projects-footer">
+            @if (pagination().total > 0) {
+              <p class="sidebar__projects-meta">
+                Showing {{ pagination().loaded }} of {{ pagination().total }} projects
+              </p>
+            }
+
+            @if (pagination().errorMessage; as paginationError) {
+              <p class="sidebar__projects-error">{{ paginationError }}</p>
+            }
+
+            @if (pagination().hasMore) {
+              <button
+                type="button"
+                class="sidebar__load-more-btn"
+                (click)="loadMore()"
+                [disabled]="pagination().loadingMore"
+              >
+                {{ pagination().loadingMore ? 'Loading more…' : 'Load more projects' }}
+              </button>
+            }
+          </div>
+        }
       }
     </section>
 

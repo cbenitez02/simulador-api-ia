@@ -36,6 +36,7 @@ import type {
   CreateProjectAiFlowState,
   EndpointListState,
   PaginationState,
+  SidebarProjectPaginationState,
   SidebarProjectRow,
   WorkspaceNavId,
 } from './models/workspace-shell.model';
@@ -84,7 +85,9 @@ export class WorkspaceShellComponent {
   protected readonly authSnapshot = this.authSession.snapshot;
   protected readonly protectedApiAccessState = this.authSession.accessState;
   protected readonly projectsLoading = signal(true);
+  protected readonly projectsLoadingMore = signal(false);
   protected readonly projectsError = signal<string | null>(null);
+  protected readonly projectsLoadMoreError = signal<string | null>(null);
   protected readonly selectedProjectId = signal<string>('');
   protected readonly activeNav = signal<WorkspaceNavId>('dashboard');
 
@@ -95,6 +98,15 @@ export class WorkspaceShellComponent {
       mockUrl: p.mockUrl,
       endpointCount: p.metrics.totalEndpoints,
     })),
+  );
+  protected readonly sidebarProjectPagination = computed(
+    (): SidebarProjectPaginationState => ({
+      loaded: this.projects().length,
+      total: this.projectsPage().total,
+      hasMore: this.projectsPage().hasMore,
+      loadingMore: this.projectsLoadingMore(),
+      errorMessage: this.projectsLoadMoreError(),
+    }),
   );
 
   protected readonly hasProjects = computed(() => this.projects().length > 0);
@@ -475,15 +487,41 @@ export class WorkspaceShellComponent {
     void this.reloadProjects();
   }
 
-  private async reloadProjects(selectProjectId?: string): Promise<void> {
-    this.projectsLoading.set(true);
-    this.projectsError.set(null);
+  protected loadMoreProjects(): void {
+    if (this.projectsLoading() || this.projectsLoadingMore() || !this.projectsPage().hasMore) return;
+    void this.reloadProjects(undefined, true);
+  }
+
+  private async reloadProjects(selectProjectId?: string, append = false): Promise<void> {
+    if (append) {
+      this.projectsLoadingMore.set(true);
+      this.projectsLoadMoreError.set(null);
+    } else {
+      this.projectsLoading.set(true);
+      this.projectsError.set(null);
+      this.projectsLoadMoreError.set(null);
+    }
+
     try {
-      const projects = await this.projectsRepository.listProjects();
+      const projects = await this.projectsRepository.listProjects({
+        limit: WorkspaceShellComponent.PROJECT_PAGE_LIMIT,
+        offset: append ? this.projects().length : 0,
+      });
+
       this.projectsPage.set(projects.page);
-      const projectItems = projects.items;
+      const projectItems = append
+        ? [
+            ...this.projects(),
+            ...projects.items.filter((project) => !this.projects().some((current) => current.id === project.id)),
+          ]
+        : projects.items;
+
       this.authSession.markProtectedApiReady();
       this.projects.set(projectItems);
+
+      if (append) {
+        return;
+      }
 
       const currentSelected = selectProjectId ?? this.selectedProjectId();
       const nextSelected =
@@ -499,9 +537,19 @@ export class WorkspaceShellComponent {
       }
     } catch (error) {
       if (this.authSession.handleProtectedApiError(error)) {
-        this.projects.set([]);
-        this.selectedProjectId.set('');
-        this.projectsError.set(null);
+        if (!append) {
+          this.projects.set([]);
+          this.selectedProjectId.set('');
+          this.projectsError.set(null);
+        } else {
+          this.projectsLoadMoreError.set(null);
+        }
+
+        return;
+      }
+
+      if (append) {
+        this.projectsLoadMoreError.set(error instanceof Error ? error.message : 'Could not load more projects.');
         return;
       }
 
@@ -511,7 +559,11 @@ export class WorkspaceShellComponent {
       this.selectedProjectId.set('');
       this.projectsError.set(error instanceof Error ? error.message : 'Could not load projects.');
     } finally {
-      this.projectsLoading.set(false);
+      if (append) {
+        this.projectsLoadingMore.set(false);
+      } else {
+        this.projectsLoading.set(false);
+      }
     }
   }
 

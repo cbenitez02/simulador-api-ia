@@ -8,7 +8,11 @@ import {
   LucidePlus,
 } from '@lucide/angular';
 
-import type { SidebarProjectRow, WorkspaceNavId } from '../../../workspace-shell/models/workspace-shell.model';
+import type {
+  SidebarProjectPaginationState,
+  SidebarProjectRow,
+  WorkspaceNavId,
+} from '../../../workspace-shell/models/workspace-shell.model';
 
 @Component({
   selector: 'app-main-dashboard-sidebar',
@@ -24,11 +28,19 @@ export class MainDashboardSidebarComponent {
   readonly activeNav = input.required<WorkspaceNavId>();
   readonly loading = input(false);
   readonly errorMessage = input<string | null>(null);
+  readonly pagination = input<SidebarProjectPaginationState>({
+    loaded: 0,
+    total: 0,
+    hasMore: false,
+    loadingMore: false,
+    errorMessage: null,
+  });
 
   readonly projectSelect = output<string>();
   readonly navSelect = output<WorkspaceNavId>();
   readonly createProjectRequested = output<void>();
   readonly retryRequested = output<void>();
+  readonly loadMoreRequested = output<void>();
 
   protected readonly activeProject = computed((): SidebarProjectRow | null => {
     const list = this.projects();
@@ -59,6 +71,10 @@ export class MainDashboardSidebarComponent {
 
   protected retry(): void {
     this.retryRequested.emit();
+  }
+
+  protected loadMore(): void {
+    this.loadMoreRequested.emit();
   }
 
   protected copyMockUrl(): void {

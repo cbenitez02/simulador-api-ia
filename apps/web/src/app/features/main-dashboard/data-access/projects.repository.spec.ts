@@ -92,6 +92,24 @@ describe('ProjectsRepository', () => {
     expect(result.items[0]?.endpoints[0]?.path).toBe('Endpoint 1');
   });
 
+  it('passes pagination offset and search query when requesting additional project pages', async () => {
+    const api = {
+      get: vi.fn(async (path: string) => {
+        if (path === '/projects?limit=25&offset=25&q=billing') {
+          return { items: [projectDto], page: { limit: 25, offset: 25, total: 26, hasMore: false } };
+        }
+
+        throw new Error(`Unexpected GET ${path}`);
+      }),
+    };
+
+    const repository = createRepository(api);
+    const result = await repository.listProjects({ limit: 25, offset: 25, q: ' billing ' });
+
+    expect(api.get).toHaveBeenCalledWith('/projects?limit=25&offset=25&q=billing');
+    expect(result.page.offset).toBe(25);
+  });
+
   it('updates a project with a partial payload and remaps the refreshed project', async () => {
     const api = {
       get: vi.fn(async () => ({

@@ -26,8 +26,11 @@ type WritableSignalLike<T> = {
 
 type WorkspaceShellTestApi = {
   projects: WritableSignalLike<DashboardProject[]>;
+  projectsPage: WritableSignalLike<{ limit: number; offset: number; total: number; hasMore: boolean }>;
   activeProject: () => DashboardProject | null;
   projectsError: () => string | null;
+  projectsLoadingMore: () => boolean;
+  projectsLoadMoreError: () => string | null;
   projectsLoading: () => boolean;
   selectedProjectId: WritableSignalLike<string>;
   selectedEndpointId: WritableSignalLike<string | null>;
@@ -50,6 +53,7 @@ type WorkspaceShellTestApi = {
   deleteProjectPending: () => boolean;
   deleteProjectError: () => string | null;
   retryLoadProjects(): void;
+  loadMoreProjects(): void;
   selectProject(id: string): void;
   editGlobalConfig(): void;
   openEditProjectModal(): void;
@@ -317,10 +321,60 @@ describe('WorkspaceShellComponent', () => {
     const component = createComponent();
     await flushAsyncWork();
 
+    expect(projectsRepository.listProjects).toHaveBeenCalledWith({ limit: 25, offset: 0 });
     expect(projectsRepository.getProject).toHaveBeenCalledWith('project-1');
     expect(component.selectedProjectId()).toBe('project-1');
     expect(component.activeProject()?.metrics.totalScenarios).toBe(3);
     expect(component.activeProject()?.recentRequests).toHaveLength(1);
+  });
+
+  it('loads the next project page without resetting the active workspace shell state', async () => {
+    const pageOne = {
+      items: [projectFixture],
+      page: { limit: 25, offset: 0, total: 30, hasMore: true },
+    };
+    const pageTwo = {
+      items: [secondProjectFixture],
+      page: { limit: 25, offset: 25, total: 30, hasMore: false },
+    };
+
+    projectsRepository.listProjects.mockResolvedValueOnce(pageOne).mockResolvedValueOnce(pageTwo);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.loadMoreProjects();
+    expect(component.projectsLoadingMore()).toBe(true);
+
+    await flushAsyncWork();
+
+    expect(projectsRepository.listProjects).toHaveBeenNthCalledWith(1, { limit: 25, offset: 0 });
+    expect(projectsRepository.listProjects).toHaveBeenNthCalledWith(2, { limit: 25, offset: 1 });
+    expect(component.projects().map((project) => project.id)).toEqual(['project-1', 'project-2']);
+    expect(component.selectedProjectId()).toBe('project-1');
+    expect(component.projectsPage().hasMore).toBe(false);
+    expect(component.projectsLoadMoreError()).toBe(null);
+    expect(component.projectsLoadingMore()).toBe(false);
+  });
+
+  it('keeps the current project list visible when loading the next page fails', async () => {
+    projectsRepository.listProjects
+      .mockResolvedValueOnce({
+        items: [projectFixture],
+        page: { limit: 25, offset: 0, total: 30, hasMore: true },
+      })
+      .mockRejectedValueOnce(new Error('Could not fetch the next page.'));
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.loadMoreProjects();
+    await flushAsyncWork();
+
+    expect(component.projects()).toEqual([projectFixture]);
+    expect(component.selectedProjectId()).toBe('project-1');
+    expect(component.projectsLoadMoreError()).toBe('Could not fetch the next page.');
+    expect(component.projectsError()).toBe(null);
   });
 
   it('reloads the dashboard summary when the user changes the active project', async () => {
