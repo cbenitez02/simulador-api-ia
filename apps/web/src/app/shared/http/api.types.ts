@@ -225,6 +225,11 @@ export interface DashboardSummaryDto {
     errorRatePct: number;
     status: DashboardEndpointStatusDto;
   }>;
+  endpointRowsMeta?: {
+    total: number;
+    limit: number;
+    hasMore: boolean;
+  };
   recentRequests: Array<{
     id: string;
     method: string;

@@ -229,6 +229,8 @@ describe('WorkspaceShellComponent integration', () => {
     };
   }
 
+  const projectListPath = '/projects?limit=25&offset=0';
+
   function createComponent() {
     const injector = Injector.create({
       providers: [
@@ -251,7 +253,7 @@ describe('WorkspaceShellComponent integration', () => {
 
   it('renders backend projects in the dashboard and selects the first project automatically', async () => {
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return {
           items: [
             {
@@ -341,7 +343,7 @@ describe('WorkspaceShellComponent integration', () => {
     await flushAsyncWork();
 
     const content = await renderSnapshot(component, logsRepository);
-    expect(api.get).toHaveBeenCalledWith('/projects');
+    expect(api.get).toHaveBeenCalledWith(projectListPath);
     expect(api.get).toHaveBeenCalledWith('/projects/p1/dashboard-summary');
     expect(api.get).toHaveBeenCalledTimes(2);
     expect(content).toContain('Workspace project');
@@ -353,7 +355,7 @@ describe('WorkspaceShellComponent integration', () => {
 
   it('renders backend logs and shows the detail sidebar after selecting a log entry', async () => {
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return createProjectListResponse(1);
       }
 
@@ -409,7 +411,7 @@ describe('WorkspaceShellComponent integration', () => {
 
   it('shows an empty state when the selected project has no logs', async () => {
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return createProjectListResponse(0);
       }
 
@@ -432,7 +434,7 @@ describe('WorkspaceShellComponent integration', () => {
     let endpointCreated = false;
 
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return projectExists
           ? createProjectListResponse(endpointCreated ? 1 : 0)
           : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
@@ -494,7 +496,7 @@ describe('WorkspaceShellComponent integration', () => {
     let endpointCreated = false;
 
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return projectExists
           ? createProjectListResponse(endpointCreated ? 1 : 0)
           : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
@@ -566,7 +568,7 @@ describe('WorkspaceShellComponent integration', () => {
     let projectExists = false;
 
     api.get.mockImplementation(async (path: string) => {
-      if (path === '/projects') {
+      if (path === projectListPath) {
         return projectExists
           ? createProjectListResponse(0)
           : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
@@ -621,7 +623,7 @@ type LogsComponentHarness = {
     (): 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     set(value: 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'): void;
   };
-  statusFilter: { (): 'all' | '2xx' | '4xx' | '5xx'; set(value: 'all' | '2xx' | '4xx' | '5xx'): void };
+  statusFilter: { (): 'all' | '2xx' | '3xx' | '4xx' | '5xx'; set(value: 'all' | '2xx' | '3xx' | '4xx' | '5xx'): void };
   endpointFilter: { (): string; set(value: string): void };
   selectedLog: { (): ApiLogEntry | null; set(value: ApiLogEntry | null): void };
   liveStatus: () => 'off' | 'live' | 'paused';
@@ -780,6 +782,7 @@ describe('LogsComponent integration', () => {
     await flushAsyncWork();
 
     expect(listLogs).toHaveBeenNthCalledWith(2, 'p1', {
+      direction: 'newer',
       cursorCreatedAt: '2026-04-08T10:00:02.000Z',
       cursorId: 'log-2',
     });
@@ -795,6 +798,7 @@ describe('LogsComponent integration', () => {
     await flushAsyncWork();
 
     expect(listLogs).toHaveBeenNthCalledWith(3, 'p1', {
+      direction: 'newer',
       cursorCreatedAt: '2026-04-08T10:00:04.000Z',
       cursorId: 'log-3',
     });

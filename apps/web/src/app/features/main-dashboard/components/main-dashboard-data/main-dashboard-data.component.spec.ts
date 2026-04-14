@@ -11,6 +11,7 @@ type MainDashboardDataHarness = MainDashboardDataComponent & {
   metrics: () => DashboardProject['metrics'];
   health: () => DashboardProject['health'];
   endpointRows: () => DashboardProject['endpointRows'];
+  endpointRowsMeta: () => DashboardProject['endpointRowsMeta'];
 };
 
 function bindProjectInput(component: { project: unknown }, project: DashboardProject): void {
@@ -61,6 +62,11 @@ const projectFixture: DashboardProject = {
       status: 'needs-attention',
     },
   ],
+  endpointRowsMeta: {
+    total: 12,
+    limit: 10,
+    hasMore: true,
+  },
   recentRequests: [],
   configSummary: {
     latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
@@ -86,6 +92,7 @@ describe('MainDashboardDataComponent', () => {
     expect(component.metrics()).toEqual(projectFixture.metrics);
     expect(component.health()).toEqual(projectFixture.health);
     expect(component.endpointRows()).toEqual(projectFixture.endpointRows);
+    expect(component.endpointRowsMeta()).toEqual(projectFixture.endpointRowsMeta);
     expect(component.endpointRows()[1]?.status).toBe('needs-attention');
   });
 });

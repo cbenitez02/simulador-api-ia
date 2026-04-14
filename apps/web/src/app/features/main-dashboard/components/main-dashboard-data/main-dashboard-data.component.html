@@ -160,6 +160,14 @@
 
       <section class="dash__table-wrap card" aria-labelledby="dash-endpoints-heading">
         <h2 id="dash-endpoints-heading" class="dash__card-title">Endpoints overview</h2>
+        @if (endpointRowsMeta().hasMore) {
+          <p class="dash__sub">
+            Showing {{ endpointRows().length }} of {{ endpointRowsMeta().total }} endpoints in this preview.
+            <button type="button" class="dash__btn dash__btn--ghost" (click)="openEndpoints.emit()">
+              View all endpoints
+            </button>
+          </p>
+        }
         <div class="dash__table-scroll">
           <table class="dash__table">
             <thead>

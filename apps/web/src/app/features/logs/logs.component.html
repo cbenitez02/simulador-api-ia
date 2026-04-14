@@ -82,6 +82,7 @@
       >
         <option value="all">All Status</option>
         <option value="2xx">2xx</option>
+        <option value="3xx">3xx</option>
         <option value="4xx">4xx</option>
         <option value="5xx">5xx</option>
       </select>
@@ -128,6 +129,17 @@
         <p class="logs__empty-state">{{ emptyStateMessage() }}</p>
       } @else {
         <app-logs-list [entries]="filteredEntries()" [selectedId]="selectedId()" (entrySelect)="selectEntry($event)" />
+
+        @if (olderHistoryAvailable()) {
+          <button
+            type="button"
+            class="logs__btn logs__btn--ghost logs__load-older"
+            [disabled]="loadingOlder()"
+            (click)="loadOlderLogs()"
+          >
+            {{ loadingOlder() ? 'Loading older logs…' : 'Load older logs' }}
+          </button>
+        }
       }
     </div>
   </div>

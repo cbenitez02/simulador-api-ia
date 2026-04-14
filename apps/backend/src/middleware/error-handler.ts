@@ -1,5 +1,7 @@
-import type { ErrorRequestHandler } from 'express';
+import type { ErrorRequestHandler, Request } from 'express';
 import { ZodError } from 'zod';
+
+type RequestWithRequestId = Request & { requestId?: string };
 
 function emitStructuredErrorLog(err: unknown, requestId: string | null): void {
   const payload = {
@@ -36,6 +38,7 @@ function isPrismaKnownError(err: unknown): err is { code: string; meta?: { targe
 
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   void _next;
+  const requestWithContext = req as RequestWithRequestId;
 
   if (err instanceof ZodError) {
     res.status(400).json({
@@ -73,6 +76,6 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     return;
   }
 
-  emitStructuredErrorLog(err, req.requestId ?? null);
+  emitStructuredErrorLog(err, requestWithContext.requestId ?? null);
   res.status(500).json({ error: 'Internal Server Error' });
 };

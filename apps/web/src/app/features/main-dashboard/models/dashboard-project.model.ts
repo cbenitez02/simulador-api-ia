@@ -63,6 +63,12 @@ export interface DashboardConfigSummary {
   scope: 'all' | 'unset';
 }
 
+export interface DashboardEndpointRowsMeta {
+  total: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export interface DashboardProject {
   id: string;
   name: string;
@@ -76,6 +82,7 @@ export interface DashboardProject {
   metrics: DashboardMetrics;
   health: DashboardHealth;
   endpointRows: DashboardEndpointRow[];
+  endpointRowsMeta: DashboardEndpointRowsMeta;
   recentRequests: DashboardRecentRequest[];
   configSummary: DashboardConfigSummary;
   /** Frontend-derived navigation previews built from summary rows, not part of the backend summary contract itself. */

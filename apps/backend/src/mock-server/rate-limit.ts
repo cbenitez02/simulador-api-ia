@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../generated/prisma/client.js';
+import type { PrismaClient } from '@prisma/client';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 

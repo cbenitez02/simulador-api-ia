@@ -28,54 +28,58 @@ describe('dashboard/service', () => {
           loggingLevel: 'full',
           scope: 'all',
         },
-        endpoints: [
-          {
-            id: 'e-ready',
-            method: 'GET',
-            path: '/users',
-            description: 'List users',
-            endpointConfig: {
-              latencyMode: 'fixed',
-              fixedDelayMs: 90,
-              minDelayMs: 0,
-              maxDelayMs: 0,
-            },
-            scenarios: [
-              { id: 's-1', type: 'success' },
-              { id: 's-2', type: 'error' },
-            ],
-          },
-          {
-            id: 'e-attention',
-            method: 'POST',
-            path: '/users',
-            description: 'Create user',
-            endpointConfig: {
-              latencyMode: 'range',
-              fixedDelayMs: 0,
-              minDelayMs: 80,
-              maxDelayMs: 180,
-            },
-            scenarios: [],
-          },
-          {
-            id: 'e-empty',
-            method: 'DELETE',
-            path: '/users/:id',
-            description: 'Delete user',
-            endpointConfig: null,
-            scenarios: [
-              { id: 's-3', type: 'empty' },
-              { id: 's-4', type: 'timeout' },
-            ],
-          },
-        ],
       },
+      endpointRows: [
+        {
+          id: 'e-ready',
+          method: 'GET',
+          path: '/users',
+          description: 'List users',
+          endpointConfig: {
+            latencyMode: 'fixed',
+            fixedDelayMs: 90,
+            minDelayMs: 0,
+            maxDelayMs: 0,
+          },
+          scenarioCount: 2,
+        },
+        {
+          id: 'e-attention',
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          endpointConfig: {
+            latencyMode: 'range',
+            fixedDelayMs: 0,
+            minDelayMs: 80,
+            maxDelayMs: 180,
+          },
+          scenarioCount: 0,
+        },
+        {
+          id: 'e-empty',
+          method: 'DELETE',
+          path: '/users/:id',
+          description: 'Delete user',
+          endpointConfig: null,
+          scenarioCount: 2,
+        },
+      ],
+      endpointRowsMeta: { total: 3, limit: 10, hasMore: false },
       traffic: buildProjectTrafficAggregate({
         totalRequests: 5,
         avgLatencyMs: 112.6,
         errorRequests: 2,
       }),
+      totalScenarios: 4,
+      health: {
+        readyEndpoints: 2,
+        needsAttentionEndpoints: 1,
+        errorScenarioEndpoints: 1,
+        emptyScenarioEndpoints: 1,
+        timeoutScenarioEndpoints: 1,
+      },
+      projectStatus: 'attention',
       endpointLogs: new Map([
         [
           'GET /users',
@@ -141,6 +145,7 @@ describe('dashboard/service', () => {
         status: 'ready',
       }),
     ]);
+    expect(summary.endpointRowsMeta).toEqual({ total: 3, limit: 10, hasMore: false });
     expect(summary.recentRequests).toEqual([
       {
         id: 'log-1',
@@ -165,13 +170,23 @@ describe('dashboard/service', () => {
         slug: 'empty-api',
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: null,
-        endpoints: [],
       },
+      endpointRows: [],
+      endpointRowsMeta: { total: 0, limit: 10, hasMore: false },
       traffic: buildProjectTrafficAggregate({
         totalRequests: 0,
         avgLatencyMs: null,
         errorRequests: 0,
       }),
+      totalScenarios: 0,
+      health: {
+        readyEndpoints: 0,
+        needsAttentionEndpoints: 0,
+        errorScenarioEndpoints: 0,
+        emptyScenarioEndpoints: 0,
+        timeoutScenarioEndpoints: 0,
+      },
+      projectStatus: 'empty',
       endpointLogs: new Map(),
       recentLogs: [],
       mockBaseUrl: 'https://mock.example.com/base',
@@ -193,6 +208,7 @@ describe('dashboard/service', () => {
       emptyScenarioEndpoints: 0,
       timeoutScenarioEndpoints: 0,
     });
+    expect(summary.endpointRowsMeta).toEqual({ total: 0, limit: 10, hasMore: false });
     expect(summary.recentRequests).toEqual([]);
     expect(summary.configSummary).toEqual({
       latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },

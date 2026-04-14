@@ -15,12 +15,28 @@ export class LogsRepository {
       params.set('limit', String(query.limit));
     }
 
+    if (query.direction) {
+      params.set('direction', query.direction);
+    }
+
     if (query.cursorCreatedAt) {
       params.set('cursorCreatedAt', query.cursorCreatedAt);
     }
 
     if (query.cursorId) {
       params.set('cursorId', query.cursorId);
+    }
+
+    if (query.method) {
+      params.set('method', query.method);
+    }
+
+    if (query.statusBucket) {
+      params.set('statusBucket', query.statusBucket);
+    }
+
+    if (query.path) {
+      params.set('path', query.path);
     }
 
     const queryString = params.size > 0 ? `?${params.toString()}` : '';

@@ -29,7 +29,7 @@ import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/componen
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type {
-  EndpointListMethodFilter,
+  EndpointsListMethodFilter,
   EndpointsListSortOption,
 } from '../endpoints/components/endpoints-list/endpoints-list.constants';
 import type {
@@ -438,6 +438,10 @@ export class WorkspaceShellComponent {
     this.activeNav.set('logs');
   }
 
+  protected openEndpoints(): void {
+    this.activeNav.set('endpoints');
+  }
+
   protected testAllEndpoints(): void {}
 
   protected exportConfig(): void {
@@ -611,7 +615,7 @@ export class WorkspaceShellComponent {
     if (projectId) void this.reloadEndpointList(projectId);
   }
 
-  protected updateEndpointMethodFilter(method: EndpointListMethodFilter): void {
+  protected updateEndpointMethodFilter(method: EndpointsListMethodFilter): void {
     this.endpointListState.update((state) => ({ ...state, method }));
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     if (projectId) void this.reloadEndpointList(projectId);

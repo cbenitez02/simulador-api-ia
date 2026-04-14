@@ -47,6 +47,11 @@ export const dashboardSummarySchema = z.object({
       status: dashboardEndpointStatusSchema,
     })
   ),
+  endpointRowsMeta: z.object({
+    total: z.number().int().min(0),
+    limit: z.number().int().min(1),
+    hasMore: z.boolean(),
+  }),
   recentRequests: z.array(
     z.object({
       id: z.string(),

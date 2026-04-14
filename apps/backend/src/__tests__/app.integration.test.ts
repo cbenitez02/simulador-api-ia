@@ -44,6 +44,7 @@ const prismaMock = {
   scenario: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
+    count: vi.fn(),
     create: vi.fn(),
     createMany: vi.fn(),
     update: vi.fn(),
@@ -569,33 +570,37 @@ describe('app integration', () => {
           loggingLevel: 'full',
           scope: 'all',
         },
-        endpoints: [
-          {
-            id: 'e1',
-            method: 'GET',
-            path: '/users',
-            description: 'List users',
-            endpointConfig: {
-              latencyMode: 'fixed',
-              fixedDelayMs: 90,
-              minDelayMs: 0,
-              maxDelayMs: 0,
-            },
-            scenarios: [
-              { id: 's1', type: 'success' },
-              { id: 's2', type: 'error' },
-            ],
-          },
-          {
-            id: 'e2',
-            method: 'POST',
-            path: '/users',
-            description: 'Create user',
-            endpointConfig: null,
-            scenarios: [],
-          },
-        ],
       });
+      prismaMock.endpoint.findMany.mockResolvedValueOnce([
+        {
+          id: 'e1',
+          method: 'GET',
+          path: '/users',
+          description: 'List users',
+          endpointConfig: {
+            latencyMode: 'fixed',
+            fixedDelayMs: 90,
+            minDelayMs: 0,
+            maxDelayMs: 0,
+          },
+          _count: { scenarios: 2 },
+        },
+        {
+          id: 'e2',
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          endpointConfig: null,
+          _count: { scenarios: 0 },
+        },
+      ]);
+      prismaMock.endpoint.count
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+      prismaMock.scenario.count.mockResolvedValueOnce(2);
       prismaMock.apiLog.aggregate.mockResolvedValueOnce({
         _count: { _all: 4 },
         _avg: { latencyMs: 120 },
@@ -679,6 +684,7 @@ describe('app integration', () => {
           status: 'needs-attention',
         },
       ]);
+      expect(response.body.endpointRowsMeta).toEqual({ total: 2, limit: 10, hasMore: false });
       expect(response.body.recentRequests).toEqual([
         {
           id: 'log-1',
@@ -699,6 +705,9 @@ describe('app integration', () => {
       });
       expect(prismaMock.apiLog.findMany).toHaveBeenCalledTimes(1);
       expect(prismaMock.apiLog.groupBy).toHaveBeenCalledTimes(2);
+      expect(prismaMock.endpoint.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 10, orderBy: [{ method: 'asc' }, { path: 'asc' }] })
+      );
     } finally {
       env.MOCK_BASE_URL = originalMockBaseUrl;
     }
@@ -724,8 +733,15 @@ describe('app integration', () => {
       description: '',
       updatedAt: new Date('2026-04-08T10:00:00.000Z'),
       globalConfig: null,
-      endpoints: [],
     });
+    prismaMock.endpoint.findMany.mockResolvedValueOnce([]);
+    prismaMock.endpoint.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    prismaMock.scenario.count.mockResolvedValueOnce(0);
     prismaMock.apiLog.aggregate.mockResolvedValueOnce({
       _count: { _all: 0 },
       _avg: { latencyMs: null },
@@ -747,6 +763,7 @@ describe('app integration', () => {
       errorRatePct: 0,
       totalRequests: 0,
     });
+    expect(response.body.endpointRowsMeta).toEqual({ total: 0, limit: 10, hasMore: false });
     expect(response.body.recentRequests).toEqual([]);
     expect(response.body.configSummary).toEqual({
       latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },
@@ -1013,7 +1030,7 @@ describe('app integration', () => {
     expect(response.headers['x-simulador-latency']).toBe('123');
   });
 
-  it('GET /api/v1/projects/:projectId/logs devuelve últimos logs', async () => {
+  it('GET /api/v1/projects/:projectId/logs devuelve últimos logs con backfill older por defecto', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.apiLog.findMany.mockResolvedValueOnce([
       {
@@ -1058,7 +1075,40 @@ describe('app integration', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.items).toHaveLength(2);
-    expect(response.body.nextCursor).toEqual({ createdAt: '2026-04-08T10:00:02.000Z', id: 'l2' });
+    expect(response.body.nextCursor).toEqual({ createdAt: '2026-04-08T10:00:01.000Z', id: 'l1' });
+    expect(prismaMock.apiLog.findMany).toHaveBeenCalledWith({
+      where: { projectId: 'p1' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 100,
+    });
+  });
+
+  it('GET /api/v1/projects/:projectId/logs aplica polling newer y filtros server-side', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.apiLog.findMany.mockResolvedValueOnce([]);
+
+    const response = await request(app)
+      .get(
+        '/api/v1/projects/p1/logs?direction=newer&cursorCreatedAt=2026-04-08T10%3A00%3A02.000Z&cursorId=l2&method=get&statusBucket=5xx&path=%2Fusers'
+      )
+      .set(authHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.nextCursor).toBeNull();
+    expect(prismaMock.apiLog.findMany).toHaveBeenCalledWith({
+      where: {
+        projectId: 'p1',
+        method: 'GET',
+        path: { contains: '/users', mode: 'insensitive' },
+        statusCode: { gte: 500, lt: 600 },
+        OR: [
+          { createdAt: { gt: new Date('2026-04-08T10:00:02.000Z') } },
+          { createdAt: new Date('2026-04-08T10:00:02.000Z'), id: { gt: 'l2' } },
+        ],
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 100,
+    });
   });
 
   it('POST /api/v1/projects/:projectId/endpoints/ai-generate valida prompt corto', async () => {

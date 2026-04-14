@@ -71,6 +71,11 @@ export function mapDashboardProjectFromApi(summary: DashboardSummaryDto): Dashbo
       method: normalizeMethod(row.method),
       status: row.status,
     })),
+    endpointRowsMeta: {
+      total: summary.endpointRowsMeta?.total ?? summary.endpointRows.length,
+      limit: summary.endpointRowsMeta?.limit ?? summary.endpointRows.length,
+      hasMore: summary.endpointRowsMeta?.hasMore ?? false,
+    },
     recentRequests: summary.recentRequests.map((request) => ({
       ...request,
       method: normalizeMethod(request.method),
@@ -114,6 +119,11 @@ export function mapCreatedProjectPlaceholder(project: ProjectDto): DashboardProj
       timeoutScenarioEndpoints: 0,
     },
     endpointRows: placeholderEndpointRows,
+    endpointRowsMeta: {
+      total: placeholderCount,
+      limit: placeholderCount,
+      hasMore: false,
+    },
     recentRequests: [],
     configSummary: {
       latency: { enabled: false, mode: 'fixed', minMs: 0, maxMs: 1000 },

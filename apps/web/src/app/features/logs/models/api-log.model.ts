@@ -53,6 +53,10 @@ export interface ApiLogListResult {
 
 export interface ListLogsQuery {
   limit?: number;
+  direction?: 'older' | 'newer';
   cursorCreatedAt?: string;
   cursorId?: string;
+  method?: HttpMethod;
+  statusBucket?: '2xx' | '3xx' | '4xx' | '5xx';
+  path?: string;
 }

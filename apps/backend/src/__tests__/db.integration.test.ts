@@ -1,7 +1,8 @@
 import request from 'supertest';
 import type { Express } from 'express';
+import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from 'vitest';
-import type { Prisma, PrismaClient } from '../generated/prisma/client.js';
 
 const runDbTests = process.env.RUN_DB_TESTS === 'true';
 const describeDb = runDbTests ? describe : describe.skip;
@@ -105,9 +106,7 @@ describeDb('db integration (real postgres)', () => {
 
     ({ app } = await import('../app.js'));
     ({ prisma } = await import('../lib/prisma.js'));
-    ({
-      Prisma: { JsonNull: prismaJsonNull },
-    } = await import('../generated/prisma/client.js'));
+    prismaJsonNull = Prisma.JsonNull;
   });
 
   beforeEach(async () => {
@@ -319,13 +318,13 @@ describeDb('db integration (real postgres)', () => {
     ]);
     expect(firstResponse.body.nextCursor).toEqual({
       createdAt: '2026-04-08T12:01:00.000Z',
-      id: 'log-same-b',
+      id: 'log-same-a',
     });
     expect(typeof firstResponse.body.serverTime).toBe('string');
 
     const incrementalResponse = await apiGet(
       app,
-      `/api/v1/projects/${projectRes.body.id}/logs?cursorCreatedAt=${encodeURIComponent('2026-04-08T12:01:00.000Z')}&cursorId=log-same-a`
+      `/api/v1/projects/${projectRes.body.id}/logs?direction=newer&cursorCreatedAt=${encodeURIComponent('2026-04-08T12:01:00.000Z')}&cursorId=log-same-a`
     );
 
     expect(incrementalResponse.status).toBe(200);
@@ -335,6 +334,20 @@ describeDb('db integration (real postgres)', () => {
     expect(incrementalResponse.body.nextCursor).toEqual({
       createdAt: '2026-04-08T12:01:00.000Z',
       id: 'log-same-b',
+    });
+
+    const backfillResponse = await apiGet(
+      app,
+      `/api/v1/projects/${projectRes.body.id}/logs?direction=older&cursorCreatedAt=${encodeURIComponent('2026-04-08T12:01:00.000Z')}&cursorId=log-same-a&method=GET&statusBucket=2xx&path=%2Folder`
+    );
+
+    expect(backfillResponse.status).toBe(200);
+    expect(backfillResponse.body.items.map((item: { id: string }) => item.id)).toEqual([
+      'log-older',
+    ]);
+    expect(backfillResponse.body.nextCursor).toEqual({
+      createdAt: '2026-04-08T12:00:00.000Z',
+      id: 'log-older',
     });
   });
 
