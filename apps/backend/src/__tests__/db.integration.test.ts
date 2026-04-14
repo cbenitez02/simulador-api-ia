@@ -1,7 +1,8 @@
 import request from 'supertest';
 import type { Express } from 'express';
+import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from 'vitest';
-import type { Prisma, PrismaClient } from '../generated/prisma/client.js';
 
 const runDbTests = process.env.RUN_DB_TESTS === 'true';
 const describeDb = runDbTests ? describe : describe.skip;
@@ -105,9 +106,7 @@ describeDb('db integration (real postgres)', () => {
 
     ({ app } = await import('../app.js'));
     ({ prisma } = await import('../lib/prisma.js'));
-    ({
-      Prisma: { JsonNull: prismaJsonNull },
-    } = await import('../generated/prisma/client.js'));
+    prismaJsonNull = Prisma.JsonNull;
   });
 
   beforeEach(async () => {

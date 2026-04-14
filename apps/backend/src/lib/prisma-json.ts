@@ -1,5 +1,5 @@
 import { DbNull, JsonNull } from '@prisma/client/runtime/client';
-import type { Prisma } from '../generated/prisma/client.js';
+import type { Prisma } from '@prisma/client';
 
 export type PrismaJsonValue = Prisma.InputJsonValue | Prisma.JsonNullValueInput;
 export type PrismaNullableJsonValue = Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput;
