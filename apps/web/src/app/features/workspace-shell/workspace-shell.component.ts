@@ -28,6 +28,8 @@ import { MainDashboardSidebarComponent } from '../main-dashboard/components/main
 import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/components/main-dashboard-utility-sidebar/main-dashboard-utility-sidebar.component';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
+import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
+import type { WorkspaceMember } from '../workspace-members/models/workspace-member.model';
 import type {
   EndpointsListMethodFilter,
   EndpointsListSortOption,
@@ -79,6 +81,7 @@ export class WorkspaceShellComponent {
   private readonly projectsRepository = inject(ProjectsRepository);
   private readonly endpointsRepository = inject(EndpointsRepository);
   private readonly globalConfigRepository = inject(GlobalConfigRepository);
+  private readonly workspaceMembersRepository = inject(WorkspaceMembersRepository);
 
   protected readonly projects = signal<DashboardProject[]>([]);
   protected readonly projectsPage = signal<PaginationState>({ limit: 25, offset: 0, total: 0, hasMore: false });
@@ -146,6 +149,17 @@ export class WorkspaceShellComponent {
     const id = this.selectedProjectId();
     return list.find((p) => p.id === id) ?? list[0] ?? null;
   });
+  protected readonly canMutateActiveWorkspace = computed(
+    () => this.activeProject()?.workspace.capabilities.canEdit ?? false,
+  );
+  protected readonly canManageActiveWorkspaceMembers = computed(
+    () => this.activeProject()?.workspace.capabilities.canManageMembers ?? false,
+  );
+
+  protected readonly workspaceMembers = signal<WorkspaceMember[]>([]);
+  protected readonly workspaceMembersLoading = signal(false);
+  protected readonly workspaceMembersError = signal<string | null>(null);
+  protected readonly workspaceMemberMutationPending = signal(false);
 
   protected readonly endpointList = signal<EndpointPreview[]>([]);
   protected readonly endpointListLoading = signal(false);
@@ -235,12 +249,14 @@ export class WorkspaceShellComponent {
   }
 
   protected openCreateProjectModal(): void {
+    if (!this.canMutateActiveWorkspace() && this.hasProjects()) return;
     this.createProjectError.set(null);
     this.createProjectPartialState.set(null);
     this.createProjectModalOpen.set(true);
   }
 
   protected openEditProjectModal(): void {
+    if (!this.canMutateActiveWorkspace()) return;
     const project = this.activeProject();
     if (!project) return;
 
@@ -276,6 +292,7 @@ export class WorkspaceShellComponent {
   }
 
   protected onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void {
+    if (!this.canMutateActiveWorkspace() && this.hasProjects()) return;
     this.createProjectModalOpen.set(true);
     void this.createProject({ name: payload.name, description: payload.description }, payload.endpointPrompt);
   }
@@ -303,6 +320,7 @@ export class WorkspaceShellComponent {
   }
 
   protected openDeleteProjectDialog(): void {
+    if (!this.canMutateActiveWorkspace()) return;
     const project = this.activeProject();
     if (!project) return;
 
@@ -391,7 +409,7 @@ export class WorkspaceShellComponent {
   }
 
   protected createEndpoint(): void {
-    if (!this.hasProjects()) return;
+    if (!this.hasProjects() || !this.canMutateActiveWorkspace()) return;
     this.endpointMutationError.set(null);
     this.navBeforeCreateFlow.set(this.activeNav());
     this.activeNav.set('endpoints');
@@ -401,7 +419,7 @@ export class WorkspaceShellComponent {
   }
 
   protected editEndpoint(ep: EndpointPreview): void {
-    if (!this.hasProjects()) return;
+    if (!this.hasProjects() || !this.canMutateActiveWorkspace()) return;
     this.endpointMutationError.set(null);
     this.navBeforeCreateFlow.set(this.activeNav());
     this.activeNav.set('endpoints');
@@ -429,6 +447,7 @@ export class WorkspaceShellComponent {
   }
 
   protected deleteEndpoint(endpointId: string): void {
+    if (!this.canMutateActiveWorkspace()) return;
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     if (!projectId || this.endpointMutationPending()) return;
     void this.deleteEndpointRemote(projectId, endpointId);
@@ -445,12 +464,14 @@ export class WorkspaceShellComponent {
   protected testAllEndpoints(): void {}
 
   protected exportConfig(): void {
+    if (!this.canMutateActiveWorkspace()) return;
     const project = this.activeProject();
     if (!project || this.endpointMutationPending()) return;
     void this.exportProjectConfiguration(project.id, project.slug);
   }
 
   protected importEndpoints(): void {
+    if (!this.canMutateActiveWorkspace()) return;
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     if (!projectId || this.endpointMutationPending()) return;
 
@@ -466,6 +487,7 @@ export class WorkspaceShellComponent {
   }
 
   protected editGlobalConfig(): void {
+    if (!this.canMutateActiveWorkspace()) return;
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     if (!projectId) return;
     this.globalConfigDrawerOpen.set(true);
@@ -480,11 +502,24 @@ export class WorkspaceShellComponent {
   }
 
   protected onGlobalConfigSaved(cfg: GlobalConfig): void {
+    if (!this.canMutateActiveWorkspace()) return;
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     if (!projectId || this.globalConfigSaving()) return;
     this.globalConfigSaving.set(true);
     this.globalConfigError.set(null);
     void this.saveGlobalConfig(projectId, cfg);
+  }
+
+  protected addWorkspaceMember(input: { email: string; role: 'owner' | 'editor' | 'viewer' }): void {
+    const workspaceId = this.activeProject()?.workspace.id;
+    if (!workspaceId || !this.canManageActiveWorkspaceMembers() || this.workspaceMemberMutationPending()) return;
+    void this.addWorkspaceMemberRemote(workspaceId, input);
+  }
+
+  protected removeWorkspaceMember(memberUserId: string): void {
+    const workspaceId = this.activeProject()?.workspace.id;
+    if (!workspaceId || !this.canManageActiveWorkspaceMembers() || this.workspaceMemberMutationPending()) return;
+    void this.removeWorkspaceMemberRemote(workspaceId, memberUserId);
   }
 
   protected retryLoadProjects(): void {
@@ -532,6 +567,11 @@ export class WorkspaceShellComponent {
         projectItems.find((project) => project.id === currentSelected)?.id ?? projectItems[0]?.id ?? '';
       this.selectedProjectId.set(nextSelected);
 
+      if (!nextSelected) {
+        this.workspaceMembers.set([]);
+        this.workspaceMembersError.set(null);
+      }
+
       if (!this.endpointList().some((endpoint) => endpoint.id === this.selectedEndpointId())) {
         this.selectedEndpointId.set(null);
       }
@@ -560,6 +600,8 @@ export class WorkspaceShellComponent {
       this.projects.set([]);
       this.projectsPage.set({ limit: WorkspaceShellComponent.PROJECT_PAGE_LIMIT, offset: 0, total: 0, hasMore: false });
       this.endpointList.set([]);
+      this.workspaceMembers.set([]);
+      this.workspaceMembersError.set(null);
       this.selectedProjectId.set('');
       this.projectsError.set(error instanceof Error ? error.message : 'Could not load projects.');
     } finally {
@@ -575,6 +617,7 @@ export class WorkspaceShellComponent {
     try {
       const refreshed = await this.projectsRepository.getProject(projectId);
       this.projects.update((projects) => projects.map((project) => (project.id === projectId ? refreshed : project)));
+      await this.reloadWorkspaceMembers(refreshed.workspace.id);
       await this.reloadEndpointList(projectId);
     } catch (error) {
       this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not refresh project data.');
@@ -595,6 +638,7 @@ export class WorkspaceShellComponent {
       this.projects.update((projects) =>
         projects.map((project) => (project.id === projectId ? summaryProject : project)),
       );
+      await this.reloadWorkspaceMembers(summaryProject.workspace.id);
     } catch (error) {
       if (requestId !== this.activeSummaryRequestId) {
         return;
@@ -883,6 +927,10 @@ export class WorkspaceShellComponent {
     this.selectedLog.set(null);
     this.selectedEndpointId.set(null);
     this.endpointMutationError.set(null);
+    this.workspaceMembers.set([]);
+    this.workspaceMembersLoading.set(false);
+    this.workspaceMembersError.set(null);
+    this.workspaceMemberMutationPending.set(false);
     this.closeCreateEndpointWizard(false);
     this.globalConfigDrawerOpen.set(false);
     this.globalConfigLoading.set(false);
@@ -912,6 +960,52 @@ export class WorkspaceShellComponent {
       this.globalConfigError.set(error instanceof Error ? error.message : 'Could not save global config.');
     } finally {
       this.globalConfigSaving.set(false);
+    }
+  }
+
+  private async reloadWorkspaceMembers(workspaceId: string): Promise<void> {
+    this.workspaceMembersLoading.set(true);
+    this.workspaceMembersError.set(null);
+
+    try {
+      const members = await this.workspaceMembersRepository.listMembers(workspaceId);
+      this.workspaceMembers.set(members);
+    } catch (error) {
+      this.workspaceMembers.set([]);
+      this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not load workspace members.');
+    } finally {
+      this.workspaceMembersLoading.set(false);
+    }
+  }
+
+  private async addWorkspaceMemberRemote(
+    workspaceId: string,
+    input: { email: string; role: 'owner' | 'editor' | 'viewer' },
+  ): Promise<void> {
+    this.workspaceMemberMutationPending.set(true);
+    this.workspaceMembersError.set(null);
+
+    try {
+      await this.workspaceMembersRepository.addMember(workspaceId, input);
+      await this.reloadWorkspaceMembers(workspaceId);
+    } catch (error) {
+      this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not add workspace member.');
+    } finally {
+      this.workspaceMemberMutationPending.set(false);
+    }
+  }
+
+  private async removeWorkspaceMemberRemote(workspaceId: string, memberUserId: string): Promise<void> {
+    this.workspaceMemberMutationPending.set(true);
+    this.workspaceMembersError.set(null);
+
+    try {
+      await this.workspaceMembersRepository.removeMember(workspaceId, memberUserId);
+      await this.reloadWorkspaceMembers(workspaceId);
+    } catch (error) {
+      this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not remove workspace member.');
+    } finally {
+      this.workspaceMemberMutationPending.set(false);
     }
   }
 }

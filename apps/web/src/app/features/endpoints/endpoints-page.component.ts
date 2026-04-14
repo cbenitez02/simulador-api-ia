@@ -22,6 +22,7 @@ export class EndpointsPageComponent {
   readonly sortOption = input<EndpointsListSortOption>('path-asc');
   readonly loading = input(false);
   readonly hasMore = input(false);
+  readonly canMutate = input(true);
 
   readonly endpointSelect = output<string>();
   readonly createEndpoint = output<void>();

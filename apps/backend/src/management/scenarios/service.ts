@@ -19,7 +19,7 @@ export async function createScenario(
   endpointId: string,
   input: CreateScenarioInput
 ) {
-  await authorizeEndpointAccess(actor, endpointId);
+  await authorizeEndpointAccess(actor, endpointId, 'mutate');
 
   return prisma.scenario.create({
     data: {
@@ -40,7 +40,7 @@ export async function updateScenario(
   scenarioId: string,
   input: UpdateScenarioInput
 ) {
-  await authorizeEndpointAccess(actor, endpointId);
+  await authorizeEndpointAccess(actor, endpointId, 'mutate');
 
   const scenario = await prisma.scenario.findFirst({
     where: { id: scenarioId, endpointId },
@@ -69,7 +69,7 @@ export async function deleteScenario(
   endpointId: string,
   scenarioId: string
 ): Promise<void> {
-  await authorizeEndpointAccess(actor, endpointId);
+  await authorizeEndpointAccess(actor, endpointId, 'mutate');
 
   const scenario = await prisma.scenario.findFirst({
     where: { id: scenarioId, endpointId },

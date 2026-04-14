@@ -7,8 +7,8 @@
           <button
             type="button"
             class="utility__action"
-            [disabled]="action.disabled === true"
-            [attr.aria-disabled]="action.disabled === true"
+            [disabled]="action.disabled === true || (!canMutate() && action.id !== 'test')"
+            [attr.aria-disabled]="action.disabled === true || (!canMutate() && action.id !== 'test')"
             [title]="action.disabled ? action.subtitle : null"
             (click)="onQuickAction(action.id)"
           >
@@ -75,6 +75,75 @@
     </div>
   </section>
 
+  <section class="utility__section" aria-labelledby="utility-members-heading">
+    <h2 id="utility-members-heading" class="utility__label">Workspace members</h2>
+    <div class="utility__config-card utility__members-card">
+      <div class="utility__members-header">
+        <span class="utility__members-role">Your role: {{ workspaceRoleLabel() }}</span>
+      </div>
+
+      @if (workspaceMembersError()) {
+        <p class="utility__members-error">{{ workspaceMembersError() }}</p>
+      }
+
+      @if (workspaceMembersLoading()) {
+        <p class="utility__activity-empty">Loading members…</p>
+      } @else if (workspaceMembers().length > 0) {
+        <ul class="utility__members-list" role="list">
+          @for (member of workspaceMembers(); track member.userId) {
+            <li class="utility__members-row">
+              <div class="utility__members-meta">
+                <strong>{{ member.displayName || member.email || member.userId }}</strong>
+                <span>{{ member.email || 'No email' }} · {{ member.role }}</span>
+              </div>
+              @if (canManageMembers()) {
+                <button
+                  type="button"
+                  class="utility__members-remove"
+                  [disabled]="workspaceMemberMutationPending()"
+                  (click)="onRemoveMember(member.userId)"
+                >
+                  Remove
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="utility__activity-empty">No workspace members yet.</p>
+      }
+
+      @if (canManageMembers()) {
+        <form
+          class="utility__members-form"
+          #memberForm="ngForm"
+          (ngSubmit)="addMember(memberEmail.value, memberRole.value); memberForm.resetForm({ role: 'viewer' })"
+        >
+          <input
+            #memberEmail
+            type="email"
+            name="email"
+            required
+            placeholder="colleague@example.com"
+            class="utility__members-input"
+          />
+          <select #memberRole name="role" class="utility__members-select">
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option>
+            <option value="owner">Owner</option>
+          </select>
+          <button
+            type="submit"
+            class="utility__config-btn"
+            [disabled]="workspaceMemberMutationPending() || !memberForm.form.valid"
+          >
+            Add member
+          </button>
+        </form>
+      }
+    </div>
+  </section>
+
   <section class="utility__section utility__section--footer" aria-labelledby="utility-global-heading">
     <h2 id="utility-global-heading" class="utility__label">Global config</h2>
     <div class="utility__config-card">
@@ -88,7 +157,7 @@
           </li>
         }
       </ul>
-      <button type="button" class="utility__config-btn" (click)="editGlobalConfig.emit()">
+      <button type="button" class="utility__config-btn" [disabled]="!canMutate()" (click)="editGlobalConfig.emit()">
         <svg lucideSettings [size]="18" strokeWidth="1.75" aria-hidden="true"></svg>
         Edit global config
       </button>

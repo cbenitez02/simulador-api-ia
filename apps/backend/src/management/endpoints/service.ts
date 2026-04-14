@@ -133,7 +133,7 @@ export async function getEndpointById(
   projectId: string,
   endpointId: string
 ) {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'read');
 
   const endpoint = await prisma.endpoint.findFirst({
     where: { id: endpointId, projectId },
@@ -155,7 +155,7 @@ export async function createEndpoint(
   projectId: string,
   input: CreateEndpointInput
 ) {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   const duplicatedEndpoint = await prisma.endpoint.findFirst({
     where: {
@@ -204,7 +204,7 @@ export async function updateEndpoint(
   endpointId: string,
   input: UpdateEndpointInput
 ) {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   const endpoint = await prisma.endpoint.findFirst({
     where: { id: endpointId, projectId },
@@ -236,7 +236,7 @@ export async function deleteEndpoint(
   projectId: string,
   endpointId: string
 ): Promise<void> {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   const endpoint = await prisma.endpoint.findFirst({
     where: { id: endpointId, projectId },

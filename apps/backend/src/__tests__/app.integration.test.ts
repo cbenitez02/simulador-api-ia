@@ -8,6 +8,7 @@ const runtimeRateLimitBuckets = new Map<string, { requestCount: number }>();
 
 const prismaMock = {
   user: {
+    findFirst: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
   },
@@ -15,7 +16,10 @@ const prismaMock = {
     create: vi.fn(),
   },
   workspaceMembership: {
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
     create: vi.fn(),
+    delete: vi.fn(),
   },
   externalIdentity: {
     findUnique: vi.fn(),
@@ -98,6 +102,24 @@ function authHeaders(overrides: Record<string, string> = {}) {
     'x-clerk-email-verified': 'true',
     'x-clerk-display-name': 'Owner User',
     ...overrides,
+  };
+}
+
+function buildActorIdentity(role: 'owner' | 'editor' | 'viewer' = 'owner') {
+  return {
+    provider: 'clerk',
+    subject: 'user_clerk_123',
+    email: 'owner@example.com',
+    emailVerified: true,
+    displayName: 'Owner User',
+    userId: 'user-1',
+    user: {
+      id: 'user-1',
+      email: 'owner@example.com',
+      displayName: 'Owner User',
+      memberships: [{ workspaceId: 'workspace-1', role }],
+      personalWorkspace: { id: 'workspace-1' },
+    },
   };
 }
 
@@ -216,21 +238,7 @@ describe('app integration', () => {
       projectId: 'p1',
       project: { workspaceId: 'workspace-1' },
     });
-    prismaMock.externalIdentity.findUnique.mockResolvedValue({
-      provider: 'clerk',
-      subject: 'user_clerk_123',
-      email: 'owner@example.com',
-      emailVerified: true,
-      displayName: 'Owner User',
-      userId: 'user-1',
-      user: {
-        id: 'user-1',
-        email: 'owner@example.com',
-        displayName: 'Owner User',
-        memberships: [{ workspaceId: 'workspace-1', role: 'owner' }],
-        personalWorkspace: { id: 'workspace-1' },
-      },
-    });
+    prismaMock.externalIdentity.findUnique.mockResolvedValue(buildActorIdentity());
   });
 
   it('rechaza /api/v1 sin identidad autenticada', async () => {
@@ -349,6 +357,7 @@ describe('app integration', () => {
     prismaMock.project.findMany.mockResolvedValueOnce([
       {
         id: 'p2',
+        workspaceId: 'workspace-1',
         name: 'Proyecto 2',
         slug: 'proyecto-2',
         description: '',
@@ -384,6 +393,7 @@ describe('app integration', () => {
         create: vi.fn().mockResolvedValue({ id: 'p1' }),
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: 'p1',
+          workspaceId: 'workspace-1',
           name: 'Mi API',
           slug: 'mi-api',
           description: '',
@@ -412,6 +422,7 @@ describe('app integration', () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     prismaMock.project.update.mockResolvedValueOnce({
       id: 'p1',
+      workspaceId: 'workspace-1',
       name: 'Mi API v2',
       slug: 'mi-api',
       description: 'Nuevo texto',
@@ -427,6 +438,93 @@ describe('app integration', () => {
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('Mi API v2');
     expect(response.body.slug).toBe('mi-api');
+  });
+
+  it('permite a viewer acceder a dashboard summary y expone rol/capabilities del workspace', async () => {
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('viewer'));
+    const { env } = await import('../config/env.js');
+    const originalMockBaseUrl = env.MOCK_BASE_URL;
+    env.MOCK_BASE_URL = 'https://mock.example.com/public-base';
+
+    try {
+      prismaMock.project.findUnique.mockResolvedValueOnce({
+        id: 'p1',
+        workspaceId: 'workspace-1',
+        name: 'Proyecto',
+        slug: 'proyecto',
+        description: 'Demo',
+        updatedAt: new Date('2026-04-08T10:00:00.000Z'),
+        globalConfig: null,
+      });
+      prismaMock.endpoint.findMany.mockResolvedValueOnce([]);
+      prismaMock.endpoint.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+      prismaMock.scenario.count.mockResolvedValueOnce(0);
+      prismaMock.apiLog.aggregate.mockResolvedValueOnce({
+        _count: { _all: 0 },
+        _avg: { latencyMs: null },
+      });
+      prismaMock.apiLog.count.mockResolvedValueOnce(0);
+      prismaMock.apiLog.findMany.mockResolvedValueOnce([]);
+      prismaMock.apiLog.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const response = await request(app)
+        .get('/api/v1/projects/p1/dashboard-summary')
+        .set(authHeaders());
+
+      expect(response.status).toBe(200);
+      expect(response.body.project.workspace).toEqual({
+        id: 'workspace-1',
+        role: 'viewer',
+        capabilities: { canEdit: false, canManageMembers: false },
+      });
+    } finally {
+      env.MOCK_BASE_URL = originalMockBaseUrl;
+    }
+  });
+
+  it('rechaza mutaciones de proyecto para viewer', async () => {
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('viewer'));
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({ name: 'No permitido' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('WORKSPACE_MUTATION_DENIED');
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('permite mutaciones de proyecto para editor', async () => {
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('editor'));
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.project.update.mockResolvedValueOnce({
+      id: 'p1',
+      workspaceId: 'workspace-1',
+      name: 'Editado',
+      slug: 'mi-api',
+      description: 'Nuevo texto',
+      globalConfig: { projectId: 'p1' },
+      _count: { endpoints: 0 },
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({ name: 'Editado' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.workspace).toEqual({
+      id: 'workspace-1',
+      role: 'editor',
+      capabilities: { canEdit: true, canManageMembers: false },
+    });
   });
 
   it('PATCH /api/v1/projects/:projectId responde 404 si el proyecto no existe', async () => {
@@ -645,6 +743,11 @@ describe('app integration', () => {
         description: 'Demo',
         slug: 'proyecto',
         mockUrl: 'https://mock.example.com/public-base/proyecto',
+        workspace: {
+          id: 'workspace-1',
+          role: 'owner',
+          capabilities: { canEdit: true, canManageMembers: true },
+        },
         updatedAt: '2026-04-08T10:00:00.000Z',
         status: 'attention',
       });
@@ -711,6 +814,104 @@ describe('app integration', () => {
     } finally {
       env.MOCK_BASE_URL = originalMockBaseUrl;
     }
+  });
+
+  it('permite a viewer listar miembros del workspace activo', async () => {
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('viewer'));
+    prismaMock.workspaceMembership.findMany.mockResolvedValueOnce([
+      {
+        userId: 'user-1',
+        role: 'owner',
+        createdAt: new Date('2026-04-08T09:00:00.000Z'),
+        user: { email: 'owner@example.com', displayName: 'Owner User' },
+      },
+      {
+        userId: 'user-2',
+        role: 'viewer',
+        createdAt: new Date('2026-04-08T09:05:00.000Z'),
+        user: { email: 'viewer@example.com', displayName: 'Viewer User' },
+      },
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/workspaces/workspace-1/members')
+      .set(authHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.items).toEqual([
+      {
+        userId: 'user-1',
+        email: 'owner@example.com',
+        displayName: 'Owner User',
+        role: 'owner',
+        createdAt: '2026-04-08T09:00:00.000Z',
+      },
+      {
+        userId: 'user-2',
+        email: 'viewer@example.com',
+        displayName: 'Viewer User',
+        role: 'viewer',
+        createdAt: '2026-04-08T09:05:00.000Z',
+      },
+    ]);
+  });
+
+  it('rechaza alta de miembros para editor', async () => {
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('editor'));
+
+    const response = await request(app)
+      .post('/api/v1/workspaces/workspace-1/members')
+      .set(authHeaders())
+      .send({ email: 'viewer@example.com', role: 'viewer' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('WORKSPACE_OWNER_REQUIRED');
+  });
+
+  it('permite a owner agregar y remover miembros del workspace', async () => {
+    prismaMock.user.findFirst.mockResolvedValueOnce({
+      id: 'user-2',
+      email: 'viewer@example.com',
+      displayName: 'Viewer User',
+    });
+    prismaMock.workspaceMembership.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ userId: 'user-2' });
+    prismaMock.workspaceMembership.create.mockResolvedValueOnce({
+      userId: 'user-2',
+      role: 'viewer',
+      createdAt: new Date('2026-04-08T09:10:00.000Z'),
+      user: { email: 'viewer@example.com', displayName: 'Viewer User' },
+    });
+    prismaMock.workspaceMembership.delete.mockResolvedValueOnce({ userId: 'user-2' });
+
+    const addResponse = await request(app)
+      .post('/api/v1/workspaces/workspace-1/members')
+      .set(authHeaders())
+      .send({ email: 'viewer@example.com', role: 'viewer' });
+
+    expect(addResponse.status).toBe(201);
+    expect(addResponse.body).toEqual({
+      userId: 'user-2',
+      email: 'viewer@example.com',
+      displayName: 'Viewer User',
+      role: 'viewer',
+      createdAt: '2026-04-08T09:10:00.000Z',
+    });
+
+    const deleteResponse = await request(app)
+      .delete('/api/v1/workspaces/workspace-1/members/user-2')
+      .set(authHeaders());
+
+    expect(deleteResponse.status).toBe(204);
+    expect(prismaMock.workspaceMembership.delete).toHaveBeenCalledWith({
+      where: {
+        workspaceId_userId: {
+          workspaceId: 'workspace-1',
+          userId: 'user-2',
+        },
+      },
+    });
   });
 
   it('GET /api/v1/projects/:projectId/dashboard-summary responde 404 cuando falta el proyecto', async () => {

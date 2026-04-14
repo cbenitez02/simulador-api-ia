@@ -10,12 +10,38 @@ export interface ApiErrorDto {
   details?: unknown;
 }
 
+export type WorkspaceRoleDto = 'owner' | 'editor' | 'viewer';
+
+export interface WorkspaceCapabilitiesDto {
+  canEdit: boolean;
+  canManageMembers: boolean;
+}
+
+export interface WorkspaceSummaryDto {
+  id: string;
+  role: WorkspaceRoleDto;
+  capabilities: WorkspaceCapabilitiesDto;
+}
+
+export interface WorkspaceMemberDto {
+  userId: string;
+  email: string | null;
+  displayName: string | null;
+  role: WorkspaceRoleDto;
+  createdAt: string;
+}
+
+export interface WorkspaceMembersListDto {
+  items: WorkspaceMemberDto[];
+}
+
 export interface ProjectDto {
   id: string;
   name: string;
   slug: string;
   description: string;
   updatedAt: string;
+  workspace: WorkspaceSummaryDto;
   _count: { endpoints: number };
 }
 
@@ -198,6 +224,7 @@ export interface DashboardSummaryDto {
     description: string;
     slug: string;
     mockUrl: string;
+    workspace: WorkspaceSummaryDto;
     updatedAt: string;
     status: DashboardProjectStatusDto;
   };

@@ -164,7 +164,7 @@ export async function clearProjectLogs(
   actor: AuthenticatedActor,
   projectId: string
 ): Promise<void> {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   await prisma.apiLog.deleteMany({
     where: { projectId },

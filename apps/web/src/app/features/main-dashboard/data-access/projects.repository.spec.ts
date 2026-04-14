@@ -10,6 +10,11 @@ const projectDto = {
   slug: 'users',
   description: '',
   updatedAt: new Date().toISOString(),
+  workspace: {
+    id: 'workspace-1',
+    role: 'owner' as const,
+    capabilities: { canEdit: true, canManageMembers: true },
+  },
   _count: { endpoints: 1 },
 };
 
@@ -20,6 +25,11 @@ const dashboardSummaryDto = {
     description: '',
     slug: 'users',
     mockUrl: 'https://mock.example.com/users',
+    workspace: {
+      id: 'workspace-1',
+      role: 'owner' as const,
+      capabilities: { canEdit: true, canManageMembers: true },
+    },
     updatedAt: new Date().toISOString(),
     status: 'running' as const,
   },

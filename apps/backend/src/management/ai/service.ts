@@ -260,7 +260,7 @@ export async function generateEndpointPreview(
   projectId: string,
   prompt: string
 ) {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   return generateNormalizedDraft(prompt);
 }
@@ -270,7 +270,7 @@ export async function generateEndpointWithAi(
   projectId: string,
   prompt: string
 ) {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   const previewDraft = await generateNormalizedDraft(prompt);
   return persistGeneratedEndpoint(projectId, toPersistedDraft(previewDraft));

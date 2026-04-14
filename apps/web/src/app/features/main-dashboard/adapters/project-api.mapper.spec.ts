@@ -27,6 +27,11 @@ describe('project-api.mapper', () => {
         description: '',
         slug: 'users-api',
         mockUrl: 'https://mock.example.com/users-api',
+        workspace: {
+          id: 'workspace-1',
+          role: 'editor',
+          capabilities: { canEdit: true, canManageMembers: false },
+        },
         updatedAt: new Date().toISOString(),
         status: 'attention',
       },
@@ -77,6 +82,8 @@ describe('project-api.mapper', () => {
     });
 
     expect(result.status).toBe('attention');
+    expect(result.workspace.role).toBe('editor');
+    expect(result.workspace.capabilities.canManageMembers).toBe(false);
     expect(result.mockUrl).toBe('https://mock.example.com/users-api');
     expect(result.description).toBe('Your mock API workspace.');
     expect(result.metrics.totalScenarios).toBe(3);
@@ -99,6 +106,11 @@ describe('project-api.mapper', () => {
         description: 'Seedless',
         slug: 'empty-api',
         mockUrl: 'https://mock.example.com/empty-api',
+        workspace: {
+          id: 'workspace-1',
+          role: 'viewer',
+          capabilities: { canEdit: false, canManageMembers: false },
+        },
         updatedAt: new Date().toISOString(),
         status: 'empty',
       },
@@ -144,6 +156,11 @@ describe('project-api.mapper', () => {
       slug: 'generated-api',
       description: '',
       updatedAt: new Date().toISOString(),
+      workspace: {
+        id: 'workspace-1',
+        role: 'owner',
+        capabilities: { canEdit: true, canManageMembers: true },
+      },
       _count: { endpoints: 0 },
     });
 
@@ -157,6 +174,11 @@ describe('project-api.mapper', () => {
       slug: 'generated-api',
       description: '',
       updatedAt: new Date().toISOString(),
+      workspace: {
+        id: 'workspace-1',
+        role: 'owner',
+        capabilities: { canEdit: true, canManageMembers: true },
+      },
       _count: { endpoints: 2 },
     });
 

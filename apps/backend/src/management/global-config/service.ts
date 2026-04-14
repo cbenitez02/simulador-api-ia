@@ -31,7 +31,7 @@ export async function upsertGlobalConfig(
   projectId: string,
   input: UpsertGlobalConfigInput
 ) {
-  await authorizeProjectAccess(actor, projectId);
+  await authorizeProjectAccess(actor, projectId, 'mutate');
 
   const canonical = canonicalizeGlobalConfig(input);
 

@@ -37,7 +37,7 @@ export async function upsertEndpointConfig(
   endpointId: string,
   input: UpsertEndpointConfigInput
 ) {
-  await authorizeEndpointAccess(actor, endpointId);
+  await authorizeEndpointAccess(actor, endpointId, 'mutate');
 
   const canonical = canonicalizeEndpointConfig(input);
 

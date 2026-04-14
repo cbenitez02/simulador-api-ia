@@ -1,3 +1,7 @@
+export const WORKSPACE_ROLE_VALUES = ['owner', 'editor', 'viewer'] as const;
+
+export type WorkspaceRole = (typeof WORKSPACE_ROLE_VALUES)[number];
+
 export interface ResolvedExternalIdentity {
   provider: string;
   subject: string;
@@ -8,7 +12,18 @@ export interface ResolvedExternalIdentity {
 
 export interface WorkspaceMembershipActor {
   workspaceId: string;
-  role: string;
+  role: WorkspaceRole;
+}
+
+export interface WorkspaceCapabilities {
+  canEdit: boolean;
+  canManageMembers: boolean;
+}
+
+export interface WorkspaceAccessSummary {
+  id: string;
+  role: WorkspaceRole;
+  capabilities: WorkspaceCapabilities;
 }
 
 export interface AuthenticatedActor {

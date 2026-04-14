@@ -37,6 +37,7 @@ export class MainDashboardDataComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly project = input.required<DashboardProject>();
+  readonly canMutate = input(true);
 
   readonly openLogs = output<void>();
   readonly openEndpoints = output<void>();

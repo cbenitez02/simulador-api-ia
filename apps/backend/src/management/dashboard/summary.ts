@@ -20,6 +20,7 @@ type ProjectRecord = {
   name: string;
   description: string;
   slug: string;
+  workspace: DashboardSummaryDto['project']['workspace'];
   updatedAt: Date;
   globalConfig: {
     latencyEnabled: boolean;
@@ -185,6 +186,7 @@ export function buildDashboardSummary(input: {
       description: input.project.description,
       slug: input.project.slug,
       mockUrl: joinMockProjectUrl(input.mockBaseUrl, input.project.slug),
+      workspace: input.project.workspace,
       updatedAt: input.project.updatedAt.toISOString(),
       status: input.projectStatus,
     },
