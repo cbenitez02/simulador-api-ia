@@ -63,6 +63,7 @@ type WorkspaceShellTestApi = {
   openDeleteProjectDialog(): void;
   closeDeleteProjectDialog(): void;
   confirmDeleteProject(): void;
+  createEndpoint(): void;
   onGlobalConfigSaved(config: GlobalConfig): void;
   addWorkspaceMember(input: { email: string; role: 'owner' | 'editor' | 'viewer' }): void;
   removeWorkspaceMember(memberUserId: string): void;
