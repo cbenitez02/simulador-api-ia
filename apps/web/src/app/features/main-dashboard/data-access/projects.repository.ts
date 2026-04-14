@@ -3,20 +3,46 @@ import { ApiClient } from '../../../shared/http/api-client';
 import type {
   CreateProjectDto,
   DashboardSummaryDto,
+  PagedResponseDto,
   ProjectDto,
   UpdateProjectDto,
 } from '../../../shared/http/api.types';
 import type { DashboardProject } from '../models/dashboard-project.model';
 import { mapCreatedProjectPlaceholder, mapDashboardProjectFromApi } from '../adapters/project-api.mapper';
 
+export interface ProjectListQuery {
+  limit?: number;
+  offset?: number;
+  q?: string;
+}
+
+export interface PagedProjectsResult {
+  items: DashboardProject[];
+  page: PagedResponseDto<ProjectDto>['page'];
+}
+
+function buildProjectsQueryString(query: ProjectListQuery = {}): string {
+  const params = new URLSearchParams();
+
+  if (query.limit !== undefined) params.set('limit', String(query.limit));
+  if (query.offset !== undefined) params.set('offset', String(query.offset));
+  if (query.q?.trim()) params.set('q', query.q.trim());
+
+  const text = params.toString();
+  return text ? `?${text}` : '';
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectsRepository {
   private readonly api = inject(ApiClient);
 
-  async listProjects(): Promise<DashboardProject[]> {
-    const projects = await this.api.get<ProjectDto[]>('/projects');
+  async listProjects(query: ProjectListQuery = {}): Promise<PagedProjectsResult> {
+    const response = await this.api.get<PagedResponseDto<ProjectDto>>(`/projects${buildProjectsQueryString(query)}`);
 
-    return projects.map(mapCreatedProjectPlaceholder);
+    return {
+      items: response.items.map(mapCreatedProjectPlaceholder),
+      page: response.page,
+    };
   }
 
   async createProject(input: CreateProjectDto): Promise<DashboardProject> {

@@ -88,9 +88,11 @@
   </div>
 
   <ul class="list__items" role="list">
-    @if (filteredEndpoints().length === 0) {
+    @if (endpoints().length === 0) {
       <li class="list__empty" role="status">
-        @if (endpoints().length === 0) {
+        @if (loading()) {
+          Loading endpoints...
+        } @else if (!searchQuery() && methodFilter() === 'all') {
           <span class="list__empty-copy">
             This project has no endpoints yet. Use Create endpoint to
             <button
@@ -108,7 +110,7 @@
         }
       </li>
     } @else {
-      @for (ep of filteredEndpoints(); track ep.id) {
+      @for (ep of endpoints(); track ep.id) {
         <li>
           <button
             type="button"
@@ -134,4 +136,10 @@
       }
     }
   </ul>
+
+  @if (hasMore()) {
+    <div class="list__footer">
+      <button type="button" class="list__empty-link" (click)="requestLoadMore()">Load more endpoints</button>
+    </div>
+  }
 </div>

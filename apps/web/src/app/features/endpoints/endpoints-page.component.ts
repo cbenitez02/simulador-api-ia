@@ -1,6 +1,10 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { EndpointsListComponent } from './components/endpoints-list/endpoints-list.component';
+import type {
+  EndpointsListMethodFilter,
+  EndpointsListSortOption,
+} from './components/endpoints-list/endpoints-list.constants';
 
 @Component({
   selector: 'app-endpoints-page',
@@ -13,7 +17,16 @@ import { EndpointsListComponent } from './components/endpoints-list/endpoints-li
 export class EndpointsPageComponent {
   readonly endpoints = input.required<EndpointPreview[]>();
   readonly selectedEndpointId = input<string | null>(null);
+  readonly searchQuery = input('');
+  readonly methodFilter = input<EndpointsListMethodFilter>('all');
+  readonly sortOption = input<EndpointsListSortOption>('path-asc');
+  readonly loading = input(false);
+  readonly hasMore = input(false);
 
   readonly endpointSelect = output<string>();
   readonly createEndpoint = output<void>();
+  readonly searchQueryChange = output<string>();
+  readonly methodFilterChange = output<EndpointsListMethodFilter>();
+  readonly sortOptionChange = output<EndpointsListSortOption>();
+  readonly loadMore = output<void>();
 }

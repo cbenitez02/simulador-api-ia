@@ -73,20 +73,23 @@ describe('ProjectsRepository', () => {
   it('loads projects without endpoint fan-out and keeps placeholder counts for the sidebar list', async () => {
     const api = {
       get: vi.fn(async (path: string) => {
-        if (path === '/projects') return [projectDto];
+        if (path === '/projects?limit=25') {
+          return { items: [projectDto], page: { limit: 25, offset: 0, total: 1, hasMore: false } };
+        }
         throw new Error(`Unexpected GET ${path}`);
       }),
     };
 
     const repository = createRepository(api);
-    const result = await repository.listProjects();
+    const result = await repository.listProjects({ limit: 25 });
 
     expect(api.get).toHaveBeenCalledTimes(1);
-    expect(api.get).toHaveBeenCalledWith('/projects');
-    expect(result[0]?.metrics.totalEndpoints).toBe(1);
-    expect(result[0]?.endpointRows).toHaveLength(1);
-    expect(result[0]?.endpoints).toHaveLength(1);
-    expect(result[0]?.endpoints[0]?.path).toBe('Endpoint 1');
+    expect(api.get).toHaveBeenCalledWith('/projects?limit=25');
+    expect(result.page.total).toBe(1);
+    expect(result.items[0]?.metrics.totalEndpoints).toBe(1);
+    expect(result.items[0]?.endpointRows).toHaveLength(1);
+    expect(result.items[0]?.endpoints).toHaveLength(1);
+    expect(result.items[0]?.endpoints[0]?.path).toBe('Endpoint 1');
   });
 
   it('updates a project with a partial payload and remaps the refreshed project', async () => {

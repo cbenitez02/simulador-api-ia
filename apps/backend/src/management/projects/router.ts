@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { requireRequestActor } from '../../auth/request-context.js';
-import { createProjectSchema, projectParamsSchema, updateProjectSchema } from './schema.js';
+import {
+  createProjectSchema,
+  listProjectsQuerySchema,
+  projectParamsSchema,
+  updateProjectSchema,
+} from './schema.js';
 import {
   createProject,
   deleteProject,
@@ -13,7 +18,9 @@ export const projectsRouter = Router();
 
 projectsRouter.get('/', async (_req, res, next) => {
   try {
-    const projects = await listProjects(requireRequestActor(_req));
+    const actor = requireRequestActor(_req);
+    const query = listProjectsQuerySchema.parse(_req.query);
+    const projects = await listProjects(actor, query);
     res.status(200).json(projects);
   } catch (error) {
     next(error);

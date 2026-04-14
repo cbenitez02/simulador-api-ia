@@ -139,8 +139,17 @@
     <app-endpoints-page
       [endpoints]="endpoints()"
       [selectedEndpointId]="selectedEndpointId()"
+      [searchQuery]="endpointListState().q"
+      [methodFilter]="endpointListState().method"
+      [sortOption]="endpointListState().sort"
+      [loading]="endpointListLoading()"
+      [hasMore]="endpointListState().hasMore"
       (endpointSelect)="selectEndpoint($event)"
       (createEndpoint)="createEndpoint()"
+      (searchQueryChange)="updateEndpointSearch($event)"
+      (methodFilterChange)="updateEndpointMethodFilter($event)"
+      (sortOptionChange)="updateEndpointSort($event)"
+      (loadMore)="loadMoreEndpoints()"
     />
   </main>
 }

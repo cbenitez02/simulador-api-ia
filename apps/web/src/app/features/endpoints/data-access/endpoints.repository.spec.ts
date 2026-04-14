@@ -110,6 +110,58 @@ describe('EndpointsRepository', () => {
     expect(result.id).toBe('e1');
   });
 
+  it('loads paged endpoint summaries with server-side filters', async () => {
+    const api = {
+      get: vi.fn(async (path: string) => {
+        if (path === '/projects/p1/endpoints?limit=25&offset=0&q=user&method=GET&sort=method') {
+          return {
+            items: [
+              {
+                id: 'e1',
+                projectId: 'p1',
+                method: 'GET',
+                path: '/users',
+                description: 'List users',
+                statusCode: 200,
+                updatedAt: new Date().toISOString(),
+                scenarioCount: 2,
+                latencyMs: 120,
+              },
+            ],
+            page: { limit: 25, offset: 0, total: 1, hasMore: false },
+          };
+        }
+
+        throw new Error(`Unexpected GET ${path}`);
+      }),
+      post: vi.fn(),
+      put: vi.fn(),
+      patch: vi.fn(),
+      delete: vi.fn(),
+    };
+
+    const repository = createRepository(api);
+    const result = await repository.listEndpoints('p1', {
+      limit: 25,
+      offset: 0,
+      q: 'user',
+      method: 'GET',
+      sort: 'method',
+    });
+
+    expect(api.get).toHaveBeenCalledWith('/projects/p1/endpoints?limit=25&offset=0&q=user&method=GET&sort=method');
+    expect(result.page.total).toBe(1);
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: 'e1',
+        method: 'GET',
+        path: '/users',
+        latencyMs: 120,
+        statusCode: 200,
+      }),
+    ]);
+  });
+
   it('updates existing endpoints and reconciles create-update-delete scenario operations', async () => {
     const api = {
       post: vi.fn(async () => ({ id: 'created-scenario' })),

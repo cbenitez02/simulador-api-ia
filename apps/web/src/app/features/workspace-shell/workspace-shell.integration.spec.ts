@@ -170,6 +170,13 @@ describe('WorkspaceShellComponent integration', () => {
     };
   }
 
+  function createProjectListResponse(endpointCount: number) {
+    return {
+      items: [createProjectListItem(endpointCount)],
+      page: { limit: 25, offset: 0, total: 1, hasMore: false },
+    };
+  }
+
   function createDashboardSummary(endpointCount: number) {
     const hasEndpoint = endpointCount > 0;
 
@@ -245,16 +252,38 @@ describe('WorkspaceShellComponent integration', () => {
   it('renders backend projects in the dashboard and selects the first project automatically', async () => {
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
-        return [
-          {
-            id: 'p1',
-            name: 'Workspace project',
-            slug: 'workspace-project',
-            description: 'Live backend project',
-            updatedAt: new Date().toISOString(),
-            _count: { endpoints: 1 },
-          },
-        ];
+        return {
+          items: [
+            {
+              id: 'p1',
+              name: 'Workspace project',
+              slug: 'workspace-project',
+              description: 'Live backend project',
+              updatedAt: new Date().toISOString(),
+              _count: { endpoints: 1 },
+            },
+          ],
+          page: { limit: 25, offset: 0, total: 1, hasMore: false },
+        };
+      }
+
+      if (path === '/projects/p1/endpoints?limit=25&offset=0&sort=path-asc') {
+        return {
+          items: [
+            {
+              id: 'e1',
+              projectId: 'p1',
+              method: 'GET',
+              path: '/users',
+              description: 'List users',
+              statusCode: 200,
+              updatedAt: new Date().toISOString(),
+              scenarioCount: 1,
+              latencyMs: 120,
+            },
+          ],
+          page: { limit: 25, offset: 0, total: 1, hasMore: false },
+        };
       }
 
       if (path === '/projects/p1/dashboard-summary') {
@@ -325,16 +354,7 @@ describe('WorkspaceShellComponent integration', () => {
   it('renders backend logs and shows the detail sidebar after selecting a log entry', async () => {
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
-        return [
-          {
-            id: 'p1',
-            name: 'Workspace project',
-            slug: 'workspace-project',
-            description: 'Live backend project',
-            updatedAt: new Date().toISOString(),
-            _count: { endpoints: 1 },
-          },
-        ];
+        return createProjectListResponse(1);
       }
 
       if (path === '/projects/p1/dashboard-summary') return createDashboardSummary(1);
@@ -390,16 +410,7 @@ describe('WorkspaceShellComponent integration', () => {
   it('shows an empty state when the selected project has no logs', async () => {
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
-        return [
-          {
-            id: 'p1',
-            name: 'Workspace project',
-            slug: 'workspace-project',
-            description: 'Live backend project',
-            updatedAt: new Date().toISOString(),
-            _count: { endpoints: 0 },
-          },
-        ];
+        return createProjectListResponse(0);
       }
 
       if (path === '/projects/p1/dashboard-summary') return createDashboardSummary(0);
@@ -422,7 +433,9 @@ describe('WorkspaceShellComponent integration', () => {
 
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
-        return projectExists ? [createProjectListItem(endpointCreated ? 1 : 0)] : [];
+        return projectExists
+          ? createProjectListResponse(endpointCreated ? 1 : 0)
+          : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
       }
 
       if (path === '/projects/p1/dashboard-summary') {
@@ -482,7 +495,9 @@ describe('WorkspaceShellComponent integration', () => {
 
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
-        return projectExists ? [createProjectListItem(endpointCreated ? 1 : 0)] : [];
+        return projectExists
+          ? createProjectListResponse(endpointCreated ? 1 : 0)
+          : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
       }
 
       if (path === '/projects/p1/dashboard-summary') {
@@ -552,7 +567,9 @@ describe('WorkspaceShellComponent integration', () => {
 
     api.get.mockImplementation(async (path: string) => {
       if (path === '/projects') {
-        return projectExists ? [createProjectListItem(0)] : [];
+        return projectExists
+          ? createProjectListResponse(0)
+          : { items: [], page: { limit: 25, offset: 0, total: 0, hasMore: false } };
       }
 
       if (path === '/projects/p1/dashboard-summary') {

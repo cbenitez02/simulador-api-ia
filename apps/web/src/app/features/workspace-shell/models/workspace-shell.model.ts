@@ -8,6 +8,19 @@ export interface SidebarProjectRow {
   endpointCount: number;
 }
 
+export interface PaginationState {
+  limit: number;
+  offset: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface EndpointListState extends PaginationState {
+  q: string;
+  method: 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  sort: 'path-asc' | 'path-desc' | 'method';
+}
+
 export interface CreateProjectAiFlowState {
   createdProjectId: string;
   projectName: string;

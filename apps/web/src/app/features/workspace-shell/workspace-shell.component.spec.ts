@@ -169,6 +169,13 @@ const normalizedConfigFixture: GlobalConfig = {
   scope: 'all',
 };
 
+function pagedProjectsResult(items: DashboardProject[]) {
+  return {
+    items,
+    page: { limit: 25, offset: 0, total: items.length, hasMore: false },
+  };
+}
+
 describe('WorkspaceShellComponent', () => {
   const projectsRepository = {
     listProjects: vi.fn(),
@@ -301,7 +308,10 @@ describe('WorkspaceShellComponent', () => {
       ],
     };
 
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue({
+      items: [projectFixture],
+      page: { limit: 25, offset: 0, total: 1, hasMore: false },
+    });
     projectsRepository.getProject.mockResolvedValue(summaryProject);
 
     const component = createComponent();
@@ -354,7 +364,10 @@ describe('WorkspaceShellComponent', () => {
       ],
     };
 
-    projectsRepository.listProjects.mockResolvedValue([projectFixture, secondProjectFixture]);
+    projectsRepository.listProjects.mockResolvedValue({
+      items: [projectFixture, secondProjectFixture],
+      page: { limit: 25, offset: 0, total: 2, hasMore: false },
+    });
     projectsRepository.getProject.mockResolvedValueOnce(summaryProjectOne).mockResolvedValueOnce(summaryProjectTwo);
 
     const component = createComponent();
@@ -371,7 +384,7 @@ describe('WorkspaceShellComponent', () => {
   });
 
   it('opens the config drawer with normalized values after loading backend config', async () => {
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     globalConfigRepository.getConfig.mockResolvedValue(normalizedConfigFixture);
 
     const component = createComponent();
@@ -391,7 +404,7 @@ describe('WorkspaceShellComponent', () => {
   });
 
   it('keeps the config drawer open and surfaces actionable feedback when save fails validation', async () => {
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     globalConfigRepository.saveConfig.mockRejectedValue(
       new Error('Validation failed: latency max must be greater than latency min.'),
     );
@@ -420,7 +433,7 @@ describe('WorkspaceShellComponent', () => {
       },
     };
 
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     projectsRepository.getProject.mockResolvedValue(refreshedProject);
     globalConfigRepository.saveConfig.mockResolvedValue(normalizedConfigFixture);
 
@@ -443,7 +456,9 @@ describe('WorkspaceShellComponent', () => {
       endpoints: [],
     };
 
-    projectsRepository.listProjects.mockResolvedValueOnce([]).mockResolvedValueOnce([createdProject]);
+    projectsRepository.listProjects
+      .mockResolvedValueOnce(pagedProjectsResult([]))
+      .mockResolvedValueOnce(pagedProjectsResult([createdProject]));
     projectsRepository.createProject.mockResolvedValue(createdProject);
     endpointsRepository.generateAiEndpoint.mockResolvedValue(endpointFixture);
 
@@ -485,7 +500,9 @@ describe('WorkspaceShellComponent', () => {
       endpoints: [],
     };
 
-    projectsRepository.listProjects.mockResolvedValueOnce([]).mockResolvedValueOnce([createdProject]);
+    projectsRepository.listProjects
+      .mockResolvedValueOnce(pagedProjectsResult([]))
+      .mockResolvedValueOnce(pagedProjectsResult([createdProject]));
     projectsRepository.createProject.mockReturnValue(createPromise);
     endpointsRepository.generateAiEndpoint.mockReturnValue(generatePromise);
 
@@ -517,7 +534,7 @@ describe('WorkspaceShellComponent', () => {
   });
 
   it('allows continuing manually after partial success without clearing the created project', async () => {
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
 
     const component = createComponent();
     await flushAsyncWork();
@@ -546,7 +563,7 @@ describe('WorkspaceShellComponent', () => {
       description: 'Fresh description',
     };
 
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     projectsRepository.updateProject.mockResolvedValue(updatedProject);
 
     const component = createComponent();
@@ -577,7 +594,7 @@ describe('WorkspaceShellComponent', () => {
       resolveUpdate = resolve;
     });
 
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     projectsRepository.updateProject.mockReturnValue(updatePromise);
 
     const component = createComponent();
@@ -597,7 +614,7 @@ describe('WorkspaceShellComponent', () => {
   });
 
   it('keeps the edit modal open and shows actionable feedback when project update fails', async () => {
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     projectsRepository.updateProject.mockRejectedValue(new Error('Name already exists in this workspace.'));
 
     const component = createComponent();
@@ -615,8 +632,8 @@ describe('WorkspaceShellComponent', () => {
 
   it('cleans project-scoped state and reselects another project after delete succeeds', async () => {
     projectsRepository.listProjects
-      .mockResolvedValueOnce([projectFixture, secondProjectFixture])
-      .mockResolvedValueOnce([secondProjectFixture]);
+      .mockResolvedValueOnce(pagedProjectsResult([projectFixture, secondProjectFixture]))
+      .mockResolvedValueOnce(pagedProjectsResult([secondProjectFixture]));
     projectsRepository.deleteProject.mockResolvedValue(undefined);
 
     const component = createComponent();
@@ -645,7 +662,7 @@ describe('WorkspaceShellComponent', () => {
   });
 
   it('does not send delete and keeps the active project selected when deletion is cancelled', async () => {
-    projectsRepository.listProjects.mockResolvedValue([projectFixture, secondProjectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture, secondProjectFixture]));
 
     const component = createComponent();
     await flushAsyncWork();
@@ -660,7 +677,9 @@ describe('WorkspaceShellComponent', () => {
   });
 
   it('returns to the dashboard empty state after deleting the last project', async () => {
-    projectsRepository.listProjects.mockResolvedValueOnce([projectFixture]).mockResolvedValueOnce([]);
+    projectsRepository.listProjects
+      .mockResolvedValueOnce(pagedProjectsResult([projectFixture]))
+      .mockResolvedValueOnce(pagedProjectsResult([]));
     projectsRepository.deleteProject.mockResolvedValue(undefined);
 
     const component = createComponent();
@@ -678,7 +697,7 @@ describe('WorkspaceShellComponent', () => {
   });
 
   it('keeps the destructive confirmation open with feedback when delete fails', async () => {
-    projectsRepository.listProjects.mockResolvedValue([projectFixture]);
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     projectsRepository.deleteProject.mockRejectedValue(new Error('Delete failed on server.'));
 
     const component = createComponent();

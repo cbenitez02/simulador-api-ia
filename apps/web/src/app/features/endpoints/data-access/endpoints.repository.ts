@@ -1,6 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { ApiClient } from '../../../shared/http/api-client';
-import type { AiEndpointPreviewDto, CreateScenarioDto, EndpointDto, ScenarioDto } from '../../../shared/http/api.types';
+import type {
+  AiEndpointPreviewDto,
+  CreateScenarioDto,
+  EndpointDto,
+  EndpointListItemDto,
+  PagedResponseDto,
+  ScenarioDto,
+} from '../../../shared/http/api.types';
 import type { EndpointPreview } from '../../../shared/models/endpoint-preview.model';
 import type { EndpointDraft } from '../models/endpoint-draft.model';
 import {
@@ -11,6 +18,47 @@ import {
   mapEndpointRequestFromDraft,
   mapEndpointSummaryFromApi,
 } from '../adapters/endpoint-api.mapper';
+
+export interface EndpointListQuery {
+  limit?: number;
+  offset?: number;
+  q?: string;
+  method?: EndpointPreview['method'];
+  sort?: 'path-asc' | 'path-desc' | 'method';
+}
+
+export interface PagedEndpointsResult {
+  items: EndpointPreview[];
+  page: PagedResponseDto<EndpointListItemDto>['page'];
+}
+
+function buildEndpointListQueryString(query: EndpointListQuery = {}): string {
+  const params = new URLSearchParams();
+
+  if (query.limit !== undefined) params.set('limit', String(query.limit));
+  if (query.offset !== undefined) params.set('offset', String(query.offset));
+  if (query.q?.trim()) params.set('q', query.q.trim());
+  if (query.method) params.set('method', query.method);
+  if (query.sort) params.set('sort', query.sort);
+
+  const text = params.toString();
+  return text ? `?${text}` : '';
+}
+
+function mapEndpointListItemFromApi(endpoint: EndpointListItemDto): EndpointPreview {
+  return {
+    id: endpoint.id,
+    method: mapEndpointSummaryFromApi({
+      ...endpoint,
+      responseBody: null,
+    } as EndpointDto).method,
+    path: endpoint.path,
+    description: endpoint.description || 'No description',
+    latencyMs: endpoint.latencyMs,
+    statusCode: endpoint.statusCode,
+    responseBody: null,
+  };
+}
 
 @Injectable({ providedIn: 'root' })
 export class EndpointsRepository {
@@ -37,6 +85,17 @@ export class EndpointsRepository {
   async loadDraft(projectId: string, endpointId: string): Promise<EndpointDraft> {
     const endpoint = await this.api.get<EndpointDto>(`/projects/${projectId}/endpoints/${endpointId}`);
     return mapEndpointDraftFromApi(endpoint);
+  }
+
+  async listEndpoints(projectId: string, query: EndpointListQuery = {}): Promise<PagedEndpointsResult> {
+    const response = await this.api.get<PagedResponseDto<EndpointListItemDto>>(
+      `/projects/${projectId}/endpoints${buildEndpointListQueryString(query)}`,
+    );
+
+    return {
+      items: response.items.map(mapEndpointListItemFromApi),
+      page: response.page,
+    };
   }
 
   async saveEndpoint(projectId: string, draft: EndpointDraft, endpointId?: string | null): Promise<EndpointPreview> {

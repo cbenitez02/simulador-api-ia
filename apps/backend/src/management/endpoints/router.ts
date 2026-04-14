@@ -3,6 +3,7 @@ import { requireRequestActor } from '../../auth/request-context.js';
 import {
   createEndpointSchema,
   endpointParamsSchema,
+  listEndpointsQuerySchema,
   projectParamsSchema,
   updateEndpointSchema,
 } from './schema.js';
@@ -20,7 +21,8 @@ endpointsRouter.get('/', async (req, res, next) => {
   try {
     const actor = requireRequestActor(req);
     const { projectId } = projectParamsSchema.parse(req.params);
-    const endpoints = await listEndpoints(actor, projectId);
+    const query = listEndpointsQuerySchema.parse(req.query);
+    const endpoints = await listEndpoints(actor, projectId, query);
 
     res.status(200).json(endpoints);
   } catch (error) {

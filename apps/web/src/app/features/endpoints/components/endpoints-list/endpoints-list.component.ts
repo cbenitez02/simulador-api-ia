@@ -1,10 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import type { EndpointPreview } from '../../../../shared/models/endpoint-preview.model';
 import { HttpMethodBadgeComponent } from '../../../../shared/ui/http-method-badge/http-method-badge.component';
 import { SelectMenuComponent } from '../../../../shared/ui/select-menu/select-menu.component';
 import {
   ENDPOINTS_LIST_METHOD_FILTER_OPTIONS,
-  ENDPOINTS_LIST_METHOD_ORDER,
   ENDPOINTS_LIST_SORT_OPTIONS,
   type EndpointsListMethodFilter,
   type EndpointsListSortOption,
@@ -24,64 +23,30 @@ export class EndpointsListComponent {
 
   readonly endpoints = input.required<EndpointPreview[]>();
   readonly selectedEndpointId = input<string | null>(null);
+  readonly searchQuery = input('');
+  readonly methodFilter = input<EndpointsListMethodFilter>('all');
+  readonly sortOption = input<EndpointsListSortOption>('path-asc');
+  readonly loading = input(false);
+  readonly hasMore = input(false);
 
   readonly endpointSelect = output<string>();
   readonly createEndpointRequest = output<void>();
 
-  protected readonly searchQuery = signal('');
-  protected readonly methodFilter = signal<EndpointsListMethodFilter>('all');
-  protected readonly sortOption = signal<EndpointsListSortOption>('path-asc');
-
-  protected readonly filteredEndpoints = computed(() => {
-    const q = this.searchQuery().trim().toLowerCase();
-    let list = [...this.endpoints()];
-
-    if (q) {
-      list = list.filter(
-        (e) =>
-          e.path.toLowerCase().includes(q) ||
-          e.description.toLowerCase().includes(q) ||
-          e.method.toLowerCase().includes(q),
-      );
-    }
-
-    const m = this.methodFilter();
-    if (m !== 'all') {
-      list = list.filter((e) => e.method === m);
-    }
-
-    const sort = this.sortOption();
-    list.sort((a, b) => {
-      switch (sort) {
-        case 'path-asc':
-          return a.path.localeCompare(b.path);
-        case 'path-desc':
-          return b.path.localeCompare(a.path);
-        case 'method':
-          return (
-            ENDPOINTS_LIST_METHOD_ORDER[a.method] - ENDPOINTS_LIST_METHOD_ORDER[b.method] ||
-            a.path.localeCompare(b.path)
-          );
-        case 'latency':
-          return a.latencyMs - b.latencyMs || a.path.localeCompare(b.path);
-        default:
-          return 0;
-      }
-    });
-
-    return list;
-  });
+  readonly searchQueryChange = output<string>();
+  readonly methodFilterChange = output<EndpointsListMethodFilter>();
+  readonly sortOptionChange = output<EndpointsListSortOption>();
+  readonly loadMoreRequest = output<void>();
 
   protected onSearchInput(event: Event): void {
-    this.searchQuery.set((event.target as HTMLInputElement).value);
+    this.searchQueryChange.emit((event.target as HTMLInputElement).value);
   }
 
   protected selectMethod(value: string): void {
-    this.methodFilter.set(value as EndpointsListMethodFilter);
+    this.methodFilterChange.emit(value as EndpointsListMethodFilter);
   }
 
   protected selectSort(value: string): void {
-    this.sortOption.set(value as EndpointsListSortOption);
+    this.sortOptionChange.emit(value as EndpointsListSortOption);
   }
 
   protected pickEndpoint(id: string): void {
@@ -90,5 +55,9 @@ export class EndpointsListComponent {
 
   protected requestCreateEndpoint(): void {
     this.createEndpointRequest.emit();
+  }
+
+  protected requestLoadMore(): void {
+    this.loadMoreRequest.emit();
   }
 }

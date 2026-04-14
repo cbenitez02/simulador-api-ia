@@ -19,6 +19,30 @@ export interface ProjectDto {
   _count: { endpoints: number };
 }
 
+export interface PageDto {
+  limit: number;
+  offset: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface PagedResponseDto<T> {
+  items: T[];
+  page: PageDto;
+}
+
+export interface EndpointListItemDto {
+  id: string;
+  projectId: string;
+  method: string;
+  path: string;
+  description: string;
+  statusCode: number;
+  updatedAt: string;
+  scenarioCount: number;
+  latencyMs: number;
+}
+
 export interface CreateProjectDto {
   name: string;
   description?: string;

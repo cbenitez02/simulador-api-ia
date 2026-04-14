@@ -31,7 +31,16 @@
   <app-endpoints-list
     [endpoints]="endpoints()"
     [selectedEndpointId]="selectedEndpointId()"
+    [searchQuery]="searchQuery()"
+    [methodFilter]="methodFilter()"
+    [sortOption]="sortOption()"
+    [loading]="loading()"
+    [hasMore]="hasMore()"
     (endpointSelect)="endpointSelect.emit($event)"
     (createEndpointRequest)="createEndpoint.emit()"
+    (searchQueryChange)="searchQueryChange.emit($event)"
+    (methodFilterChange)="methodFilterChange.emit($event)"
+    (sortOptionChange)="sortOptionChange.emit($event)"
+    (loadMoreRequest)="loadMore.emit()"
   />
 </main>

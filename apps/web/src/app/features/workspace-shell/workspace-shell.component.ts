@@ -28,7 +28,17 @@ import { MainDashboardSidebarComponent } from '../main-dashboard/components/main
 import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/components/main-dashboard-utility-sidebar/main-dashboard-utility-sidebar.component';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
-import type { CreateProjectAiFlowState, SidebarProjectRow, WorkspaceNavId } from './models/workspace-shell.model';
+import type {
+  EndpointListMethodFilter,
+  EndpointsListSortOption,
+} from '../endpoints/components/endpoints-list/endpoints-list.constants';
+import type {
+  CreateProjectAiFlowState,
+  EndpointListState,
+  PaginationState,
+  SidebarProjectRow,
+  WorkspaceNavId,
+} from './models/workspace-shell.model';
 
 interface ExportedWorkspaceProjectConfig {
   version: 1;
@@ -61,12 +71,16 @@ interface ExportedWorkspaceProjectConfig {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkspaceShellComponent {
+  private static readonly PROJECT_PAGE_LIMIT = 25;
+  private static readonly ENDPOINT_PAGE_LIMIT = 25;
+
   private readonly authSession = inject(FrontendAuthSessionService);
   private readonly projectsRepository = inject(ProjectsRepository);
   private readonly endpointsRepository = inject(EndpointsRepository);
   private readonly globalConfigRepository = inject(GlobalConfigRepository);
 
   protected readonly projects = signal<DashboardProject[]>([]);
+  protected readonly projectsPage = signal<PaginationState>({ limit: 25, offset: 0, total: 0, hasMore: false });
   protected readonly authSnapshot = this.authSession.snapshot;
   protected readonly protectedApiAccessState = this.authSession.accessState;
   protected readonly projectsLoading = signal(true);
@@ -121,7 +135,19 @@ export class WorkspaceShellComponent {
     return list.find((p) => p.id === id) ?? list[0] ?? null;
   });
 
-  protected readonly endpoints = computed(() => this.activeProject()?.endpoints ?? []);
+  protected readonly endpointList = signal<EndpointPreview[]>([]);
+  protected readonly endpointListLoading = signal(false);
+  protected readonly endpointListError = signal<string | null>(null);
+  protected readonly endpointListState = signal<EndpointListState>({
+    limit: 25,
+    offset: 0,
+    total: 0,
+    hasMore: false,
+    q: '',
+    method: 'all',
+    sort: 'path-asc',
+  });
+  protected readonly endpoints = computed(() => this.endpointList());
   protected readonly apiBaseUrl = computed(() => this.activeProject()?.mockUrl ?? '');
   protected readonly selectedEndpointId = signal<string | null>(null);
   protected readonly endpointMutationPending = signal(false);
@@ -305,17 +331,30 @@ export class WorkspaceShellComponent {
     if (!project) return;
     this.selectedProjectId.set(project.id);
     const selectedEndpointId = this.selectedEndpointId();
-    if (selectedEndpointId && !project.endpoints.some((endpoint) => endpoint.id === selectedEndpointId)) {
+    if (selectedEndpointId && !this.endpointList().some((endpoint) => endpoint.id === selectedEndpointId)) {
       this.selectedEndpointId.set(null);
     }
     this.selectedLog.set(null);
     this.endpointMutationError.set(null);
     this.closeCreateEndpointWizard(true);
+    this.endpointList.set([]);
+    this.endpointListState.update((state) => ({ ...state, offset: 0, total: 0, hasMore: false }));
+    if (this.activeNav() === 'endpoints') {
+      void Promise.all([this.hydrateActiveProjectSummary(project.id), this.reloadEndpointList(project.id)]);
+      return;
+    }
+
     void this.hydrateActiveProjectSummary(project.id);
   }
 
   protected selectNav(id: WorkspaceNavId): void {
     this.activeNav.set(id);
+    if (id === 'endpoints') {
+      const projectId = this.selectedProjectId() || this.activeProject()?.id;
+      if (projectId) {
+        void this.reloadEndpointList(projectId);
+      }
+    }
     if (id !== 'endpoints') {
       this.selectedEndpointId.set(null);
       this.createEndpointFlowOpen.set(false);
@@ -441,16 +480,17 @@ export class WorkspaceShellComponent {
     this.projectsError.set(null);
     try {
       const projects = await this.projectsRepository.listProjects();
+      this.projectsPage.set(projects.page);
+      const projectItems = projects.items;
       this.authSession.markProtectedApiReady();
-      this.projects.set(projects);
+      this.projects.set(projectItems);
 
       const currentSelected = selectProjectId ?? this.selectedProjectId();
-      const nextSelected = projects.find((project) => project.id === currentSelected)?.id ?? projects[0]?.id ?? '';
+      const nextSelected =
+        projectItems.find((project) => project.id === currentSelected)?.id ?? projectItems[0]?.id ?? '';
       this.selectedProjectId.set(nextSelected);
 
-      if (
-        !projects.some((project) => project.endpoints.some((endpoint) => endpoint.id === this.selectedEndpointId()))
-      ) {
+      if (!this.endpointList().some((endpoint) => endpoint.id === this.selectedEndpointId())) {
         this.selectedEndpointId.set(null);
       }
 
@@ -466,6 +506,8 @@ export class WorkspaceShellComponent {
       }
 
       this.projects.set([]);
+      this.projectsPage.set({ limit: WorkspaceShellComponent.PROJECT_PAGE_LIMIT, offset: 0, total: 0, hasMore: false });
+      this.endpointList.set([]);
       this.selectedProjectId.set('');
       this.projectsError.set(error instanceof Error ? error.message : 'Could not load projects.');
     } finally {
@@ -477,6 +519,7 @@ export class WorkspaceShellComponent {
     try {
       const refreshed = await this.projectsRepository.getProject(projectId);
       this.projects.update((projects) => projects.map((project) => (project.id === projectId ? refreshed : project)));
+      await this.reloadEndpointList(projectId);
     } catch (error) {
       this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not refresh project data.');
     }
@@ -507,6 +550,69 @@ export class WorkspaceShellComponent {
       }
 
       this.projectsError.set(error instanceof Error ? error.message : 'Could not load project summary.');
+    }
+  }
+
+  protected updateEndpointSearch(query: string): void {
+    this.endpointListState.update((state) => ({ ...state, q: query }));
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    if (projectId) void this.reloadEndpointList(projectId);
+  }
+
+  protected updateEndpointMethodFilter(method: EndpointListMethodFilter): void {
+    this.endpointListState.update((state) => ({ ...state, method }));
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    if (projectId) void this.reloadEndpointList(projectId);
+  }
+
+  protected updateEndpointSort(sort: EndpointsListSortOption): void {
+    this.endpointListState.update((state) => ({ ...state, sort }));
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    if (projectId) void this.reloadEndpointList(projectId);
+  }
+
+  protected loadMoreEndpoints(): void {
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    if (!projectId || this.endpointListLoading() || !this.endpointListState().hasMore) return;
+    void this.reloadEndpointList(projectId, true);
+  }
+
+  private async reloadEndpointList(projectId: string, append = false): Promise<void> {
+    const state = this.endpointListState();
+    const offset = append ? this.endpointList().length : 0;
+
+    this.endpointListLoading.set(true);
+    this.endpointListError.set(null);
+
+    try {
+      const response = await this.endpointsRepository.listEndpoints(projectId, {
+        limit: WorkspaceShellComponent.ENDPOINT_PAGE_LIMIT,
+        offset,
+        q: state.q,
+        method: state.method === 'all' ? undefined : state.method,
+        sort: state.sort,
+      });
+
+      this.endpointList.set(append ? [...this.endpointList(), ...response.items] : response.items);
+      this.endpointListState.update(() => ({
+        ...state,
+        limit: response.page.limit,
+        offset: response.page.offset,
+        total: response.page.total,
+        hasMore: response.page.hasMore,
+      }));
+
+      if (!this.endpointList().some((endpoint) => endpoint.id === this.selectedEndpointId())) {
+        this.selectedEndpointId.set(null);
+      }
+    } catch (error) {
+      this.endpointListError.set(error instanceof Error ? error.message : 'Could not load endpoints.');
+      if (!append) {
+        this.endpointList.set([]);
+        this.selectedEndpointId.set(null);
+      }
+    } finally {
+      this.endpointListLoading.set(false);
     }
   }
 

@@ -3,20 +3,129 @@ import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
 import { AppError } from '../../middleware/error-handler.js';
-import type { CreateEndpointInput, UpdateEndpointInput } from './schema.js';
+import type {
+  CreateEndpointInput,
+  ListEndpointsQueryInput,
+  UpdateEndpointInput,
+} from './schema.js';
 
-export async function listEndpoints(actor: AuthenticatedActor, projectId: string) {
+type PagedResult<T> = {
+  items: T[];
+  page: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
+};
+
+type EndpointListItem = {
+  id: string;
+  projectId: string;
+  method: string;
+  path: string;
+  description: string;
+  statusCode: number;
+  updatedAt: Date;
+  scenarioCount: number;
+  latencyMs: number;
+};
+
+function resolveLatencyMs(
+  endpointConfig: {
+    latencyMode: string;
+    fixedDelayMs: number;
+    minDelayMs: number;
+    maxDelayMs: number;
+  } | null
+) {
+  if (!endpointConfig) return 0;
+  return endpointConfig.latencyMode === 'range'
+    ? Math.round((endpointConfig.minDelayMs + endpointConfig.maxDelayMs) / 2)
+    : endpointConfig.fixedDelayMs;
+}
+
+function resolveEndpointOrderBy(query: ListEndpointsQueryInput) {
+  switch (query.sort) {
+    case 'path-desc':
+      return [{ path: 'desc' as const }, { id: 'desc' as const }];
+    case 'method':
+      return [{ method: 'asc' as const }, { path: 'asc' as const }, { id: 'asc' as const }];
+    case 'path-asc':
+    default:
+      return [{ path: 'asc' as const }, { id: 'asc' as const }];
+  }
+}
+
+export async function listEndpoints(
+  actor: AuthenticatedActor,
+  projectId: string,
+  query: ListEndpointsQueryInput
+): Promise<PagedResult<EndpointListItem>> {
   await authorizeProjectAccess(actor, projectId);
 
-  return prisma.endpoint.findMany({
-    where: { projectId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: { scenarios: true },
+  const where = {
+    projectId,
+    ...(query.q
+      ? {
+          OR: [
+            { path: { contains: query.q, mode: 'insensitive' as const } },
+            { description: { contains: query.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+    ...(query.method ? { method: query.method } : {}),
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.endpoint.findMany({
+      where,
+      orderBy: resolveEndpointOrderBy(query),
+      skip: query.offset,
+      take: query.limit,
+      select: {
+        id: true,
+        projectId: true,
+        method: true,
+        path: true,
+        description: true,
+        statusCode: true,
+        updatedAt: true,
+        endpointConfig: {
+          select: {
+            latencyMode: true,
+            fixedDelayMs: true,
+            minDelayMs: true,
+            maxDelayMs: true,
+          },
+        },
+        _count: {
+          select: { scenarios: true },
+        },
       },
+    }),
+    prisma.endpoint.count({ where }),
+  ]);
+
+  return {
+    items: items.map((item) => ({
+      id: item.id,
+      projectId: item.projectId,
+      method: item.method,
+      path: item.path,
+      description: item.description,
+      statusCode: item.statusCode,
+      updatedAt: item.updatedAt,
+      scenarioCount: item._count.scenarios,
+      latencyMs: resolveLatencyMs(item.endpointConfig),
+    })),
+    page: {
+      limit: query.limit,
+      offset: query.offset,
+      total,
+      hasMore: query.offset + items.length < total,
     },
-  });
+  };
 }
 
 export async function getEndpointById(

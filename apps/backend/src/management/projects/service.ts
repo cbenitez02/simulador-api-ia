@@ -8,7 +8,17 @@ import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { buildBaseSlug, resolveNextAvailableSlug } from './slug.js';
-import type { CreateProjectInput, UpdateProjectInput } from './schema.js';
+import type { CreateProjectInput, ListProjectsQueryInput, UpdateProjectInput } from './schema.js';
+
+type PagedResult<T> = {
+  items: T[];
+  page: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
+};
 
 async function generateUniqueProjectSlug(name: string): Promise<string> {
   const baseSlug = buildBaseSlug(name);
@@ -26,20 +36,49 @@ async function generateUniqueProjectSlug(name: string): Promise<string> {
   );
 }
 
-export async function listProjects(actor: AuthenticatedActor) {
-  return prisma.project.findMany({
-    where: {
-      workspaceId: {
-        in: getAccessibleWorkspaceIds(actor),
-      },
+export async function listProjects(
+  actor: AuthenticatedActor,
+  query: ListProjectsQueryInput
+): Promise<PagedResult<Awaited<ReturnType<typeof prisma.project.findMany>>[number]>> {
+  const where = {
+    workspaceId: {
+      in: getAccessibleWorkspaceIds(actor),
     },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: { endpoints: true },
+    ...(query.q
+      ? {
+          OR: [
+            { name: { contains: query.q, mode: 'insensitive' as const } },
+            { slug: { contains: query.q, mode: 'insensitive' as const } },
+            { description: { contains: query.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.project.findMany({
+      where,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      skip: query.offset,
+      take: query.limit,
+      include: {
+        _count: {
+          select: { endpoints: true },
+        },
       },
+    }),
+    prisma.project.count({ where }),
+  ]);
+
+  return {
+    items,
+    page: {
+      limit: query.limit,
+      offset: query.offset,
+      total,
+      hasMore: query.offset + items.length < total,
     },
-  });
+  };
 }
 
 export async function getProjectById(actor: AuthenticatedActor, projectId: string) {

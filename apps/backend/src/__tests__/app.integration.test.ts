@@ -344,16 +344,35 @@ describe('app integration', () => {
     }
   });
 
-  it('GET /api/v1/projects responde lista', async () => {
+  it('GET /api/v1/projects responde una página filtrada y estable', async () => {
     prismaMock.project.findMany.mockResolvedValueOnce([
-      { id: 'p1', name: 'Proyecto', slug: 'proyecto', description: '', _count: { endpoints: 0 } },
+      {
+        id: 'p2',
+        name: 'Proyecto 2',
+        slug: 'proyecto-2',
+        description: '',
+        updatedAt: new Date('2026-04-08T10:00:00.000Z'),
+        _count: { endpoints: 3 },
+      },
     ]);
+    prismaMock.project.count.mockResolvedValueOnce(7);
 
-    const response = await request(app).get('/api/v1/projects').set(authHeaders());
+    const response = await request(app)
+      .get('/api/v1/projects?limit=10&offset=5&q=yecto')
+      .set(authHeaders());
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveLength(1);
-    expect(response.body[0].slug).toBe('proyecto');
+    expect(response.body.page).toEqual({ limit: 10, offset: 5, total: 7, hasMore: true });
+    expect(response.body.items).toHaveLength(1);
+    expect(response.body.items[0].slug).toBe('proyecto-2');
+    expect(prismaMock.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        skip: 5,
+        take: 10,
+      })
+    );
+    expect(prismaMock.project.count).toHaveBeenCalledTimes(1);
   });
 
   it('POST /api/v1/projects crea proyecto + global config', async () => {
@@ -451,6 +470,51 @@ describe('app integration', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.error).toMatch(/already exists/i);
+  });
+
+  it('GET /api/v1/projects/:projectId/endpoints responde una página con filtros y orden estable', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.endpoint.findMany.mockResolvedValueOnce([
+      {
+        id: 'e2',
+        projectId: 'p1',
+        method: 'GET',
+        path: '/users',
+        description: 'List users',
+        statusCode: 200,
+        updatedAt: new Date('2026-04-08T10:00:00.000Z'),
+        endpointConfig: { latencyMode: 'range', fixedDelayMs: 0, minDelayMs: 50, maxDelayMs: 150 },
+        _count: { scenarios: 2 },
+      },
+    ]);
+    prismaMock.endpoint.count.mockResolvedValueOnce(3);
+
+    const response = await request(app)
+      .get('/api/v1/projects/p1/endpoints?limit=1&offset=1&q=user&method=get&sort=method')
+      .set(authHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.page).toEqual({ limit: 1, offset: 1, total: 3, hasMore: true });
+    expect(response.body.items).toEqual([
+      {
+        id: 'e2',
+        projectId: 'p1',
+        method: 'GET',
+        path: '/users',
+        description: 'List users',
+        statusCode: 200,
+        updatedAt: '2026-04-08T10:00:00.000Z',
+        scenarioCount: 2,
+        latencyMs: 100,
+      },
+    ]);
+    expect(prismaMock.endpoint.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ method: 'asc' }, { path: 'asc' }, { id: 'asc' }],
+        skip: 1,
+        take: 1,
+      })
+    );
   });
 
   it('POST /api/v1/endpoints/:endpointId/scenarios crea scenario', async () => {
