@@ -1,6 +1,7 @@
 import { authorizeProjectAccess } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
+import { writeAuditEvent } from '../audit-events/service.js';
 import type { UpsertGlobalConfigInput } from './schema.js';
 export { buildDefaultGlobalConfig, DEFAULT_GLOBAL_CONFIG_VALUES } from './defaults.js';
 import { buildDefaultGlobalConfig } from './defaults.js';
@@ -35,34 +36,57 @@ export async function upsertGlobalConfig(
 
   const canonical = canonicalizeGlobalConfig(input);
 
-  return prisma.globalConfig.upsert({
-    where: { projectId },
-    update: {
-      latencyEnabled: canonical.latencyEnabled,
-      latencyMinMs: canonical.latencyMinMs,
-      latencyMaxMs: canonical.latencyMaxMs,
-      latencyMode: canonical.latencyMode,
-      errorSimulationEnabled: canonical.errorSimulationEnabled,
-      errorSimulationRate: canonical.errorSimulationRate,
-      errorSimulationCodes: canonical.errorSimulationCodes,
-      rateLimitingEnabled: canonical.rateLimitingEnabled,
-      rateLimitingRpm: canonical.rateLimitingRpm,
-      loggingLevel: canonical.loggingLevel,
-      scope: canonical.scope,
-    },
-    create: {
+  return prisma.$transaction(async (tx) => {
+    const config = await tx.globalConfig.upsert({
+      where: { projectId },
+      update: {
+        latencyEnabled: canonical.latencyEnabled,
+        latencyMinMs: canonical.latencyMinMs,
+        latencyMaxMs: canonical.latencyMaxMs,
+        latencyMode: canonical.latencyMode,
+        errorSimulationEnabled: canonical.errorSimulationEnabled,
+        errorSimulationRate: canonical.errorSimulationRate,
+        errorSimulationCodes: canonical.errorSimulationCodes,
+        rateLimitingEnabled: canonical.rateLimitingEnabled,
+        rateLimitingRpm: canonical.rateLimitingRpm,
+        loggingLevel: canonical.loggingLevel,
+        scope: canonical.scope,
+      },
+      create: {
+        projectId,
+        latencyEnabled: canonical.latencyEnabled,
+        latencyMinMs: canonical.latencyMinMs,
+        latencyMaxMs: canonical.latencyMaxMs,
+        latencyMode: canonical.latencyMode,
+        errorSimulationEnabled: canonical.errorSimulationEnabled,
+        errorSimulationRate: canonical.errorSimulationRate,
+        errorSimulationCodes: canonical.errorSimulationCodes,
+        rateLimitingEnabled: canonical.rateLimitingEnabled,
+        rateLimitingRpm: canonical.rateLimitingRpm,
+        loggingLevel: canonical.loggingLevel,
+        scope: canonical.scope,
+      },
+    });
+
+    const project = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { workspaceId: true },
+    });
+
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId: project.workspaceId ?? '',
       projectId,
-      latencyEnabled: canonical.latencyEnabled,
-      latencyMinMs: canonical.latencyMinMs,
-      latencyMaxMs: canonical.latencyMaxMs,
-      latencyMode: canonical.latencyMode,
-      errorSimulationEnabled: canonical.errorSimulationEnabled,
-      errorSimulationRate: canonical.errorSimulationRate,
-      errorSimulationCodes: canonical.errorSimulationCodes,
-      rateLimitingEnabled: canonical.rateLimitingEnabled,
-      rateLimitingRpm: canonical.rateLimitingRpm,
-      loggingLevel: canonical.loggingLevel,
-      scope: canonical.scope,
-    },
+      resourceType: 'global-config',
+      resourceId: config.id,
+      action: 'updated',
+      summary: 'Updated global config',
+      metadata: {
+        loggingLevel: canonical.loggingLevel,
+        latencyMode: canonical.latencyMode,
+      },
+    });
+
+    return config;
   });
 }

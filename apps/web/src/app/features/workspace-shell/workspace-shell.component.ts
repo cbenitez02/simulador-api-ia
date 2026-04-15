@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../../shared/http/api-error.mapper';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
+import { AuditHistoryComponent } from '../audit-history/audit-history.component';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
@@ -56,6 +57,7 @@ interface ExportedWorkspaceProjectConfig {
   selector: 'app-workspace-shell',
   standalone: true,
   imports: [
+    AuditHistoryComponent,
     CreateEndpointPageComponent,
     EndpointDetailPanelComponent,
     EndpointsPageComponent,

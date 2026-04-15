@@ -1,6 +1,7 @@
 import { authorizeEndpointAccess } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
+import { writeAuditEvent } from '../audit-events/service.js';
 import type { UpsertEndpointConfigInput } from './schema.js';
 
 function canonicalizeEndpointConfig(input: UpsertEndpointConfigInput): UpsertEndpointConfigInput {
@@ -41,24 +42,55 @@ export async function upsertEndpointConfig(
 
   const canonical = canonicalizeEndpointConfig(input);
 
-  return prisma.endpointConfig.upsert({
-    where: { endpointId },
-    update: {
-      latencyMode: canonical.latencyMode,
-      fixedDelayMs: canonical.fixedDelayMs,
-      minDelayMs: canonical.minDelayMs,
-      maxDelayMs: canonical.maxDelayMs,
-      errorRate: canonical.errorRate,
-      useScenarioWeights: canonical.useScenarioWeights,
-    },
-    create: {
-      endpointId,
-      latencyMode: canonical.latencyMode,
-      fixedDelayMs: canonical.fixedDelayMs,
-      minDelayMs: canonical.minDelayMs,
-      maxDelayMs: canonical.maxDelayMs,
-      errorRate: canonical.errorRate,
-      useScenarioWeights: canonical.useScenarioWeights,
-    },
+  return prisma.$transaction(async (tx) => {
+    const config = await tx.endpointConfig.upsert({
+      where: { endpointId },
+      update: {
+        latencyMode: canonical.latencyMode,
+        fixedDelayMs: canonical.fixedDelayMs,
+        minDelayMs: canonical.minDelayMs,
+        maxDelayMs: canonical.maxDelayMs,
+        errorRate: canonical.errorRate,
+        useScenarioWeights: canonical.useScenarioWeights,
+      },
+      create: {
+        endpointId,
+        latencyMode: canonical.latencyMode,
+        fixedDelayMs: canonical.fixedDelayMs,
+        minDelayMs: canonical.minDelayMs,
+        maxDelayMs: canonical.maxDelayMs,
+        errorRate: canonical.errorRate,
+        useScenarioWeights: canonical.useScenarioWeights,
+      },
+    });
+
+    const endpoint = await tx.endpoint.findUniqueOrThrow({
+      where: { id: endpointId },
+      select: {
+        method: true,
+        path: true,
+        projectId: true,
+        project: {
+          select: { workspaceId: true },
+        },
+      },
+    });
+
+    await writeAuditEvent(tx, {
+      actor,
+      workspaceId: endpoint.project.workspaceId ?? '',
+      projectId: endpoint.projectId,
+      resourceType: 'endpoint-config',
+      resourceId: config.id,
+      action: 'updated',
+      summary: `Updated endpoint config for ${endpoint.method} ${endpoint.path}`,
+      metadata: {
+        method: endpoint.method,
+        endpointPath: endpoint.path,
+        latencyMode: canonical.latencyMode,
+      },
+    });
+
+    return config;
   });
 }

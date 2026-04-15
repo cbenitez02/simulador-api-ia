@@ -9,6 +9,7 @@ const runtimeRateLimitBuckets = new Map<string, { requestCount: number }>();
 const prismaMock = {
   user: {
     findFirst: vi.fn(),
+    findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
   },
@@ -48,6 +49,7 @@ const prismaMock = {
   scenario: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     count: vi.fn(),
     create: vi.fn(),
     createMany: vi.fn(),
@@ -71,6 +73,10 @@ const prismaMock = {
     findMany: vi.fn(),
     groupBy: vi.fn(),
     deleteMany: vi.fn(),
+  },
+  auditEvent: {
+    create: vi.fn(),
+    findMany: vi.fn(),
   },
   runtimeRateLimitBucket: {
     upsert: vi.fn(),
@@ -201,6 +207,7 @@ describe('app integration', () => {
     resetNestedMocks(prismaMock.endpointConfig);
     resetNestedMocks(prismaMock.globalConfig);
     resetNestedMocks(prismaMock.apiLog);
+    resetNestedMocks(prismaMock.auditEvent);
     resetNestedMocks(prismaMock.runtimeRateLimitBucket);
     prismaMock.$transaction.mockReset();
     openaiCreateMock.mockReset();
@@ -233,11 +240,28 @@ describe('app integration', () => {
       }
     );
     prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.project.findUniqueOrThrow.mockResolvedValue({
+      id: 'p1',
+      workspaceId: 'workspace-1',
+    });
     prismaMock.endpoint.findUnique.mockResolvedValue({
       id: 'e1',
       projectId: 'p1',
       project: { workspaceId: 'workspace-1' },
     });
+    prismaMock.endpoint.findUniqueOrThrow.mockResolvedValue({
+      id: 'e1',
+      method: 'GET',
+      path: '/users',
+      projectId: 'p1',
+      project: { workspaceId: 'workspace-1' },
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+      email: 'owner@example.com',
+      displayName: 'Owner User',
+    });
+    prismaMock.auditEvent.create.mockResolvedValue({ id: 'audit-1' });
+    prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
     prismaMock.externalIdentity.findUnique.mockResolvedValue(buildActorIdentity());
   });
 
@@ -390,7 +414,13 @@ describe('app integration', () => {
 
     const tx = {
       project: {
-        create: vi.fn().mockResolvedValue({ id: 'p1' }),
+        create: vi.fn().mockResolvedValue({
+          id: 'p1',
+          workspaceId: 'workspace-1',
+          name: 'Mi API',
+          slug: 'mi-api',
+          description: '',
+        }),
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: 'p1',
           workspaceId: 'workspace-1',
@@ -403,6 +433,15 @@ describe('app integration', () => {
       },
       globalConfig: {
         create: vi.fn().mockResolvedValue({ id: 'gc1' }),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          email: 'owner@example.com',
+          displayName: 'Owner User',
+        }),
+      },
+      auditEvent: {
+        create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
       },
     };
 

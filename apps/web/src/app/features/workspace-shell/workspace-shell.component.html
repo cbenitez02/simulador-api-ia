@@ -135,6 +135,10 @@
       (selectedLogChange)="selectedLog.set($event)"
     />
   </main>
+} @else if (activeNav() === 'history') {
+  <main class="workspace__main" aria-label="Audit history">
+    <app-audit-history [projectId]="selectedProjectId()" />
+  </main>
 } @else if (activeNav() === 'endpoints') {
   <main class="workspace__main" aria-label="Endpoints">
     @if (endpointMutationError()) {

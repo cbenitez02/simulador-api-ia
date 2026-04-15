@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { authenticateApiRequest } from './auth/middleware.js';
+import { auditEventsRouter } from './management/audit-events/router.js';
 import { createCorsOptions } from './config/cors.js';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -44,6 +45,7 @@ app.use('/api/v1/endpoints/:endpointId/scenarios', scenariosRouter);
 app.use('/api/v1/endpoints/:endpointId/config', endpointConfigRouter);
 app.use('/api/v1/projects/:projectId/config', globalConfigRouter);
 app.use('/api/v1/projects/:projectId/logs', logsRouter);
+app.use('/api/v1/projects/:projectId/audit-events', auditEventsRouter);
 app.use('/api/v1/workspaces/:workspaceId/members', workspaceMembersRouter);
 app.use('/mock', mockRouter);
 

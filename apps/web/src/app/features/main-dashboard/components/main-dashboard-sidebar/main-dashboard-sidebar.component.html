@@ -110,6 +110,15 @@
         <svg lucideFileText [size]="18" strokeWidth="1.75"></svg>
         <span>Logs</span>
       </button>
+      <button
+        type="button"
+        class="sidebar__nav-item"
+        [class.sidebar__nav-item--active]="activeNav() === 'history'"
+        (click)="selectNav('history')"
+      >
+        <svg lucideHistory [size]="18" strokeWidth="1.75"></svg>
+        <span>History</span>
+      </button>
     </nav>
   </div>
 
