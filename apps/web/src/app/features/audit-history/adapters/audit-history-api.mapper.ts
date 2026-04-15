@@ -11,10 +11,10 @@ function resolveActorLabel(actor: ApiAuditEventDto['actor']): string {
 
 function resolveResourceLabel(event: ApiAuditEventDto): string {
   const metadata = (event.metadata ?? {}) as Record<string, unknown>;
-  const endpointPath = typeof metadata.endpointPath === 'string' ? metadata.endpointPath : null;
-  const method = typeof metadata.method === 'string' ? metadata.method : null;
-  const projectName = typeof metadata.projectName === 'string' ? metadata.projectName : null;
-  const scenarioName = typeof metadata.scenarioName === 'string' ? metadata.scenarioName : null;
+  const endpointPath = typeof metadata['endpointPath'] === 'string' ? metadata['endpointPath'] : null;
+  const method = typeof metadata['method'] === 'string' ? metadata['method'] : null;
+  const projectName = typeof metadata['projectName'] === 'string' ? metadata['projectName'] : null;
+  const scenarioName = typeof metadata['scenarioName'] === 'string' ? metadata['scenarioName'] : null;
 
   switch (event.resourceType) {
     case 'endpoint':
