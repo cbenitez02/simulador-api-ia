@@ -6,6 +6,7 @@ import { EndpointsRepository } from '../endpoints/data-access/endpoints.reposito
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import type { GlobalConfig } from '../global-config/models/global-config.model';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
+import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
@@ -226,6 +227,13 @@ describe('WorkspaceShellComponent', () => {
     removeMember: vi.fn(),
   };
 
+  const projectSnapshotsRepository = {
+    list: vi.fn(),
+    get: vi.fn(),
+    create: vi.fn(),
+    restore: vi.fn(),
+  };
+
   const authSession = {
     snapshot: signal({
       state: 'authenticated',
@@ -257,6 +265,7 @@ describe('WorkspaceShellComponent', () => {
         { provide: ProjectsRepository, useValue: projectsRepository },
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
+        { provide: ProjectSnapshotsRepository, useValue: projectSnapshotsRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
       ],
@@ -276,6 +285,10 @@ describe('WorkspaceShellComponent', () => {
     endpointsRepository.deleteEndpoint.mockReset();
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
+    projectSnapshotsRepository.list.mockReset();
+    projectSnapshotsRepository.get.mockReset();
+    projectSnapshotsRepository.create.mockReset();
+    projectSnapshotsRepository.restore.mockReset();
     workspaceMembersRepository.listMembers.mockReset();
     workspaceMembersRepository.addMember.mockReset();
     workspaceMembersRepository.removeMember.mockReset();
@@ -287,6 +300,10 @@ describe('WorkspaceShellComponent', () => {
     authSession.canAccessProtectedRoutes.mockReset();
     authSession.handleProtectedApiError.mockReturnValue(false);
     authSession.canAccessProtectedRoutes.mockReturnValue(true);
+    projectSnapshotsRepository.list.mockResolvedValue({ items: [] });
+    projectSnapshotsRepository.get.mockResolvedValue(null);
+    projectSnapshotsRepository.create.mockResolvedValue(null);
+    projectSnapshotsRepository.restore.mockResolvedValue(undefined);
     authSession.snapshot.set({
       state: 'authenticated',
       userId: 'user-1',

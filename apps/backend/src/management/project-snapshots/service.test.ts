@@ -1,9 +1,24 @@
-import { describe, expect, it } from 'vitest';
-import {
-  buildSnapshotPayload,
-  buildSnapshotEndpointKey,
-  planSnapshotEndpointReconciliation,
-} from './service.js';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type * as ProjectSnapshotsService from './service.js';
+
+vi.mock('../../lib/prisma.js', () => ({
+  prisma: {
+    project: { findUnique: vi.fn() },
+    projectSnapshot: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
+    auditEvent: { findMany: vi.fn(), create: vi.fn() },
+    endpoint: { findUnique: vi.fn() },
+    $transaction: vi.fn(),
+  },
+}));
+
+let buildSnapshotPayload: typeof ProjectSnapshotsService.buildSnapshotPayload;
+let buildSnapshotEndpointKey: typeof ProjectSnapshotsService.buildSnapshotEndpointKey;
+let planSnapshotEndpointReconciliation: typeof ProjectSnapshotsService.planSnapshotEndpointReconciliation;
+
+beforeAll(async () => {
+  ({ buildSnapshotPayload, buildSnapshotEndpointKey, planSnapshotEndpointReconciliation } =
+    await import('./service.js'));
+});
 
 describe('project-snapshots/service helpers', () => {
   it('normalizes canonical project state into an immutable snapshot payload', () => {
