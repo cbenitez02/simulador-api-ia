@@ -183,6 +183,77 @@ export interface GlobalConfigDto {
 
 export type SaveGlobalConfigDto = Omit<GlobalConfigDto, 'projectId'>;
 
+export interface ProjectSnapshotActorDto {
+  userId: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+export interface ProjectSnapshotPayloadEndpointConfigDto {
+  latencyMode: 'fixed' | 'range';
+  fixedDelayMs: number;
+  minDelayMs: number;
+  maxDelayMs: number;
+  errorRate: number;
+  useScenarioWeights: boolean;
+}
+
+export interface ProjectSnapshotPayloadScenarioDto {
+  name: string;
+  type: 'success' | 'error' | 'timeout' | 'empty';
+  statusCode: number;
+  body: unknown;
+  delayMs: number;
+  weight: number;
+}
+
+export interface ProjectSnapshotPayloadEndpointDto {
+  method: string;
+  path: string;
+  description: string;
+  statusCode: number;
+  responseBody: unknown;
+  endpointConfig: ProjectSnapshotPayloadEndpointConfigDto;
+  scenarios: ProjectSnapshotPayloadScenarioDto[];
+}
+
+export interface ProjectSnapshotPayloadDto {
+  project: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+  };
+  globalConfig: GlobalConfigDto;
+  endpoints: ProjectSnapshotPayloadEndpointDto[];
+}
+
+export interface ProjectSnapshotDto {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  createdBy: ProjectSnapshotActorDto;
+}
+
+export interface ProjectSnapshotListDto {
+  items: ProjectSnapshotDto[];
+}
+
+export interface ProjectSnapshotDetailDto extends ProjectSnapshotDto {
+  payload: ProjectSnapshotPayloadDto;
+}
+
+export interface CreateProjectSnapshotDto {
+  name: string;
+  description?: string;
+}
+
+export interface RestoreProjectSnapshotResponseDto {
+  restoredSnapshotId: string;
+}
+
 export interface ApiLogDto {
   id: string;
   projectId: string;
@@ -214,8 +285,14 @@ export interface ApiLogListDto {
   serverTime: string;
 }
 
-export type ApiAuditEventResourceTypeDto = 'project' | 'endpoint' | 'scenario' | 'global-config' | 'endpoint-config';
-export type ApiAuditEventActionDto = 'created' | 'updated' | 'deleted';
+export type ApiAuditEventResourceTypeDto =
+  | 'project'
+  | 'endpoint'
+  | 'scenario'
+  | 'global-config'
+  | 'endpoint-config'
+  | 'snapshot';
+export type ApiAuditEventActionDto = 'created' | 'updated' | 'deleted' | 'restored';
 
 export interface ApiAuditActorDto {
   userId: string;

@@ -36,3 +36,8 @@ export interface CreateProjectAiFlowState {
   message: string;
   retryable: boolean;
 }
+
+export interface SnapshotHistoryState {
+  loadedForProjectId: string | null;
+  latestSnapshotId: string | null;
+}

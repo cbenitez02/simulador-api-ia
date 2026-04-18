@@ -137,7 +137,11 @@
   </main>
 } @else if (activeNav() === 'history') {
   <main class="workspace__main" aria-label="Audit history">
-    <app-audit-history [projectId]="selectedProjectId()" />
+    <app-audit-history
+      [projectId]="selectedProjectId()"
+      [canRestoreSnapshots]="canMutateActiveWorkspace()"
+      (restoreSnapshotRequested)="restoreSnapshot($event)"
+    />
   </main>
 } @else if (activeNav() === 'endpoints') {
   <main class="workspace__main" aria-label="Endpoints">
@@ -173,6 +177,7 @@
       [workspaceMembersError]="workspaceMembersError()"
       [workspaceMemberMutationPending]="workspaceMemberMutationPending()"
       (createEndpoint)="createEndpoint()"
+      (createSnapshot)="createSnapshot()"
       (testAllEndpoints)="testAllEndpoints()"
       (exportConfig)="exportConfig()"
       (importEndpoints)="importEndpoints()"

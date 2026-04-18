@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ApiError } from '../../shared/http/api-error.mapper';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { AuditHistoryComponent } from '../audit-history/audit-history.component';
+import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
+import type { ProjectSnapshot } from '../project-snapshots/models/project-snapshot.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
@@ -41,6 +43,7 @@ import type {
   PaginationState,
   SidebarProjectPaginationState,
   SidebarProjectRow,
+  SnapshotHistoryState,
   WorkspaceNavId,
 } from './models/workspace-shell.model';
 
@@ -83,6 +86,7 @@ export class WorkspaceShellComponent {
   private readonly projectsRepository = inject(ProjectsRepository);
   private readonly endpointsRepository = inject(EndpointsRepository);
   private readonly globalConfigRepository = inject(GlobalConfigRepository);
+  private readonly projectSnapshotsRepository = inject(ProjectSnapshotsRepository);
   private readonly workspaceMembersRepository = inject(WorkspaceMembersRepository);
 
   protected readonly projects = signal<DashboardProject[]>([]);
@@ -180,6 +184,11 @@ export class WorkspaceShellComponent {
   protected readonly selectedEndpointId = signal<string | null>(null);
   protected readonly endpointMutationPending = signal(false);
   protected readonly endpointMutationError = signal<string | null>(null);
+  protected readonly snapshotHistory = signal<ProjectSnapshot[]>([]);
+  protected readonly snapshotHistoryState = signal<SnapshotHistoryState>({
+    loadedForProjectId: null,
+    latestSnapshotId: null,
+  });
 
   protected readonly selectedLog = signal<ApiLogEntry | null>(null);
 
@@ -387,6 +396,12 @@ export class WorkspaceShellComponent {
         void this.reloadEndpointList(projectId);
       }
     }
+    if (id === 'history') {
+      const projectId = this.selectedProjectId() || this.activeProject()?.id;
+      if (projectId) {
+        void this.loadSnapshotHistory(projectId);
+      }
+    }
     if (id !== 'endpoints') {
       this.selectedEndpointId.set(null);
       this.createEndpointFlowOpen.set(false);
@@ -464,6 +479,13 @@ export class WorkspaceShellComponent {
   }
 
   protected testAllEndpoints(): void {}
+
+  protected async createSnapshot(): Promise<void> {
+    if (!this.canMutateActiveWorkspace()) return;
+    const project = this.activeProject();
+    if (!project || this.endpointMutationPending()) return;
+    await this.createProjectSnapshot(project.id, project.name);
+  }
 
   protected exportConfig(): void {
     if (!this.canMutateActiveWorkspace()) return;
@@ -620,6 +642,9 @@ export class WorkspaceShellComponent {
       const refreshed = await this.projectsRepository.getProject(projectId);
       this.projects.update((projects) => projects.map((project) => (project.id === projectId ? refreshed : project)));
       await this.reloadWorkspaceMembers(refreshed.workspace.id);
+      if (this.activeNav() === 'history') {
+        await this.loadSnapshotHistory(projectId, true);
+      }
       await this.reloadEndpointList(projectId);
     } catch (error) {
       this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not refresh project data.');
@@ -1008,6 +1033,62 @@ export class WorkspaceShellComponent {
       this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not remove workspace member.');
     } finally {
       this.workspaceMemberMutationPending.set(false);
+    }
+  }
+
+  protected async restoreSnapshot(snapshotId: string): Promise<void> {
+    if (!this.canMutateActiveWorkspace()) return;
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    if (!projectId || this.endpointMutationPending()) return;
+
+    this.endpointMutationPending.set(true);
+    this.endpointMutationError.set(null);
+
+    try {
+      const snapshot = await this.projectSnapshotsRepository.get(projectId, snapshotId);
+      const confirmed = window.confirm(`Restore snapshot “${snapshot.name}”? Live endpoints/config will be replaced.`);
+      if (!confirmed) return;
+
+      await this.projectSnapshotsRepository.restore(projectId, snapshotId);
+      await this.refreshProject(projectId);
+      await this.loadSnapshotHistory(projectId, true);
+    } catch (error) {
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not restore snapshot.');
+    } finally {
+      this.endpointMutationPending.set(false);
+    }
+  }
+
+  private async createProjectSnapshot(projectId: string, projectName: string): Promise<void> {
+    this.endpointMutationPending.set(true);
+    this.endpointMutationError.set(null);
+
+    try {
+      const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+      await this.projectSnapshotsRepository.create(projectId, {
+        name: `${projectName} @ ${timestamp}`,
+      });
+      await this.loadSnapshotHistory(projectId, true);
+      await this.refreshProject(projectId);
+    } catch (error) {
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not create snapshot.');
+    } finally {
+      this.endpointMutationPending.set(false);
+    }
+  }
+
+  private async loadSnapshotHistory(projectId: string, force = false): Promise<void> {
+    if (!force && this.snapshotHistoryState().loadedForProjectId === projectId) return;
+
+    try {
+      const response = await this.projectSnapshotsRepository.list(projectId);
+      this.snapshotHistory.set(response.items);
+      this.snapshotHistoryState.set({
+        loadedForProjectId: projectId,
+        latestSnapshotId: response.items[0]?.id ?? null,
+      });
+    } catch (error) {
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not load snapshot history.');
     }
   }
 }

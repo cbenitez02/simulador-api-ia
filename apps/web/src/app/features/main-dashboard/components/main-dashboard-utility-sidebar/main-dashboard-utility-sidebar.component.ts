@@ -24,7 +24,7 @@ export interface UtilitySidebarRequestItem {
 }
 
 interface UtilityQuickAction {
-  id: 'create' | 'test' | 'export' | 'import';
+  id: 'create' | 'snapshot' | 'test' | 'export' | 'import';
   title: string;
   subtitle: string;
   icon: 'plus' | 'play' | 'download' | 'upload';
@@ -57,6 +57,7 @@ export class MainDashboardUtilitySidebarComponent {
   readonly workspaceMemberMutationPending = input(false);
 
   readonly createEndpoint = output<void>();
+  readonly createSnapshot = output<void>();
   readonly testAllEndpoints = output<void>();
   readonly exportConfig = output<void>();
   readonly importEndpoints = output<void>();
@@ -70,6 +71,12 @@ export class MainDashboardUtilitySidebarComponent {
       title: 'Create endpoint',
       subtitle: 'Add a new mock endpoint',
       icon: 'plus' as const,
+    },
+    {
+      id: 'snapshot',
+      title: 'Create snapshot',
+      subtitle: 'Save the current project state',
+      icon: 'download' as const,
     },
     {
       id: 'test',
@@ -174,6 +181,10 @@ export class MainDashboardUtilitySidebarComponent {
       case 'create':
         if (!this.canMutate()) return;
         this.createEndpoint.emit();
+        break;
+      case 'snapshot':
+        if (!this.canMutate()) return;
+        this.createSnapshot.emit();
         break;
       case 'test':
         this.testAllEndpoints.emit();
