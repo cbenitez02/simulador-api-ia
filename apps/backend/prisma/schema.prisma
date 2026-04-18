@@ -20,6 +20,7 @@ model Project {
   globalConfig     GlobalConfig?
   logs             ApiLog[]
   auditEvents      AuditEvent[]
+  snapshots        ProjectSnapshot[]
   rateLimitBuckets RuntimeRateLimitBucket[]
 
   @@index([workspaceId])
@@ -191,6 +192,22 @@ model AuditEvent {
   @@index([projectId, createdAt(sort: Desc), id(sort: Desc)])
   @@index([projectId, resourceType, createdAt(sort: Desc), id(sort: Desc)])
   @@index([projectId, action, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+model ProjectSnapshot {
+  id                   String   @id @default(cuid())
+  projectId            String
+  name                 String
+  description          String   @default("")
+  createdByUserId      String
+  createdByEmail       String?
+  createdByDisplayName String?
+  payload              Json
+  createdAt            DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model RuntimeRateLimitBucket {

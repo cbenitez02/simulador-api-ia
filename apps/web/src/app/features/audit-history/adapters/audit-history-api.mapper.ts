@@ -15,6 +15,7 @@ function resolveResourceLabel(event: ApiAuditEventDto): string {
   const method = typeof metadata['method'] === 'string' ? metadata['method'] : null;
   const projectName = typeof metadata['projectName'] === 'string' ? metadata['projectName'] : null;
   const scenarioName = typeof metadata['scenarioName'] === 'string' ? metadata['scenarioName'] : null;
+  const snapshotName = typeof metadata['snapshotName'] === 'string' ? metadata['snapshotName'] : null;
 
   switch (event.resourceType) {
     case 'endpoint':
@@ -27,9 +28,17 @@ function resolveResourceLabel(event: ApiAuditEventDto): string {
       return scenarioName ?? event.resourceId;
     case 'global-config':
       return 'Global config';
+    case 'snapshot':
+      return snapshotName ?? event.resourceId;
     default:
       return event.resourceId;
   }
+}
+
+function resolveActionLabel(event: ApiAuditEventDto): string {
+  if (event.resourceType === 'snapshot' && event.action === 'created') return 'saved snapshot';
+  if (event.resourceType === 'snapshot' && event.action === 'restored') return 'restored snapshot';
+  return event.action;
 }
 
 export function mapAuditEventFromApi(event: ApiAuditEventDto): AuditHistoryEntry {
@@ -43,6 +52,7 @@ export function mapAuditEventFromApi(event: ApiAuditEventDto): AuditHistoryEntry
     resourceId: event.resourceId,
     resourceLabel: resolveResourceLabel(event),
     action: event.action,
+    actionLabel: resolveActionLabel(event),
     summary: event.summary,
     metadata: event.metadata,
     createdAt: event.createdAt,

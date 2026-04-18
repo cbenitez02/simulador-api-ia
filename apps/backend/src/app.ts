@@ -15,6 +15,7 @@ import { endpointsRouter } from './management/endpoints/router.js';
 import { globalConfigRouter } from './management/global-config/router.js';
 import { logsRouter } from './management/logs/router.js';
 import { projectsRouter } from './management/projects/router.js';
+import { projectSnapshotsRouter } from './management/project-snapshots/router.js';
 import { scenariosRouter } from './management/scenarios/router.js';
 import { opsRouter } from './management/ops/router.js';
 import { workspaceMembersRouter } from './management/workspace-members/router.js';
@@ -46,6 +47,7 @@ app.use('/api/v1/endpoints/:endpointId/config', endpointConfigRouter);
 app.use('/api/v1/projects/:projectId/config', globalConfigRouter);
 app.use('/api/v1/projects/:projectId/logs', logsRouter);
 app.use('/api/v1/projects/:projectId/audit-events', auditEventsRouter);
+app.use('/api/v1/projects/:projectId/snapshots', projectSnapshotsRouter);
 app.use('/api/v1/workspaces/:workspaceId/members', workspaceMembersRouter);
 app.use('/mock', mockRouter);
 

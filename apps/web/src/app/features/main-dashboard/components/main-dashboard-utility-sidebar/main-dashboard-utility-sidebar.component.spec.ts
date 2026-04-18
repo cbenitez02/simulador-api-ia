@@ -1,5 +1,5 @@
 import { Injector, runInInjectionContext } from '@angular/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../../../testing/angular-vitest';
 import type { DashboardProject } from '../../models/dashboard-project.model';
 import { MainDashboardUtilitySidebarComponent } from './main-dashboard-utility-sidebar.component';
@@ -16,6 +16,9 @@ type MainDashboardUtilityHarness = MainDashboardUtilitySidebarComponent & {
     timeLabel: string;
   }>;
   globalConfigRows: () => Array<{ label: string; badge: string; tone: 'neutral' | 'success' }>;
+  quickActions: Array<{ id: string; title: string; subtitle: string }>;
+  onQuickAction(id: string): void;
+  createSnapshot: { emit: () => void };
 };
 
 function bindProjectInput(component: { project: unknown }, project: DashboardProject): void {
@@ -115,5 +118,47 @@ describe('MainDashboardUtilitySidebarComponent', () => {
     bindProjectInput(component, { ...projectFixture, recentRequests: [] });
 
     expect(component.recentRequests()).toEqual([]);
+  });
+
+  it('adds a create snapshot quick action gated through the mutation affordance', () => {
+    const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
+    const component = runInInjectionContext(
+      injector,
+      () => new MainDashboardUtilitySidebarComponent(),
+    ) as unknown as MainDashboardUtilityHarness & { project: () => DashboardProject; canMutate: () => boolean };
+
+    bindProjectInput(component, projectFixture);
+    component.canMutate = (() => true) as typeof component.canMutate;
+    const emitSpy = vi.spyOn(component.createSnapshot, 'emit');
+
+    expect(component.quickActions.map((action) => action.id)).toContain('snapshot');
+
+    component.onQuickAction('snapshot');
+
+    expect(emitSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps snapshot quick actions read-only when the workspace cannot mutate', () => {
+    const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
+    const component = runInInjectionContext(
+      injector,
+      () => new MainDashboardUtilitySidebarComponent(),
+    ) as unknown as MainDashboardUtilityHarness & { project: () => DashboardProject; canMutate: () => boolean };
+
+    bindProjectInput(component, {
+      ...projectFixture,
+      workspace: {
+        ...projectFixture.workspace,
+        role: 'viewer',
+        capabilities: { canEdit: false, canManageMembers: false },
+      },
+    });
+    component.canMutate = (() => false) as typeof component.canMutate;
+    const emitSpy = vi.spyOn(component.createSnapshot, 'emit');
+
+    component.onQuickAction('snapshot');
+
+    expect(component.quickActions.map((action) => action.id)).toContain('snapshot');
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 });

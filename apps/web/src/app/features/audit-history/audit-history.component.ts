@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { AuditHistoryRepository } from './data-access/audit-history.repository';
 import type { AuditHistoryCursor, AuditHistoryEntry } from './models/audit-history.model';
 
@@ -26,6 +26,8 @@ export class AuditHistoryComponent {
   private activeProjectId: string | null = null;
 
   readonly projectId = input('');
+  readonly canRestoreSnapshots = input(false);
+  readonly restoreSnapshotRequested = output<string>();
 
   protected readonly entries = signal<AuditHistoryEntry[]>([]);
   protected readonly loading = signal(false);
@@ -44,6 +46,15 @@ export class AuditHistoryComponent {
   }
 
   protected readonly emptyStateMessage = () => 'No audit history yet for this project.';
+
+  protected canRestoreEntry(entry: AuditHistoryEntry): boolean {
+    return this.canRestoreSnapshots() && entry.resourceType === 'snapshot';
+  }
+
+  protected requestRestore(entry: AuditHistoryEntry): void {
+    if (!this.canRestoreEntry(entry)) return;
+    this.restoreSnapshotRequested.emit(entry.resourceId);
+  }
 
   async loadProject(projectId: string): Promise<void> {
     this.loading.set(true);

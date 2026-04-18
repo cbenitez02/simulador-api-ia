@@ -13,8 +13,9 @@ export const auditEventResourceTypeSchema = z.enum([
   'scenario',
   'global-config',
   'endpoint-config',
+  'snapshot',
 ]);
-export const auditEventActionSchema = z.enum(['created', 'updated', 'deleted']);
+export const auditEventActionSchema = z.enum(['created', 'updated', 'deleted', 'restored']);
 
 export const projectParamsSchema = z.object({
   projectId: z.string().min(1),

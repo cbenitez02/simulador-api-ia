@@ -19,10 +19,15 @@
           <div class="audit-history__meta">
             <span class="audit-history__time">{{ entry.timeLabel }}</span>
             <span class="audit-history__actor">{{ entry.actorLabel }}</span>
-            <span class="audit-history__action">{{ entry.action }}</span>
+            <span class="audit-history__action">{{ entry.actionLabel }}</span>
             <span class="audit-history__resource">{{ entry.resourceLabel }}</span>
           </div>
           <p class="audit-history__summary">{{ entry.summary }}</p>
+          @if (canRestoreEntry(entry)) {
+            <button type="button" class="audit-history__load-more" (click)="requestRestore(entry)">
+              Restore snapshot
+            </button>
+          }
         </li>
       }
     </ul>
