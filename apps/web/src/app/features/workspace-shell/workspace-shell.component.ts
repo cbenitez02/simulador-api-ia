@@ -1,7 +1,10 @@
+import { TitleCasePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ApiError } from '../../shared/http/api-error.mapper';
+import type { OpenApiContractAnalyzeDto } from '../../shared/http/api.types';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { AuditHistoryComponent } from '../audit-history/audit-history.component';
+import { ProjectContractsRepository } from './data-access/project-contracts.repository';
 import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
 import type { ProjectSnapshot } from '../project-snapshots/models/project-snapshot.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
@@ -18,7 +21,6 @@ import { CreateEndpointPageComponent } from '../endpoints/components/create-endp
 import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { EndpointsPageComponent } from '../endpoints/endpoints-page.component';
-import type { EndpointDraft } from '../endpoints/models/endpoint-draft.model';
 import { GlobalConfigDrawerComponent } from '../global-config/components/global-config-drawer/global-config-drawer.component';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import { createDefaultGlobalConfig, type GlobalConfig } from '../global-config/models/global-config.model';
@@ -47,13 +49,9 @@ import type {
   WorkspaceNavId,
 } from './models/workspace-shell.model';
 
-interface ExportedWorkspaceProjectConfig {
-  version: 1;
-  exportedAt: string;
-  projectId: string;
-  projectSlug: string;
-  globalConfig: GlobalConfig;
-  endpoints: EndpointDraft[];
+interface ContractImportReviewState {
+  file: File;
+  analysis: OpenApiContractAnalyzeDto;
 }
 
 @Component({
@@ -70,6 +68,7 @@ interface ExportedWorkspaceProjectConfig {
     MainDashboardDataComponent,
     MainDashboardSidebarComponent,
     MainDashboardUtilitySidebarComponent,
+    TitleCasePipe,
     GlobalConfigDrawerComponent,
     CreateProjectModalComponent,
     ConfirmDialogComponent,
@@ -87,6 +86,7 @@ export class WorkspaceShellComponent {
   private readonly endpointsRepository = inject(EndpointsRepository);
   private readonly globalConfigRepository = inject(GlobalConfigRepository);
   private readonly projectSnapshotsRepository = inject(ProjectSnapshotsRepository);
+  private readonly projectContractsRepository = inject(ProjectContractsRepository);
   private readonly workspaceMembersRepository = inject(WorkspaceMembersRepository);
 
   protected readonly projects = signal<DashboardProject[]>([]);
@@ -185,6 +185,7 @@ export class WorkspaceShellComponent {
   protected readonly endpointMutationPending = signal(false);
   protected readonly endpointMutationError = signal<string | null>(null);
   protected readonly snapshotHistory = signal<ProjectSnapshot[]>([]);
+  protected readonly contractImportReview = signal<ContractImportReviewState | null>(null);
   protected readonly snapshotHistoryState = signal<SnapshotHistoryState>({
     loadedForProjectId: null,
     latestSnapshotId: null,
@@ -488,7 +489,6 @@ export class WorkspaceShellComponent {
   }
 
   protected exportConfig(): void {
-    if (!this.canMutateActiveWorkspace()) return;
     const project = this.activeProject();
     if (!project || this.endpointMutationPending()) return;
     void this.exportProjectConfiguration(project.id, project.slug);
@@ -501,13 +501,26 @@ export class WorkspaceShellComponent {
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'application/json';
+    input.accept = '.json,.yaml,.yml,application/json,application/yaml,text/yaml';
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
-      void this.importProjectEndpoints(projectId, file);
+      void this.analyzeProjectContractImport(projectId, file);
     };
     input.click();
+  }
+
+  protected cancelContractImportReview(): void {
+    if (this.endpointMutationPending()) return;
+    this.contractImportReview.set(null);
+  }
+
+  protected confirmContractImport(): void {
+    if (!this.canMutateActiveWorkspace()) return;
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    const review = this.contractImportReview();
+    if (!projectId || !review || this.endpointMutationPending()) return;
+    void this.commitProjectContractImport(projectId, review.file);
   }
 
   protected editGlobalConfig(): void {
@@ -626,6 +639,7 @@ export class WorkspaceShellComponent {
       this.endpointList.set([]);
       this.workspaceMembers.set([]);
       this.workspaceMembersError.set(null);
+      this.contractImportReview.set(null);
       this.selectedProjectId.set('');
       this.projectsError.set(error instanceof Error ? error.message : 'Could not load projects.');
     } finally {
@@ -646,6 +660,7 @@ export class WorkspaceShellComponent {
         await this.loadSnapshotHistory(projectId, true);
       }
       await this.reloadEndpointList(projectId);
+      this.contractImportReview.set(null);
     } catch (error) {
       this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not refresh project data.');
     }
@@ -873,57 +888,52 @@ export class WorkspaceShellComponent {
     this.endpointMutationError.set(null);
 
     try {
-      const globalConfig = await this.globalConfigRepository.getConfig(projectId);
-      const endpoints = await Promise.all(
-        this.endpoints().map((endpoint) => this.endpointsRepository.loadDraft(projectId, endpoint.id)),
-      );
-
-      const payload: ExportedWorkspaceProjectConfig = {
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        projectId,
-        projectSlug,
-        globalConfig,
-        endpoints,
-      };
-
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const payload = await this.projectContractsRepository.exportContract(projectId, 'json');
+      const blob = new Blob([payload.text], { type: payload.contentType });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `${projectSlug}-config.json`;
+      anchor.download = payload.filename || `${projectSlug}-openapi.json`;
       anchor.click();
       URL.revokeObjectURL(url);
+
+      if (payload.warnings.length > 0) {
+        this.endpointMutationError.set(
+          `Contract exported with ${payload.warnings.length} warning${payload.warnings.length === 1 ? '' : 's'}.`,
+        );
+      }
     } catch (error) {
-      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not export project config.');
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not export project contract.');
     } finally {
       this.endpointMutationPending.set(false);
     }
   }
 
-  private async importProjectEndpoints(projectId: string, file: File): Promise<void> {
+  private async analyzeProjectContractImport(projectId: string, file: File): Promise<void> {
+    this.endpointMutationPending.set(true);
+    this.endpointMutationError.set(null);
+    this.contractImportReview.set(null);
+
+    try {
+      const analysis = await this.projectContractsRepository.analyzeContract(projectId, file);
+      this.contractImportReview.set({ file, analysis });
+    } catch (error) {
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not analyze project contract.');
+    } finally {
+      this.endpointMutationPending.set(false);
+    }
+  }
+
+  private async commitProjectContractImport(projectId: string, file: File): Promise<void> {
     this.endpointMutationPending.set(true);
     this.endpointMutationError.set(null);
 
     try {
-      const rawText = await file.text();
-      const parsed = JSON.parse(rawText) as Partial<ExportedWorkspaceProjectConfig>;
-
-      if (!Array.isArray(parsed.endpoints)) {
-        throw new Error('Invalid import file: endpoints array is required.');
-      }
-
-      if (parsed.globalConfig) {
-        await this.globalConfigRepository.saveConfig(projectId, parsed.globalConfig);
-      }
-
-      for (const endpoint of parsed.endpoints) {
-        await this.endpointsRepository.saveEndpoint(projectId, endpoint, null);
-      }
-
+      await this.projectContractsRepository.importContract(projectId, file);
+      this.contractImportReview.set(null);
       await this.refreshProject(projectId);
     } catch (error) {
-      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not import endpoints.');
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not import project contract.');
     } finally {
       this.endpointMutationPending.set(false);
     }

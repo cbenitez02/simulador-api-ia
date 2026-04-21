@@ -11,6 +11,7 @@ import { ProjectsRepository } from '../main-dashboard/data-access/projects.repos
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
+import { ProjectContractsRepository } from './data-access/project-contracts.repository';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 
@@ -112,6 +113,12 @@ describe('WorkspaceShellComponent integration', () => {
     restore: vi.fn(),
   };
 
+  const projectContractsRepository = {
+    exportContract: vi.fn(),
+    analyzeContract: vi.fn(),
+    importContract: vi.fn(),
+  };
+
   const authSession = {
     snapshot: signal({
       state: 'authenticated',
@@ -152,6 +159,9 @@ describe('WorkspaceShellComponent integration', () => {
     projectSnapshotsRepository.get.mockReset();
     projectSnapshotsRepository.create.mockReset();
     projectSnapshotsRepository.restore.mockReset();
+    projectContractsRepository.exportContract.mockReset();
+    projectContractsRepository.analyzeContract.mockReset();
+    projectContractsRepository.importContract.mockReset();
     workspaceMembersRepository.listMembers.mockReset();
     workspaceMembersRepository.addMember.mockReset();
     workspaceMembersRepository.removeMember.mockReset();
@@ -167,6 +177,27 @@ describe('WorkspaceShellComponent integration', () => {
     projectSnapshotsRepository.get.mockResolvedValue(null);
     projectSnapshotsRepository.create.mockResolvedValue(null);
     projectSnapshotsRepository.restore.mockResolvedValue(undefined);
+    projectContractsRepository.exportContract.mockResolvedValue({
+      text: '{"openapi":"3.0.3"}',
+      filename: 'users-api-openapi.json',
+      contentType: 'application/json',
+      warnings: [],
+    });
+    projectContractsRepository.analyzeContract.mockResolvedValue({
+      document: { title: 'Users API', version: '1.0.0', format: 'json' },
+      summary: { create: 0, update: 0, delete: 0, warnings: 0, errors: 0 },
+      operations: [],
+      warnings: [],
+      errors: [],
+    });
+    projectContractsRepository.importContract.mockResolvedValue({
+      document: { title: 'Users API', version: '1.0.0', format: 'json' },
+      summary: { create: 0, update: 0, delete: 0, warnings: 0, errors: 0 },
+      operations: [],
+      warnings: [],
+      errors: [],
+      committed: { created: 0, updated: 0, deleted: 0 },
+    });
     authSession.snapshot.set({
       state: 'authenticated',
       userId: 'user-1',
@@ -277,6 +308,7 @@ describe('WorkspaceShellComponent integration', () => {
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
         { provide: ProjectSnapshotsRepository, useValue: projectSnapshotsRepository },
+        { provide: ProjectContractsRepository, useValue: projectContractsRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
       ],

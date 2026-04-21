@@ -16,6 +16,7 @@ function resolveResourceLabel(event: ApiAuditEventDto): string {
   const projectName = typeof metadata['projectName'] === 'string' ? metadata['projectName'] : null;
   const scenarioName = typeof metadata['scenarioName'] === 'string' ? metadata['scenarioName'] : null;
   const snapshotName = typeof metadata['snapshotName'] === 'string' ? metadata['snapshotName'] : null;
+  const contractName = typeof metadata['contractName'] === 'string' ? metadata['contractName'] : null;
 
   switch (event.resourceType) {
     case 'endpoint':
@@ -30,6 +31,8 @@ function resolveResourceLabel(event: ApiAuditEventDto): string {
       return 'Global config';
     case 'snapshot':
       return snapshotName ?? event.resourceId;
+    case 'contract':
+      return contractName ?? 'OpenAPI contract';
     default:
       return event.resourceId;
   }
@@ -38,6 +41,9 @@ function resolveResourceLabel(event: ApiAuditEventDto): string {
 function resolveActionLabel(event: ApiAuditEventDto): string {
   if (event.resourceType === 'snapshot' && event.action === 'created') return 'saved snapshot';
   if (event.resourceType === 'snapshot' && event.action === 'restored') return 'restored snapshot';
+  if (event.resourceType === 'contract' && event.action === 'analyzed') return 'analyzed contract';
+  if (event.resourceType === 'contract' && event.action === 'exported') return 'exported contract';
+  if (event.resourceType === 'contract' && event.action === 'imported') return 'imported contract';
   return event.action;
 }
 

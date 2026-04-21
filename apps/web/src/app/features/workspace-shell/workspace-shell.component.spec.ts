@@ -7,6 +7,7 @@ import { GlobalConfigRepository } from '../global-config/data-access/global-conf
 import type { GlobalConfig } from '../global-config/models/global-config.model';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
+import { ProjectContractsRepository } from './data-access/project-contracts.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
@@ -49,6 +50,7 @@ type WorkspaceShellTestApi = {
   createProjectModalLoading: () => boolean;
   createProjectError: () => string | null;
   createProjectPartialState: WritableSignalLike<CreateProjectAiFlowState | null>;
+  contractImportReview: WritableSignalLike<unknown | null>;
   editProjectModalOpen: WritableSignalLike<boolean>;
   editProjectModalLoading: () => boolean;
   editProjectError: () => string | null;
@@ -71,6 +73,8 @@ type WorkspaceShellTestApi = {
   onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void;
   retryCreateProjectEndpointGeneration(): void;
   continueCreateProjectManually(): void;
+  confirmContractImport(): void;
+  cancelContractImportReview(): void;
 };
 
 function flushAsyncWork(cycles = 4): Promise<void> {
@@ -234,6 +238,12 @@ describe('WorkspaceShellComponent', () => {
     restore: vi.fn(),
   };
 
+  const projectContractsRepository = {
+    exportContract: vi.fn(),
+    analyzeContract: vi.fn(),
+    importContract: vi.fn(),
+  };
+
   const authSession = {
     snapshot: signal({
       state: 'authenticated',
@@ -266,6 +276,7 @@ describe('WorkspaceShellComponent', () => {
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
         { provide: ProjectSnapshotsRepository, useValue: projectSnapshotsRepository },
+        { provide: ProjectContractsRepository, useValue: projectContractsRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
       ],
@@ -289,6 +300,9 @@ describe('WorkspaceShellComponent', () => {
     projectSnapshotsRepository.get.mockReset();
     projectSnapshotsRepository.create.mockReset();
     projectSnapshotsRepository.restore.mockReset();
+    projectContractsRepository.exportContract.mockReset();
+    projectContractsRepository.analyzeContract.mockReset();
+    projectContractsRepository.importContract.mockReset();
     workspaceMembersRepository.listMembers.mockReset();
     workspaceMembersRepository.addMember.mockReset();
     workspaceMembersRepository.removeMember.mockReset();
@@ -304,6 +318,27 @@ describe('WorkspaceShellComponent', () => {
     projectSnapshotsRepository.get.mockResolvedValue(null);
     projectSnapshotsRepository.create.mockResolvedValue(null);
     projectSnapshotsRepository.restore.mockResolvedValue(undefined);
+    projectContractsRepository.exportContract.mockResolvedValue({
+      text: '{"openapi":"3.0.3"}',
+      filename: 'users-api-openapi.json',
+      contentType: 'application/json',
+      warnings: [],
+    });
+    projectContractsRepository.analyzeContract.mockResolvedValue({
+      document: { title: 'Users API', version: '1.0.0', format: 'json' },
+      summary: { create: 1, update: 0, delete: 0, warnings: 1, errors: 0 },
+      operations: [{ method: 'POST', path: '/accounts', action: 'create', warnings: [] }],
+      warnings: [{ code: 'missing-example', message: 'Placeholder', path: 'POST /accounts' }],
+      errors: [],
+    });
+    projectContractsRepository.importContract.mockResolvedValue({
+      document: { title: 'Users API', version: '1.0.0', format: 'json' },
+      summary: { create: 1, update: 0, delete: 0, warnings: 1, errors: 0 },
+      operations: [{ method: 'POST', path: '/accounts', action: 'create', warnings: [] }],
+      warnings: [{ code: 'missing-example', message: 'Placeholder', path: 'POST /accounts' }],
+      errors: [],
+      committed: { created: 1, updated: 0, deleted: 0 },
+    });
     authSession.snapshot.set({
       state: 'authenticated',
       userId: 'user-1',
@@ -895,5 +930,56 @@ describe('WorkspaceShellComponent', () => {
     expect(component.deleteProjectDialogOpen()).toBe(true);
     expect(component.deleteProjectError()).toBe('Delete failed on server.');
     expect(component.selectedProjectId()).toBe('project-1');
+  });
+
+  it('stores analyze results so the user can review warnings before importing', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.contractImportReview.set({
+      file: new File(['{}'], 'contract.json', { type: 'application/json' }),
+      analysis: {
+        document: { title: 'Users API', version: '1.0.0', format: 'json' },
+        summary: { create: 1, update: 0, delete: 0, warnings: 1, errors: 0 },
+        operations: [{ method: 'POST', path: '/accounts', action: 'create', warnings: [] }],
+        warnings: [{ code: 'missing-example', message: 'Placeholder', path: 'POST /accounts' }],
+        errors: [],
+      },
+    });
+
+    expect(component.contractImportReview()).toMatchObject({
+      file: expect.objectContaining({ name: 'contract.json' }),
+      analysis: expect.objectContaining({ summary: expect.objectContaining({ create: 1, warnings: 1 }) }),
+    });
+
+    component.cancelContractImportReview();
+    expect(component.contractImportReview()).toBe(null);
+  });
+
+  it('commits the reviewed contract import through the backend repository', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+
+    const component = createComponent();
+    await flushAsyncWork();
+    const file = new File(['{}'], 'contract.json', { type: 'application/json' });
+
+    component.contractImportReview.set({
+      file,
+      analysis: {
+        document: { title: 'Users API', version: '1.0.0', format: 'json' },
+        summary: { create: 1, update: 0, delete: 0, warnings: 0, errors: 0 },
+        operations: [{ method: 'POST', path: '/accounts', action: 'create', warnings: [] }],
+        warnings: [],
+        errors: [],
+      },
+    });
+
+    component.confirmContractImport();
+    await flushAsyncWork();
+
+    expect(projectContractsRepository.importContract).toHaveBeenCalledWith('project-1', file);
+    expect(component.contractImportReview()).toBe(null);
   });
 });

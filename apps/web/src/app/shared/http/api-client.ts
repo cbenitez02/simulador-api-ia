@@ -13,7 +13,32 @@ export class ApiClient {
     return this.request(() => firstValueFrom(this.http.get<T>(this.url(path))));
   }
 
+  getTextResponse(path: string): Promise<{ body: string; headers: Record<string, string | null> }> {
+    return this.request(async () => {
+      const response = await firstValueFrom(
+        this.http.get(this.url(path), {
+          observe: 'response',
+          responseType: 'text',
+        }),
+      );
+
+      const headers: Record<string, string | null> = {};
+      for (const key of response.headers.keys()) {
+        headers[key.toLowerCase()] = response.headers.get(key);
+      }
+
+      return {
+        body: response.body ?? '',
+        headers,
+      };
+    });
+  }
+
   post<TResponse, TBody>(path: string, body: TBody): Promise<TResponse> {
+    return this.request(() => firstValueFrom(this.http.post<TResponse>(this.url(path), body)));
+  }
+
+  postForm<TResponse>(path: string, body: FormData): Promise<TResponse> {
     return this.request(() => firstValueFrom(this.http.post<TResponse>(this.url(path), body)));
   }
 

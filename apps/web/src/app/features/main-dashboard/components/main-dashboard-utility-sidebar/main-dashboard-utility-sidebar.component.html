@@ -7,8 +7,10 @@
           <button
             type="button"
             class="utility__action"
-            [disabled]="action.disabled === true || (!canMutate() && action.id !== 'test')"
-            [attr.aria-disabled]="action.disabled === true || (!canMutate() && action.id !== 'test')"
+            [disabled]="action.disabled === true || (!canMutate() && action.id !== 'test' && action.id !== 'export')"
+            [attr.aria-disabled]="
+              action.disabled === true || (!canMutate() && action.id !== 'test' && action.id !== 'export')
+            "
             [title]="action.disabled ? action.subtitle : null"
             (click)="onQuickAction(action.id)"
           >
