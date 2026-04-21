@@ -5,6 +5,7 @@ import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-sess
 import { AuditHistoryComponent } from '../audit-history/audit-history.component';
 import { AuditHistoryRepository } from '../audit-history/data-access/audit-history.repository';
 import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
+import { ProjectContractsRepository } from './data-access/project-contracts.repository';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
@@ -47,6 +48,12 @@ describe('WorkspaceShellComponent audit history integration', () => {
     get: vi.fn(),
     create: vi.fn(),
     restore: vi.fn(),
+  };
+
+  const projectContractsRepository = {
+    exportContract: vi.fn(),
+    analyzeContract: vi.fn(),
+    importContract: vi.fn(),
   };
 
   const endpointsRepository = {
@@ -99,9 +106,33 @@ describe('WorkspaceShellComponent audit history integration', () => {
     projectSnapshotsRepository.get.mockReset();
     projectSnapshotsRepository.create.mockReset();
     projectSnapshotsRepository.restore.mockReset();
+    projectContractsRepository.exportContract.mockReset();
+    projectContractsRepository.analyzeContract.mockReset();
+    projectContractsRepository.importContract.mockReset();
     workspaceMembersRepository.listMembers.mockReset();
     workspaceMembersRepository.listMembers.mockResolvedValue([]);
     projectSnapshotsRepository.list.mockResolvedValue({ items: [] });
+    projectContractsRepository.exportContract.mockResolvedValue({
+      text: '{"openapi":"3.0.3"}',
+      filename: 'users-api-openapi.json',
+      contentType: 'application/json',
+      warnings: [],
+    });
+    projectContractsRepository.analyzeContract.mockResolvedValue({
+      document: { title: 'Users API', version: '1.0.0', format: 'json' },
+      summary: { create: 0, update: 0, delete: 0, warnings: 0, errors: 0 },
+      operations: [],
+      warnings: [],
+      errors: [],
+    });
+    projectContractsRepository.importContract.mockResolvedValue({
+      document: { title: 'Users API', version: '1.0.0', format: 'json' },
+      summary: { create: 0, update: 0, delete: 0, warnings: 0, errors: 0 },
+      operations: [],
+      warnings: [],
+      errors: [],
+      committed: { created: 0, updated: 0, deleted: 0 },
+    });
   });
 
   async function renderHistorySnapshot(injector: Injector, projectId: string): Promise<string> {
@@ -126,6 +157,7 @@ describe('WorkspaceShellComponent audit history integration', () => {
         { provide: ProjectsRepository, useValue: projectsRepository },
         { provide: AuditHistoryRepository, useValue: auditHistoryRepository },
         { provide: ProjectSnapshotsRepository, useValue: projectSnapshotsRepository },
+        { provide: ProjectContractsRepository, useValue: projectContractsRepository },
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },

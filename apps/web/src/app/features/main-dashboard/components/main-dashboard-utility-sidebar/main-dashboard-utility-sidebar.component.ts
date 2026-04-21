@@ -87,14 +87,14 @@ export class MainDashboardUtilitySidebarComponent {
     },
     {
       id: 'export',
-      title: 'Export config',
-      subtitle: 'Download project as JSON',
+      title: 'Export contract',
+      subtitle: 'Download backend OpenAPI JSON or YAML',
       icon: 'download' as const,
     },
     {
       id: 'import',
-      title: 'Import endpoints',
-      subtitle: 'Bulk import from file',
+      title: 'Import contract',
+      subtitle: 'Analyze an OpenAPI file before commit',
       icon: 'upload' as const,
     },
   ];
@@ -190,7 +190,6 @@ export class MainDashboardUtilitySidebarComponent {
         this.testAllEndpoints.emit();
         break;
       case 'export':
-        if (!this.canMutate()) return;
         this.exportConfig.emit();
         break;
       case 'import':

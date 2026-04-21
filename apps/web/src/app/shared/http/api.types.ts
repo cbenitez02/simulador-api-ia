@@ -285,14 +285,63 @@ export interface ApiLogListDto {
   serverTime: string;
 }
 
+export type OpenApiContractFormatDto = 'json' | 'yaml';
+
+export interface OpenApiContractMessageDto {
+  code: string;
+  message: string;
+  path?: string;
+}
+
+export interface OpenApiContractOperationDto {
+  method: string;
+  path: string;
+  action: 'create' | 'update' | 'delete' | 'keep';
+  warnings: string[];
+}
+
+export interface OpenApiContractAnalyzeDto {
+  document: {
+    title: string;
+    version: string;
+    format: OpenApiContractFormatDto;
+  };
+  summary: {
+    create: number;
+    update: number;
+    delete: number;
+    warnings: number;
+    errors: number;
+  };
+  operations: OpenApiContractOperationDto[];
+  warnings: OpenApiContractMessageDto[];
+  errors: OpenApiContractMessageDto[];
+}
+
+export interface OpenApiContractImportDto extends OpenApiContractAnalyzeDto {
+  committed: {
+    created: number;
+    updated: number;
+    deleted: number;
+  };
+}
+
 export type ApiAuditEventResourceTypeDto =
   | 'project'
   | 'endpoint'
   | 'scenario'
   | 'global-config'
   | 'endpoint-config'
-  | 'snapshot';
-export type ApiAuditEventActionDto = 'created' | 'updated' | 'deleted' | 'restored';
+  | 'snapshot'
+  | 'contract';
+export type ApiAuditEventActionDto =
+  | 'created'
+  | 'updated'
+  | 'deleted'
+  | 'restored'
+  | 'analyzed'
+  | 'exported'
+  | 'imported';
 
 export interface ApiAuditActorDto {
   userId: string;

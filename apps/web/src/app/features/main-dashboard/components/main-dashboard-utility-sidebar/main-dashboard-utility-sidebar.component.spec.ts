@@ -19,6 +19,7 @@ type MainDashboardUtilityHarness = MainDashboardUtilitySidebarComponent & {
   quickActions: Array<{ id: string; title: string; subtitle: string }>;
   onQuickAction(id: string): void;
   createSnapshot: { emit: () => void };
+  exportConfig: { emit: () => void };
 };
 
 function bindProjectInput(component: { project: unknown }, project: DashboardProject): void {
@@ -160,5 +161,28 @@ describe('MainDashboardUtilitySidebarComponent', () => {
 
     expect(component.quickActions.map((action) => action.id)).toContain('snapshot');
     expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('labels import/export actions as contract flows and still allows export for viewers', () => {
+    const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
+    const component = runInInjectionContext(
+      injector,
+      () => new MainDashboardUtilitySidebarComponent(),
+    ) as unknown as MainDashboardUtilityHarness & { project: () => DashboardProject; canMutate: () => boolean };
+
+    bindProjectInput(component, projectFixture);
+    component.canMutate = (() => false) as typeof component.canMutate;
+    const exportSpy = vi.spyOn(component.exportConfig, 'emit');
+
+    expect(component.quickActions.find((action) => action.id === 'export')).toMatchObject({
+      title: 'Export contract',
+    });
+    expect(component.quickActions.find((action) => action.id === 'import')).toMatchObject({
+      title: 'Import contract',
+    });
+
+    component.onQuickAction('export');
+
+    expect(exportSpy).toHaveBeenCalledTimes(1);
   });
 });

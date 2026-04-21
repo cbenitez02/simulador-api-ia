@@ -167,6 +167,53 @@
   </main>
 }
 
+@if (contractImportReview(); as review) {
+  <section class="workspace__contract-review" aria-label="OpenAPI contract review">
+    <h2>Review OpenAPI import</h2>
+    <p>
+      {{ review.file.name }} · {{ review.analysis.summary.create }} create · {{ review.analysis.summary.update }} update
+      · {{ review.analysis.summary.delete }} delete
+    </p>
+    @if (review.analysis.warnings.length > 0) {
+      <ul>
+        @for (warning of review.analysis.warnings; track warning.code + warning.message + (warning.path ?? '')) {
+          <li>
+            {{ warning.message }}
+            @if (warning.path) {
+              — {{ warning.path }}
+            }
+          </li>
+        }
+      </ul>
+    }
+    @if (review.analysis.operations.length > 0) {
+      <ul>
+        @for (operation of review.analysis.operations; track operation.method + operation.path) {
+          <li>{{ operation.action | titlecase }} · {{ operation.method }} {{ operation.path }}</li>
+        }
+      </ul>
+    }
+    <div class="workspace__needs-project-actions">
+      <button
+        type="button"
+        class="workspace__needs-project-btn workspace__needs-project-btn--primary"
+        [disabled]="!canMutateActiveWorkspace() || endpointMutationPending()"
+        (click)="confirmContractImport()"
+      >
+        Confirm import
+      </button>
+      <button
+        type="button"
+        class="workspace__needs-project-btn"
+        [disabled]="endpointMutationPending()"
+        (click)="cancelContractImportReview()"
+      >
+        Cancel
+      </button>
+    </div>
+  </section>
+}
+
 @if (activeNav() === 'dashboard' && hasProjects()) {
   @if (activeProject(); as project) {
     <app-main-dashboard-utility-sidebar

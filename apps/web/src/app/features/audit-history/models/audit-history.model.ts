@@ -1,5 +1,12 @@
-export type AuditResourceType = 'project' | 'endpoint' | 'scenario' | 'global-config' | 'endpoint-config' | 'snapshot';
-export type AuditAction = 'created' | 'updated' | 'deleted' | 'restored';
+export type AuditResourceType =
+  | 'project'
+  | 'endpoint'
+  | 'scenario'
+  | 'global-config'
+  | 'endpoint-config'
+  | 'snapshot'
+  | 'contract';
+export type AuditAction = 'created' | 'updated' | 'deleted' | 'restored' | 'exported' | 'imported';
 
 export interface AuditHistoryActor {
   userId: string;
