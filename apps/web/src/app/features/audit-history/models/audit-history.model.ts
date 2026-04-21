@@ -6,7 +6,7 @@ export type AuditResourceType =
   | 'endpoint-config'
   | 'snapshot'
   | 'contract';
-export type AuditAction = 'created' | 'updated' | 'deleted' | 'restored' | 'exported' | 'imported';
+export type AuditAction = 'created' | 'updated' | 'deleted' | 'restored' | 'analyzed' | 'exported' | 'imported';
 
 export interface AuditHistoryActor {
   userId: string;

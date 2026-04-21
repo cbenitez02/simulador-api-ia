@@ -75,6 +75,8 @@ type ParsedOpenApiDocument = {
   warnings: ProjectContractMessage[];
 };
 
+type OpenApiExampleObject = Exclude<OpenAPIV3.ExampleObject | OpenAPIV3.ReferenceObject, undefined>;
+
 type AnalyzePlan = {
   parsed: ParsedOpenApiDocument;
   result: ProjectContractAnalyzeResult;
@@ -87,6 +89,45 @@ type AnalyzePlan = {
 const SUPPORTED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 export function buildProjectContractKey(method: string, path: string): string {
   return `${method.trim().toUpperCase()} ${path.trim()}`;
+}
+
+function isOpenApiExampleObject(value: unknown): value is OpenApiExampleObject {
+  return typeof value === 'object' && value !== null;
+}
+
+function getOperationExtension(
+  operation: OpenAPIV3.OperationObject
+): OpenApiOperationExtension | undefined {
+  const extension = (operation as Record<string, unknown>)['x-simulador-api-ia'];
+  return typeof extension === 'object' && extension !== null
+    ? (extension as OpenApiOperationExtension)
+    : undefined;
+}
+
+function getRootExtension(document: OpenAPIV3.Document): OpenApiRootExtension | undefined {
+  const extension = (document as unknown as Record<string, unknown>)['x-simulador-api-ia'];
+  return typeof extension === 'object' && extension !== null
+    ? (extension as OpenApiRootExtension)
+    : undefined;
+}
+
+function getPathItemOperation(
+  pathItem: OpenAPIV3.PathItemObject,
+  method: SupportedMethod
+): OpenAPIV3.OperationObject | OpenAPIV3.ReferenceObject | undefined {
+  return (pathItem as Record<string, unknown>)[method.toLowerCase()] as
+    | OpenAPIV3.OperationObject
+    | OpenAPIV3.ReferenceObject
+    | undefined;
+}
+
+function setPathItemOperation(
+  pathItem: OpenAPIV3.PathItemObject,
+  method: string,
+  operation: OpenAPIV3.OperationObject
+): void {
+  (pathItem as Record<string, OpenAPIV3.OperationObject | undefined>)[method.toLowerCase()] =
+    operation;
 }
 
 function normalizeEndpointConfig(
@@ -255,7 +296,7 @@ function extractOperationExample(operation: OpenAPIV3.OperationObject): {
 
   const firstNamedExample = media.examples ? Object.values(media.examples)[0] : undefined;
   if (
-    firstNamedExample &&
+    isOpenApiExampleObject(firstNamedExample) &&
     !('$ref' in firstNamedExample) &&
     firstNamedExample.value !== undefined
   ) {
@@ -320,7 +361,7 @@ export async function parseProjectContractDocument(
 
   let validated: OpenAPIV3.Document;
   try {
-    validated = (await SwaggerParser.validate(raw as object)) as OpenAPIV3.Document;
+    validated = (await SwaggerParser.validate(raw as OpenAPIV3.Document)) as OpenAPIV3.Document;
   } catch (error) {
     throw new AppError(400, 'Contract is not a valid OpenAPI document', {
       code: 'OPENAPI_INVALID',
@@ -339,8 +380,10 @@ export async function parseProjectContractDocument(
   for (const [path, pathItem] of Object.entries(validated.paths ?? {})) {
     if (!pathItem) continue;
 
+    const typedPathItem = pathItem as OpenAPIV3.PathItemObject;
+
     for (const method of SUPPORTED_METHODS) {
-      const operation = pathItem[method.toLowerCase() as keyof OpenAPIV3.PathItemObject];
+      const operation = getPathItemOperation(typedPathItem, method);
       if (!operation || '$ref' in operation) continue;
 
       const example = extractOperationExample(operation);
@@ -353,21 +396,23 @@ export async function parseProjectContractDocument(
         });
       }
 
-      const extension = (operation['x-simulador-api-ia'] ?? {}) as OpenApiOperationExtension;
+      const extension = getOperationExtension(operation);
       operations.push({
         method,
         path,
         description: operation.description ?? operation.summary ?? '',
         statusCode: example.statusCode,
         responseBody: example.responseBody,
-        endpointConfig: extension.endpointConfig,
-        scenarios: extension.scenarios,
+        ...(extension?.endpointConfig !== undefined
+          ? { endpointConfig: extension.endpointConfig }
+          : {}),
+        ...(extension?.scenarios !== undefined ? { scenarios: extension.scenarios } : {}),
         warnings: operationWarnings,
       });
       warnings.push(...operationWarnings);
     }
 
-    for (const [methodName] of Object.entries(pathItem)) {
+    for (const methodName of Object.keys(pathItem as Record<string, unknown>)) {
       if (
         !SUPPORTED_METHODS.includes(methodName.toUpperCase() as SupportedMethod) &&
         !['parameters', '$ref', 'summary', 'description', 'servers'].includes(methodName)
@@ -381,12 +426,14 @@ export async function parseProjectContractDocument(
     }
   }
 
+  const rootExtension = getRootExtension(validated);
+
   return {
     document: validated,
     format,
     title: validated.info?.title?.trim() || 'Imported contract',
     version: validated.info?.version?.trim() || '1.0.0',
-    rootExtension: (validated['x-simulador-api-ia'] ?? {}) as OpenApiRootExtension,
+    ...(rootExtension ? { rootExtension } : {}),
     operations,
     warnings,
   };
@@ -443,37 +490,41 @@ export function buildProjectContractDocument(project: LiveProjectState): {
     }
 
     const pathItem = (paths[endpoint.path] ?? {}) as OpenAPIV3.PathItemObject;
-    pathItem[endpoint.method.toLowerCase() as keyof OpenAPIV3.PathItemObject] = {
-      summary: endpoint.description || undefined,
-      description: endpoint.description || undefined,
+    const operation: OpenAPIV3.OperationObject & Record<string, unknown> = {
+      ...(endpoint.description
+        ? { summary: endpoint.description, description: endpoint.description }
+        : {}),
       responses: {
         [String(endpoint.statusCode)]: toOpenApiResponse(endpoint.responseBody),
       },
-      'x-simulador-api-ia': {
-        endpointConfig: normalizeEndpointConfig(endpoint.endpointConfig),
-        scenarios: normalizeScenarioList(
-          endpoint.scenarios,
-          endpoint.statusCode,
-          endpoint.responseBody
-        ),
-      },
-    } as OpenAPIV3.OperationObject;
+    };
+    operation['x-simulador-api-ia'] = {
+      endpointConfig: normalizeEndpointConfig(endpoint.endpointConfig),
+      scenarios: normalizeScenarioList(
+        endpoint.scenarios,
+        endpoint.statusCode,
+        endpoint.responseBody
+      ),
+    };
+    setPathItemOperation(pathItem, endpoint.method, operation);
     paths[endpoint.path] = pathItem;
   }
 
-  return {
-    document: {
-      openapi: '3.0.3',
-      info: {
-        title: project.name,
-        version: '1.0.0',
-        description: project.description || undefined,
-      },
-      paths,
-      'x-simulador-api-ia': {
-        globalConfig: normalizeGlobalConfig(project.id, project.globalConfig),
-      },
+  const document: OpenAPIV3.Document & Record<string, unknown> = {
+    openapi: '3.0.3',
+    info: {
+      title: project.name,
+      version: '1.0.0',
+      ...(project.description ? { description: project.description } : {}),
     },
+    paths,
+  };
+  document['x-simulador-api-ia'] = {
+    globalConfig: normalizeGlobalConfig(project.id, project.globalConfig),
+  };
+
+  return {
+    document,
     warnings,
   };
 }

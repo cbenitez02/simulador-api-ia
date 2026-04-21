@@ -1,5 +1,5 @@
 import multer from 'multer';
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { requireRequestActor } from '../../auth/request-context.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { projectContractFormatQuerySchema, projectContractParamsSchema } from './schema.js';
@@ -9,8 +9,12 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 export const projectContractsRouter = Router({ mergeParams: true });
 
-function requireUploadedContract(req: Parameters<typeof projectContractsRouter.post>[1][0]) {
-  const file = (req as typeof req & { file?: { buffer: Buffer; originalname?: string } }).file;
+type UploadedContractRequest = Request & {
+  file?: { buffer: Buffer; originalname?: string };
+};
+
+function requireUploadedContract(req: Request) {
+  const file = (req as UploadedContractRequest).file;
   if (!file?.buffer?.length) {
     throw new AppError(400, 'Contract file is required', { code: 'OPENAPI_FILE_REQUIRED' });
   }

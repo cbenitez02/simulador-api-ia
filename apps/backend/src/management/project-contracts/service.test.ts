@@ -75,7 +75,9 @@ describe('project-contracts/service helpers', () => {
         scenarios: [{ name: 'ok', type: 'success' }],
       },
     });
-    expect(exported.document['x-simulador-api-ia']).toMatchObject({
+    expect(
+      (exported.document as unknown as Record<string, unknown>)['x-simulador-api-ia']
+    ).toMatchObject({
       globalConfig: { projectId: 'project-1' },
     });
     expect(exported.warnings.map((warning) => warning.code)).toEqual(['default-global-config']);

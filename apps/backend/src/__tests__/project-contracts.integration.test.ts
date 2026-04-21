@@ -147,9 +147,9 @@ describe('project contracts integration', () => {
       openapi: '3.0.3',
       info: { title: 'Users API' },
     });
-    expect(
-      JSON.parse(decodeURIComponent(response.headers['x-simulador-contract-warnings']))
-    ).toEqual([
+    const warningHeader = response.headers['x-simulador-contract-warnings'];
+    expect(typeof warningHeader).toBe('string');
+    expect(JSON.parse(decodeURIComponent(warningHeader ?? '[]'))).toEqual([
       expect.objectContaining({
         code: 'default-global-config',
         path: 'x-simulador-api-ia.globalConfig',
