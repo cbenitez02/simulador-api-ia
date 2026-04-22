@@ -1,4 +1,3 @@
-import { authorizeProjectAccess } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import type { Env } from '../../config/env.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
@@ -143,6 +142,11 @@ function mapProviderExecutionError(error: AiProviderExecutionError): AppError {
   return createAiUnavailableError();
 }
 
+async function authorizeAiProjectMutation(actor: AuthenticatedActor, projectId: string) {
+  const { authorizeProjectAccess } = await import('../../auth/authorization.js');
+  await authorizeProjectAccess(actor, projectId, 'mutate');
+}
+
 export async function createNormalizedDraftWithFallback(
   prompt: string,
   providers?: AiProvider[]
@@ -262,7 +266,7 @@ export async function generateEndpointPreview(
   projectId: string,
   prompt: string
 ) {
-  await authorizeProjectAccess(actor, projectId, 'mutate');
+  await authorizeAiProjectMutation(actor, projectId);
 
   return generateNormalizedDraft(prompt);
 }
@@ -272,7 +276,7 @@ export async function generateEndpointWithAi(
   projectId: string,
   prompt: string
 ) {
-  await authorizeProjectAccess(actor, projectId, 'mutate');
+  await authorizeAiProjectMutation(actor, projectId);
 
   const previewDraft = await generateNormalizedDraft(prompt);
   return persistGeneratedEndpoint(projectId, toPersistedDraft(previewDraft));
