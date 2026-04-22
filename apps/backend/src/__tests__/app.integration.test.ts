@@ -4,6 +4,7 @@ import type { Express } from 'express';
 import { resetRateLimitStoreForTests } from '../mock-server/rate-limit.js';
 
 const openaiCreateMock = vi.fn();
+const openAiClientConfigs: Array<Record<string, unknown> | undefined> = [];
 const runtimeRateLimitBuckets = new Map<string, { requestCount: number }>();
 
 const prismaMock = {
@@ -90,6 +91,10 @@ vi.mock('../lib/prisma.js', () => ({
 
 vi.mock('openai', () => ({
   default: class MockOpenAI {
+    public constructor(config?: Record<string, unknown>) {
+      openAiClientConfigs.push(config);
+    }
+
     public chat = {
       completions: {
         create: openaiCreateMock,
@@ -211,6 +216,7 @@ describe('app integration', () => {
     resetNestedMocks(prismaMock.runtimeRateLimitBucket);
     prismaMock.$transaction.mockReset();
     openaiCreateMock.mockReset();
+    openAiClientConfigs.length = 0;
     resetRateLimitStoreForTests();
     runtimeRateLimitBuckets.clear();
     prismaMock.runtimeRateLimitBucket.upsert.mockImplementation(
@@ -1485,6 +1491,103 @@ describe('app integration', () => {
     expect(prismaMock.scenario.createMany).not.toHaveBeenCalled();
   });
 
+  it('POST /api/v1/projects/:projectId/endpoints/ai-generate usa fallback cuando falla la ejecución del primario y persiste el endpoint', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.endpoint.findFirst.mockResolvedValueOnce(null);
+
+    const { env } = await import('../config/env.js');
+    const originalPrimary = env.AI_PRIMARY_PROVIDER;
+    const originalFallback = env.AI_FALLBACK_PROVIDER;
+    const originalCompatKey = env.AI_COMPAT_API_KEY;
+    const originalCompatModel = env.AI_COMPAT_MODEL;
+    const originalCompatBaseUrl = env.AI_COMPAT_BASE_URL;
+
+    env.AI_PRIMARY_PROVIDER = 'openai';
+    env.AI_FALLBACK_PROVIDER = 'compat';
+    env.AI_COMPAT_API_KEY = 'compat-key';
+    env.AI_COMPAT_MODEL = 'compat-model';
+    env.AI_COMPAT_BASE_URL = 'https://compat.example.com/v1';
+
+    openaiCreateMock.mockRejectedValueOnce(new Error('primary unavailable')).mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              method: 'POST',
+              path: '/users',
+              description: 'Create user',
+              statusCode: 201,
+              responseBody: { id: 'u1' },
+              scenarios: [
+                {
+                  name: 'success',
+                  type: 'success',
+                  statusCode: 201,
+                  body: { id: 'u1' },
+                  delayMs: 0,
+                  weight: 1,
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+
+    const tx = {
+      endpoint: {
+        create: vi.fn().mockResolvedValue({ id: 'e-ai-fallback-1' }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 'e-ai-fallback-1',
+          method: 'POST',
+          path: '/users',
+          endpointConfig: { endpointId: 'e-ai-fallback-1' },
+          scenarios: [{ id: 's-ai-fallback-1', type: 'success' }],
+        }),
+      },
+      endpointConfig: {
+        create: vi.fn().mockResolvedValue({ id: 'cfg-ai-fallback-1' }),
+      },
+      scenario: {
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
+
+    try {
+      const response = await request(app)
+        .post('/api/v1/projects/p1/endpoints/ai-generate')
+        .set(authHeaders())
+        .send({ prompt: 'Generate endpoint for creating users using fallback execution' });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        id: 'e-ai-fallback-1',
+        method: 'POST',
+        path: '/users',
+      });
+      expect(tx.endpoint.create).toHaveBeenCalled();
+      expect(tx.scenario.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [expect.objectContaining({ type: 'success' })],
+        })
+      );
+      expect(openAiClientConfigs).toContainEqual(
+        expect.objectContaining({
+          apiKey: 'compat-key',
+          baseURL: 'https://compat.example.com/v1',
+        })
+      );
+    } finally {
+      env.AI_PRIMARY_PROVIDER = originalPrimary;
+      env.AI_FALLBACK_PROVIDER = originalFallback;
+      env.AI_COMPAT_API_KEY = originalCompatKey;
+      env.AI_COMPAT_MODEL = originalCompatModel;
+      env.AI_COMPAT_BASE_URL = originalCompatBaseUrl;
+    }
+  });
+
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview devuelve draft normalizado sin persistir', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockResolvedValueOnce({
@@ -1629,5 +1732,163 @@ describe('app integration', () => {
       code: 'AI_INVALID_OUTPUT',
       retryable: true,
     });
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview usa fallback cuando falla la ejecución del primario', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    const { env } = await import('../config/env.js');
+    const originalPrimary = env.AI_PRIMARY_PROVIDER;
+    const originalFallback = env.AI_FALLBACK_PROVIDER;
+    const originalCompatKey = env.AI_COMPAT_API_KEY;
+    const originalCompatModel = env.AI_COMPAT_MODEL;
+    const originalCompatBaseUrl = env.AI_COMPAT_BASE_URL;
+
+    env.AI_PRIMARY_PROVIDER = 'openai';
+    env.AI_FALLBACK_PROVIDER = 'compat';
+    env.AI_COMPAT_API_KEY = 'compat-key';
+    env.AI_COMPAT_MODEL = 'compat-model';
+    env.AI_COMPAT_BASE_URL = 'https://compat.example.com/v1';
+
+    openaiCreateMock
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                method: 'POST',
+                path: '/users',
+                description: 'Create user',
+                statusCode: 201,
+                responseBody: { id: 'u1' },
+                scenarios: [
+                  {
+                    name: 'success',
+                    type: 'success',
+                    statusCode: 201,
+                    body: { id: 'u1' },
+                    delayMs: 0,
+                    weight: 1,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      });
+
+    try {
+      const response = await request(app)
+        .post('/api/v1/projects/p1/endpoints/ai-preview')
+        .set(authHeaders())
+        .send({ prompt: 'Generate a user creation endpoint preview using fallback execution' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ method: 'POST', path: '/users' });
+      expect(openaiCreateMock).toHaveBeenCalledTimes(2);
+    } finally {
+      env.AI_PRIMARY_PROVIDER = originalPrimary;
+      env.AI_FALLBACK_PROVIDER = originalFallback;
+      env.AI_COMPAT_API_KEY = originalCompatKey;
+      env.AI_COMPAT_MODEL = originalCompatModel;
+      env.AI_COMPAT_BASE_URL = originalCompatBaseUrl;
+    }
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview no usa fallback cuando el primario devuelve salida inválida', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    const { env } = await import('../config/env.js');
+    const originalPrimary = env.AI_PRIMARY_PROVIDER;
+    const originalFallback = env.AI_FALLBACK_PROVIDER;
+    const originalCompatKey = env.AI_COMPAT_API_KEY;
+    const originalCompatModel = env.AI_COMPAT_MODEL;
+    const originalCompatBaseUrl = env.AI_COMPAT_BASE_URL;
+
+    env.AI_PRIMARY_PROVIDER = 'openai';
+    env.AI_FALLBACK_PROVIDER = 'compat';
+    env.AI_COMPAT_API_KEY = 'compat-key';
+    env.AI_COMPAT_MODEL = 'compat-model';
+    env.AI_COMPAT_BASE_URL = 'https://compat.example.com/v1';
+
+    openaiCreateMock.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              method: 'GET',
+              path: '/users',
+              description: 'Broken payload',
+              statusCode: 200,
+              responseBody: [],
+              scenarios: [],
+            }),
+          },
+        },
+      ],
+    });
+
+    try {
+      const response = await request(app)
+        .post('/api/v1/projects/p1/endpoints/ai-preview')
+        .set(authHeaders())
+        .send({
+          prompt:
+            'Generate a users endpoint preview with malformed primary output and fallback configured',
+        });
+
+      expect(response.status).toBe(422);
+      expect(response.body).toMatchObject({
+        error: 'AI returned invalid output',
+        code: 'AI_INVALID_OUTPUT',
+      });
+      expect(openaiCreateMock).toHaveBeenCalledTimes(2);
+    } finally {
+      env.AI_PRIMARY_PROVIDER = originalPrimary;
+      env.AI_FALLBACK_PROVIDER = originalFallback;
+      env.AI_COMPAT_API_KEY = originalCompatKey;
+      env.AI_COMPAT_MODEL = originalCompatModel;
+      env.AI_COMPAT_BASE_URL = originalCompatBaseUrl;
+    }
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview conserva error determinístico cuando se agota la cadena', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    const { env } = await import('../config/env.js');
+    const originalPrimary = env.AI_PRIMARY_PROVIDER;
+    const originalFallback = env.AI_FALLBACK_PROVIDER;
+    const originalCompatKey = env.AI_COMPAT_API_KEY;
+    const originalCompatModel = env.AI_COMPAT_MODEL;
+    const originalCompatBaseUrl = env.AI_COMPAT_BASE_URL;
+
+    env.AI_PRIMARY_PROVIDER = 'openai';
+    env.AI_FALLBACK_PROVIDER = 'compat';
+    env.AI_COMPAT_API_KEY = 'compat-key';
+    env.AI_COMPAT_MODEL = 'compat-model';
+    env.AI_COMPAT_BASE_URL = 'https://compat.example.com/v1';
+
+    openaiCreateMock
+      .mockRejectedValueOnce(new Error('primary unavailable'))
+      .mockRejectedValueOnce(new Error('fallback unavailable'));
+
+    try {
+      const response = await request(app)
+        .post('/api/v1/projects/p1/endpoints/ai-preview')
+        .set(authHeaders())
+        .send({ prompt: 'Generate a users endpoint preview with both providers unavailable' });
+
+      expect(response.status).toBe(503);
+      expect(response.body).toMatchObject({
+        error: 'AI is unavailable right now',
+        code: 'AI_UNAVAILABLE',
+        retryable: true,
+      });
+      expect(openaiCreateMock).toHaveBeenCalledTimes(2);
+    } finally {
+      env.AI_PRIMARY_PROVIDER = originalPrimary;
+      env.AI_FALLBACK_PROVIDER = originalFallback;
+      env.AI_COMPAT_API_KEY = originalCompatKey;
+      env.AI_COMPAT_MODEL = originalCompatModel;
+      env.AI_COMPAT_BASE_URL = originalCompatBaseUrl;
+    }
   });
 });
