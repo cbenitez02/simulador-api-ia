@@ -1,8 +1,7 @@
 import { authorizeProjectAccess } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
-import { env } from '../../config/env.js';
+import type { Env } from '../../config/env.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
-import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { normalizeAiDraft } from './normalize-draft.js';
 import { AiProviderExecutionError, resolveAiProviderChain, type AiProvider } from './provider.js';
@@ -115,7 +114,14 @@ function parseAiCompletion(rawContent: string): AiRawGeneratedEndpointInput {
   return parsed.data;
 }
 
-function buildAiProviders(): AiProvider[] {
+async function getEnv(): Promise<Env> {
+  const { env } = await import('../../config/env.js');
+  return env;
+}
+
+async function buildAiProviders(): Promise<AiProvider[]> {
+  const env = await getEnv();
+
   return resolveAiProviderChain(env).map((providerName) => {
     if (providerName === 'compat') {
       return createCompatAiProvider(env, { systemPrompt: SYSTEM_PROMPT });
@@ -139,15 +145,17 @@ function mapProviderExecutionError(error: AiProviderExecutionError): AppError {
 
 export async function createNormalizedDraftWithFallback(
   prompt: string,
-  providers: AiProvider[] = buildAiProviders()
+  providers?: AiProvider[]
 ): Promise<AiPreviewResponseInput> {
-  if (providers.length === 0) {
+  const activeProviders = providers ?? (await buildAiProviders());
+
+  if (activeProviders.length === 0) {
     throw createAiMissingConfigError('No AI providers are configured');
   }
 
   let lastExecutionError: AiProviderExecutionError | null = null;
 
-  for (const provider of providers) {
+  for (const provider of activeProviders) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const generated = parseAiCompletion(await provider.generateJson(prompt));
@@ -190,6 +198,8 @@ function toPersistedDraft(previewDraft: AiPreviewResponseInput): AiNormalizedDra
 }
 
 async function persistGeneratedEndpoint(projectId: string, generated: AiNormalizedDraftInput) {
+  const { prisma } = await import('../../lib/prisma.js');
+
   const duplicate = await prisma.endpoint.findFirst({
     where: {
       projectId,
