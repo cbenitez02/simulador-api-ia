@@ -8,6 +8,7 @@ import { createCompatAiProvider } from './providers/compat.js';
 import { createOpenAiProvider } from './providers/openai.js';
 import {
   aiNormalizedDraftSchema,
+  aiPreviewResponseSchema,
   aiRawGeneratedEndpointSchema,
   type AiNormalizedDraftInput,
   type AiPreviewResponseInput,
@@ -52,6 +53,91 @@ const AI_TIMEOUT_CODE = 'AI_TIMEOUT';
 const AI_UNAVAILABLE_CODE = 'AI_UNAVAILABLE';
 const AI_INVALID_OUTPUT_CODE = 'AI_INVALID_OUTPUT';
 const AI_MISSING_CONFIG_CODE = 'AI_UNAVAILABLE';
+const AI_PREVIEW_CACHE_TTL_MS = 5 * 60_000;
+const AI_PREVIEW_CACHE_MAX_ENTRIES = 100;
+
+interface PreviewCacheEntry {
+  value: AiPreviewResponseInput;
+  expiresAtMs: number;
+}
+
+interface AiPreviewRuntimeOptions {
+  providers?: AiProvider[];
+  nowMs?: number;
+}
+
+const previewCache = new Map<string, PreviewCacheEntry>();
+
+function clonePreviewValue(value: AiPreviewResponseInput): AiPreviewResponseInput {
+  return aiPreviewResponseSchema.parse(structuredClone(value));
+}
+
+function normalizePreviewCachePrompt(prompt: string): string {
+  return prompt.trim();
+}
+
+function buildPreviewCacheKey(projectId: string, prompt: string): string {
+  return `${projectId}:${normalizePreviewCachePrompt(prompt)}`;
+}
+
+function pruneExpiredPreviewCacheEntries(nowMs: number): void {
+  for (const [key, entry] of previewCache.entries()) {
+    if (entry.expiresAtMs <= nowMs) {
+      previewCache.delete(key);
+    }
+  }
+}
+
+function evictPreviewCacheEntriesIfNeeded(): void {
+  while (previewCache.size >= AI_PREVIEW_CACHE_MAX_ENTRIES) {
+    const oldestKey = previewCache.keys().next().value;
+
+    if (!oldestKey) {
+      return;
+    }
+
+    previewCache.delete(oldestKey);
+  }
+}
+
+function readPreviewCache(
+  projectId: string,
+  prompt: string,
+  nowMs: number
+): AiPreviewResponseInput | null {
+  pruneExpiredPreviewCacheEntries(nowMs);
+
+  const entry = previewCache.get(buildPreviewCacheKey(projectId, prompt));
+
+  if (!entry) {
+    return null;
+  }
+
+  return clonePreviewValue(entry.value);
+}
+
+function writePreviewCache(
+  projectId: string,
+  prompt: string,
+  value: AiPreviewResponseInput,
+  nowMs: number
+): AiPreviewResponseInput {
+  pruneExpiredPreviewCacheEntries(nowMs);
+  evictPreviewCacheEntriesIfNeeded();
+
+  const clonedValue = clonePreviewValue(value);
+
+  previewCache.set(buildPreviewCacheKey(projectId, prompt), {
+    value: clonedValue,
+    expiresAtMs: nowMs + AI_PREVIEW_CACHE_TTL_MS,
+  });
+
+  return clonePreviewValue(clonedValue);
+}
+
+export function resetAiPreviewCacheForTests(): void {
+  previewCache.clear();
+}
 
 function createAiTimeoutError(): AppError {
   return new AppError(504, 'AI request timed out', {
@@ -257,18 +343,30 @@ async function persistGeneratedEndpoint(projectId: string, generated: AiNormaliz
   });
 }
 
-async function generateNormalizedDraft(prompt: string): Promise<AiPreviewResponseInput> {
-  return createNormalizedDraftWithFallback(prompt);
+async function generateNormalizedDraft(
+  prompt: string,
+  providers?: AiProvider[]
+): Promise<AiPreviewResponseInput> {
+  return createNormalizedDraftWithFallback(prompt, providers);
 }
 
 export async function generateEndpointPreview(
   actor: AuthenticatedActor,
   projectId: string,
-  prompt: string
+  prompt: string,
+  runtimeOptions: AiPreviewRuntimeOptions = {}
 ) {
   await authorizeAiProjectMutation(actor, projectId);
 
-  return generateNormalizedDraft(prompt);
+  const nowMs = runtimeOptions.nowMs ?? Date.now();
+  const cachedPreview = readPreviewCache(projectId, prompt, nowMs);
+
+  if (cachedPreview) {
+    return cachedPreview;
+  }
+
+  const preview = await generateNormalizedDraft(prompt, runtimeOptions.providers);
+  return writePreviewCache(projectId, prompt, preview, nowMs);
 }
 
 export async function generateEndpointWithAi(

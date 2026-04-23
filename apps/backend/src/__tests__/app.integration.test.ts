@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Express } from 'express';
 import { resetRateLimitStoreForTests } from '../mock-server/rate-limit.js';
+import { resetAiPreviewCacheForTests } from '../management/ai/service.js';
 
 const openaiCreateMock = vi.fn();
 const openAiClientConfigs: Array<Record<string, unknown> | undefined> = [];
@@ -217,6 +218,7 @@ describe('app integration', () => {
     prismaMock.$transaction.mockReset();
     openaiCreateMock.mockReset();
     openAiClientConfigs.length = 0;
+    resetAiPreviewCacheForTests();
     resetRateLimitStoreForTests();
     runtimeRateLimitBuckets.clear();
     prismaMock.runtimeRateLimitBucket.upsert.mockImplementation(
@@ -1641,6 +1643,50 @@ describe('app integration', () => {
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview reutiliza un hit en memoria para requests idénticos', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
+    openaiCreateMock.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              method: 'GET',
+              path: '/users',
+              description: 'List users',
+              statusCode: 200,
+              responseBody: [{ id: 'u1' }],
+              scenarios: [
+                {
+                  name: 'success',
+                  type: 'success',
+                  statusCode: 200,
+                  body: [{ id: 'u1' }],
+                  delayMs: 0,
+                  weight: 1,
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+
+    const firstResponse = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
+      .send({ prompt: 'Generate a users endpoint preview with cached success response' });
+
+    const secondResponse = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
+      .send({ prompt: 'Generate a users endpoint preview with cached success response' });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.body).toEqual(firstResponse.body);
+    expect(openaiCreateMock).toHaveBeenCalledTimes(1);
+  });
+
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_UNAVAILABLE cuando OpenAI falla', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockRejectedValueOnce(new Error('upstream unavailable'));
@@ -1890,5 +1936,99 @@ describe('app integration', () => {
       env.AI_COMPAT_MODEL = originalCompatModel;
       env.AI_COMPAT_BASE_URL = originalCompatBaseUrl;
     }
+  });
+
+  it('POST /api/v1/projects/:projectId/endpoints/ai-generate ignora previews cacheados y persiste por su flujo normal', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.endpoint.findFirst.mockResolvedValueOnce(null);
+
+    openaiCreateMock
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                method: 'GET',
+                path: '/users',
+                description: 'List users',
+                statusCode: 200,
+                responseBody: [{ id: 'u1' }],
+                scenarios: [
+                  {
+                    name: 'success',
+                    type: 'success',
+                    statusCode: 200,
+                    body: [{ id: 'u1' }],
+                    delayMs: 0,
+                    weight: 1,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                method: 'GET',
+                path: '/users',
+                description: 'List users',
+                statusCode: 200,
+                responseBody: [{ id: 'u1' }],
+                scenarios: [
+                  {
+                    name: 'success',
+                    type: 'success',
+                    statusCode: 200,
+                    body: [{ id: 'u1' }],
+                    delayMs: 0,
+                    weight: 1,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      });
+
+    const tx = {
+      endpoint: {
+        create: vi.fn().mockResolvedValue({ id: 'e-ai-cache-bypass-1' }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 'e-ai-cache-bypass-1',
+          method: 'GET',
+          path: '/users',
+          endpointConfig: { endpointId: 'e-ai-cache-bypass-1' },
+          scenarios: [{ id: 's-ai-cache-bypass-1', type: 'success' }],
+        }),
+      },
+      endpointConfig: {
+        create: vi.fn().mockResolvedValue({ id: 'cfg-ai-cache-bypass-1' }),
+      },
+      scenario: {
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
+
+    const previewResponse = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
+      .send({ prompt: 'Generate a users endpoint preview before persisted generation' });
+
+    const generateResponse = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .set(authHeaders())
+      .send({ prompt: 'Generate a users endpoint preview before persisted generation' });
+
+    expect(previewResponse.status).toBe(200);
+    expect(generateResponse.status).toBe(201);
+    expect(tx.endpoint.create).toHaveBeenCalledTimes(1);
+    expect(tx.scenario.createMany).toHaveBeenCalledTimes(1);
+    expect(openaiCreateMock).toHaveBeenCalledTimes(2);
   });
 });

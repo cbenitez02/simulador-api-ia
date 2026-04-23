@@ -1,10 +1,36 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeAiDraft } from './normalize-draft.js';
+import type { AuthenticatedActor } from '../../auth/types.js';
+
+const authorizeProjectAccessMock = vi.fn();
+
+vi.mock('../../auth/authorization.js', () => ({
+  authorizeProjectAccess: authorizeProjectAccessMock,
+}));
+
 import {
   AiProviderExecutionError,
   createNormalizedDraftWithFallback,
+  generateEndpointPreview,
+  resetAiPreviewCacheForTests,
   type AiProvider,
 } from './service.js';
+
+const actor: AuthenticatedActor = {
+  userId: 'user-1',
+  personalWorkspaceId: 'workspace-1',
+  identity: {
+    provider: 'clerk',
+    subject: 'user_clerk_123',
+  },
+  workspaceMemberships: [{ workspaceId: 'workspace-1', role: 'owner' }],
+};
+
+beforeEach(() => {
+  authorizeProjectAccessMock.mockReset();
+  authorizeProjectAccessMock.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
+  resetAiPreviewCacheForTests();
+});
 
 describe('normalizeAiDraft', () => {
   it('normaliza method/path y expone locks para preview/persist', () => {
@@ -203,6 +229,259 @@ describe('createNormalizedDraftWithFallback', () => {
         code: 'AI_UNAVAILABLE',
         retryable: false,
       },
+    });
+  });
+});
+
+describe('generateEndpointPreview cache', () => {
+  it('reutiliza previews cacheados por projectId y prompt normalizado sin filtrar mutaciones previas', async () => {
+    const provider = {
+      name: 'openai',
+      generateJson: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          statusCode: 201,
+          responseBody: { id: 'u1' },
+          scenarios: [
+            {
+              name: 'success',
+              type: 'success',
+              statusCode: 201,
+              body: { id: 'u1' },
+              delayMs: 0,
+              weight: 1,
+            },
+          ],
+        })
+      ),
+    } satisfies AiProvider;
+
+    const firstPreview = await generateEndpointPreview(actor, 'p1', '  Generate users  ', {
+      providers: [provider],
+      nowMs: 1_000,
+    });
+
+    firstPreview.scenarios[0]!.name = 'mutated in test';
+    firstPreview.responseBody = { id: 'mutated' };
+
+    const cachedPreview = await generateEndpointPreview(actor, 'p1', 'Generate users', {
+      providers: [provider],
+      nowMs: 1_001,
+    });
+
+    expect(provider.generateJson).toHaveBeenCalledTimes(1);
+    expect(cachedPreview).toMatchObject({
+      method: 'POST',
+      path: '/users',
+      responseBody: { id: 'u1' },
+      scenarios: [{ name: 'success', type: 'success' }],
+    });
+  });
+
+  it('aísla cache por projectId aun con el mismo prompt normalizado', async () => {
+    const provider = {
+      name: 'openai',
+      generateJson: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          method: 'GET',
+          path: '/users',
+          description: 'List users',
+          statusCode: 200,
+          responseBody: [{ id: 'u1' }],
+          scenarios: [
+            {
+              name: 'success',
+              type: 'success',
+              statusCode: 200,
+              body: [{ id: 'u1' }],
+              delayMs: 0,
+              weight: 1,
+            },
+          ],
+        })
+      ),
+    } satisfies AiProvider;
+
+    await generateEndpointPreview(actor, 'p1', 'Generate users', {
+      providers: [provider],
+      nowMs: 2_000,
+    });
+    await generateEndpointPreview(actor, 'p2', 'Generate users', {
+      providers: [provider],
+      nowMs: 2_001,
+    });
+
+    expect(provider.generateJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('expira entradas y permite reset explícito para pruebas determinísticas', async () => {
+    const provider = {
+      name: 'openai',
+      generateJson: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          method: 'GET',
+          path: '/reports',
+          description: 'List reports',
+          statusCode: 200,
+          responseBody: [],
+          scenarios: [
+            {
+              name: 'success',
+              type: 'success',
+              statusCode: 200,
+              body: [],
+              delayMs: 0,
+              weight: 1,
+            },
+          ],
+        })
+      ),
+    } satisfies AiProvider;
+
+    await generateEndpointPreview(actor, 'p1', 'Generate reports', {
+      providers: [provider],
+      nowMs: 3_000,
+    });
+    await generateEndpointPreview(actor, 'p1', 'Generate reports', {
+      providers: [provider],
+      nowMs: 303_000,
+    });
+
+    resetAiPreviewCacheForTests();
+
+    await generateEndpointPreview(actor, 'p1', 'Generate reports', {
+      providers: [provider],
+      nowMs: 303_001,
+    });
+
+    expect(provider.generateJson).toHaveBeenCalledTimes(3);
+  });
+
+  it('no cachea errores AI_UNAVAILABLE y reintenta en cada request', async () => {
+    const provider = {
+      name: 'openai',
+      generateJson: vi
+        .fn()
+        .mockRejectedValue(new AiProviderExecutionError('openai', 'unavailable')),
+    } satisfies AiProvider;
+
+    await expect(
+      generateEndpointPreview(actor, 'p1', 'Generate users with outage', {
+        providers: [provider],
+        nowMs: 4_000,
+      })
+    ).rejects.toMatchObject({
+      options: { code: 'AI_UNAVAILABLE', retryable: true },
+    });
+
+    await expect(
+      generateEndpointPreview(actor, 'p1', 'Generate users with outage', {
+        providers: [provider],
+        nowMs: 4_001,
+      })
+    ).rejects.toMatchObject({
+      options: { code: 'AI_UNAVAILABLE', retryable: true },
+    });
+
+    expect(provider.generateJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('no cachea errores AI_TIMEOUT y permite regenerar en el siguiente request', async () => {
+    const provider = {
+      name: 'openai',
+      generateJson: vi
+        .fn()
+        .mockRejectedValueOnce(new AiProviderExecutionError('openai', 'timeout'))
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            method: 'GET',
+            path: '/users',
+            description: 'List users after retry',
+            statusCode: 200,
+            responseBody: [{ id: 'u1' }],
+            scenarios: [
+              {
+                name: 'success',
+                type: 'success',
+                statusCode: 200,
+                body: [{ id: 'u1' }],
+                delayMs: 0,
+                weight: 1,
+              },
+            ],
+          })
+        ),
+    } satisfies AiProvider;
+
+    await expect(
+      generateEndpointPreview(actor, 'p1', 'Generate users after timeout', {
+        providers: [provider],
+        nowMs: 5_000,
+      })
+    ).rejects.toMatchObject({
+      options: { code: 'AI_TIMEOUT', retryable: true },
+    });
+
+    await expect(
+      generateEndpointPreview(actor, 'p1', 'Generate users after timeout', {
+        providers: [provider],
+        nowMs: 5_001,
+      })
+    ).resolves.toMatchObject({
+      method: 'GET',
+      path: '/users',
+      responseBody: [{ id: 'u1' }],
+    });
+  });
+
+  it('no cachea errores AI_INVALID_OUTPUT y vuelve a generar en el siguiente request', async () => {
+    const provider = {
+      name: 'openai',
+      generateJson: vi
+        .fn()
+        .mockResolvedValueOnce(JSON.stringify({ method: 'GET', scenarios: [] }))
+        .mockResolvedValueOnce(JSON.stringify({ method: 'GET', scenarios: [] }))
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            method: 'POST',
+            path: '/users',
+            description: 'Create user after invalid output',
+            statusCode: 201,
+            responseBody: { id: 'u1' },
+            scenarios: [
+              {
+                name: 'success',
+                type: 'success',
+                statusCode: 201,
+                body: { id: 'u1' },
+                delayMs: 0,
+                weight: 1,
+              },
+            ],
+          })
+        ),
+    } satisfies AiProvider;
+
+    await expect(
+      generateEndpointPreview(actor, 'p1', 'Generate users after invalid output', {
+        providers: [provider],
+        nowMs: 6_000,
+      })
+    ).rejects.toMatchObject({
+      options: { code: 'AI_INVALID_OUTPUT', retryable: true },
+    });
+
+    await expect(
+      generateEndpointPreview(actor, 'p1', 'Generate users after invalid output', {
+        providers: [provider],
+        nowMs: 6_001,
+      })
+    ).resolves.toMatchObject({
+      method: 'POST',
+      path: '/users',
+      responseBody: { id: 'u1' },
     });
   });
 });
