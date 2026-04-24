@@ -1,8 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeAiDraft } from './normalize-draft.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
+import { activeAiPromptDescriptor } from './prompt-descriptor.js';
+
+const mockedEnvModule = vi.hoisted(() => ({
+  env: {
+    AI_PRIMARY_PROVIDER: 'openai' as const,
+    AI_FALLBACK_PROVIDER: undefined,
+    OPENAI_MODEL: 'gpt-4.1-mini',
+  },
+}));
 
 const authorizeProjectAccessMock = vi.fn();
+
+vi.mock('../../config/env.js', () => mockedEnvModule);
 
 vi.mock('../../auth/authorization.js', () => ({
   authorizeProjectAccess: authorizeProjectAccessMock,
@@ -314,6 +325,96 @@ describe('generateEndpointPreview cache', () => {
     });
 
     expect(provider.generateJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('invalida el cache cuando cambia la versión del prompt descriptor', async () => {
+    const originalVersion = activeAiPromptDescriptor.version;
+    const provider = {
+      name: 'openai',
+      generateJson: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          method: 'GET',
+          path: '/users',
+          description: 'List users',
+          statusCode: 200,
+          responseBody: [{ id: 'u1' }],
+          scenarios: [
+            {
+              name: 'success',
+              type: 'success',
+              statusCode: 200,
+              body: [{ id: 'u1' }],
+              delayMs: 0,
+              weight: 1,
+            },
+          ],
+        })
+      ),
+    } satisfies AiProvider;
+
+    try {
+      await generateEndpointPreview(actor, 'p1', 'Generate users', {
+        providers: [provider],
+        nowMs: 2_100,
+      });
+
+      activeAiPromptDescriptor.version = 'v2';
+
+      await generateEndpointPreview(actor, 'p1', 'Generate users', {
+        providers: [provider],
+        nowMs: 2_101,
+      });
+
+      expect(provider.generateJson).toHaveBeenCalledTimes(2);
+    } finally {
+      activeAiPromptDescriptor.version = originalVersion;
+    }
+  });
+
+  it('invalida el cache cuando cambia el fingerprint del modelo configurado', async () => {
+    const originalModel = mockedEnvModule.env.OPENAI_MODEL;
+    const provider = {
+      name: 'openai',
+      generateJson: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          method: 'GET',
+          path: '/reports',
+          description: 'List reports',
+          statusCode: 200,
+          responseBody: [],
+          scenarios: [
+            {
+              name: 'success',
+              type: 'success',
+              statusCode: 200,
+              body: [],
+              delayMs: 0,
+              weight: 1,
+            },
+          ],
+        })
+      ),
+    } satisfies AiProvider;
+
+    try {
+      mockedEnvModule.env.OPENAI_MODEL = 'gpt-4.1-mini';
+
+      await generateEndpointPreview(actor, 'p1', 'Generate reports', {
+        providers: [provider],
+        nowMs: 2_200,
+      });
+
+      mockedEnvModule.env.OPENAI_MODEL = 'gpt-4.1-nano';
+
+      await generateEndpointPreview(actor, 'p1', 'Generate reports', {
+        providers: [provider],
+        nowMs: 2_201,
+      });
+
+      expect(provider.generateJson).toHaveBeenCalledTimes(2);
+    } finally {
+      mockedEnvModule.env.OPENAI_MODEL = originalModel;
+    }
   });
 
   it('expira entradas y permite reset explícito para pruebas determinísticas', async () => {
