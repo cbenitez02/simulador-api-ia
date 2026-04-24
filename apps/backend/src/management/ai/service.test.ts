@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeAiDraft } from './normalize-draft.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
-import { env } from '../../config/env.js';
 import { activeAiPromptDescriptor } from './prompt-descriptor.js';
 
+const mockedEnvModule = vi.hoisted(() => ({
+  env: {
+    AI_PRIMARY_PROVIDER: 'openai' as const,
+    AI_FALLBACK_PROVIDER: undefined,
+    OPENAI_MODEL: 'gpt-4.1-mini',
+  },
+}));
+
 const authorizeProjectAccessMock = vi.fn();
+
+vi.mock('../../config/env.js', () => mockedEnvModule);
 
 vi.mock('../../auth/authorization.js', () => ({
   authorizeProjectAccess: authorizeProjectAccessMock,
@@ -363,7 +372,7 @@ describe('generateEndpointPreview cache', () => {
   });
 
   it('invalida el cache cuando cambia el fingerprint del modelo configurado', async () => {
-    const originalModel = env.OPENAI_MODEL;
+    const originalModel = mockedEnvModule.env.OPENAI_MODEL;
     const provider = {
       name: 'openai',
       generateJson: vi.fn().mockResolvedValue(
@@ -388,14 +397,14 @@ describe('generateEndpointPreview cache', () => {
     } satisfies AiProvider;
 
     try {
-      env.OPENAI_MODEL = 'gpt-4.1-mini';
+      mockedEnvModule.env.OPENAI_MODEL = 'gpt-4.1-mini';
 
       await generateEndpointPreview(actor, 'p1', 'Generate reports', {
         providers: [provider],
         nowMs: 2_200,
       });
 
-      env.OPENAI_MODEL = 'gpt-4.1-nano';
+      mockedEnvModule.env.OPENAI_MODEL = 'gpt-4.1-nano';
 
       await generateEndpointPreview(actor, 'p1', 'Generate reports', {
         providers: [provider],
@@ -404,7 +413,7 @@ describe('generateEndpointPreview cache', () => {
 
       expect(provider.generateJson).toHaveBeenCalledTimes(2);
     } finally {
-      env.OPENAI_MODEL = originalModel;
+      mockedEnvModule.env.OPENAI_MODEL = originalModel;
     }
   });
 
