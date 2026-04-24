@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Express } from 'express';
 import { resetRateLimitStoreForTests } from '../mock-server/rate-limit.js';
+import { activeAiPromptDescriptor } from '../management/ai/prompt-descriptor.js';
 import { resetAiPreviewCacheForTests } from '../management/ai/service.js';
 
 const openaiCreateMock = vi.fn();
@@ -1687,6 +1688,88 @@ describe('app integration', () => {
     expect(openaiCreateMock).toHaveBeenCalledTimes(1);
   });
 
+  it('POST /api/v1/projects/:projectId/endpoints/ai-preview invalida el cache cuando cambia el modelo backend sin cambiar el payload HTTP', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
+    const { env } = await import('../config/env.js');
+    const originalModel = env.OPENAI_MODEL;
+
+    openaiCreateMock
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                method: 'GET',
+                path: '/users',
+                description: 'List users v1',
+                statusCode: 200,
+                responseBody: [{ id: 'u1' }],
+                scenarios: [
+                  {
+                    name: 'success',
+                    type: 'success',
+                    statusCode: 200,
+                    body: [{ id: 'u1' }],
+                    delayMs: 0,
+                    weight: 1,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                method: 'GET',
+                path: '/users',
+                description: 'List users v2',
+                statusCode: 200,
+                responseBody: [{ id: 'u2' }],
+                scenarios: [
+                  {
+                    name: 'success',
+                    type: 'success',
+                    statusCode: 200,
+                    body: [{ id: 'u2' }],
+                    delayMs: 0,
+                    weight: 1,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      });
+
+    try {
+      env.OPENAI_MODEL = 'gpt-4.1-mini';
+
+      const firstResponse = await request(app)
+        .post('/api/v1/projects/p1/endpoints/ai-preview')
+        .set(authHeaders())
+        .send({ prompt: 'Generate a users endpoint preview with cached success response' });
+
+      env.OPENAI_MODEL = 'gpt-4.1-nano';
+
+      const secondResponse = await request(app)
+        .post('/api/v1/projects/p1/endpoints/ai-preview')
+        .set(authHeaders())
+        .send({ prompt: 'Generate a users endpoint preview with cached success response' });
+
+      expect(firstResponse.status).toBe(200);
+      expect(secondResponse.status).toBe(200);
+      expect(firstResponse.body).toMatchObject({ description: 'List users v1' });
+      expect(secondResponse.body).toMatchObject({ description: 'List users v2' });
+      expect(openaiCreateMock).toHaveBeenCalledTimes(2);
+    } finally {
+      env.OPENAI_MODEL = originalModel;
+    }
+  });
+
   it('POST /api/v1/projects/:projectId/endpoints/ai-preview responde AI_UNAVAILABLE cuando OpenAI falla', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
     openaiCreateMock.mockRejectedValueOnce(new Error('upstream unavailable'));
@@ -2030,5 +2113,107 @@ describe('app integration', () => {
     expect(tx.endpoint.create).toHaveBeenCalledTimes(1);
     expect(tx.scenario.createMany).toHaveBeenCalledTimes(1);
     expect(openaiCreateMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('POST preview y generate reutilizan el mismo prompt descriptor y el prompt trimmeado con payload HTTP mínimo', async () => {
+    const prompt = '  Generate a users endpoint preview before persisted generation  ';
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.endpoint.findFirst.mockResolvedValueOnce(null);
+
+    openaiCreateMock
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                method: 'GET',
+                path: '/users',
+                description: 'List users',
+                statusCode: 200,
+                responseBody: [{ id: 'u1' }],
+                scenarios: [
+                  {
+                    name: 'success',
+                    type: 'success',
+                    statusCode: 200,
+                    body: [{ id: 'u1' }],
+                    delayMs: 0,
+                    weight: 1,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                method: 'GET',
+                path: '/users',
+                description: 'List users',
+                statusCode: 200,
+                responseBody: [{ id: 'u1' }],
+                scenarios: [
+                  {
+                    name: 'success',
+                    type: 'success',
+                    statusCode: 200,
+                    body: [{ id: 'u1' }],
+                    delayMs: 0,
+                    weight: 1,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      });
+
+    const tx = {
+      endpoint: {
+        create: vi.fn().mockResolvedValue({ id: 'e-ai-identity-1' }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 'e-ai-identity-1',
+          method: 'GET',
+          path: '/users',
+          endpointConfig: { endpointId: 'e-ai-identity-1' },
+          scenarios: [{ id: 's-ai-identity-1', type: 'success' }],
+        }),
+      },
+      endpointConfig: {
+        create: vi.fn().mockResolvedValue({ id: 'cfg-ai-identity-1' }),
+      },
+      scenario: {
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
+
+    const previewResponse = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-preview')
+      .set(authHeaders())
+      .send({ prompt });
+
+    const generateResponse = await request(app)
+      .post('/api/v1/projects/p1/endpoints/ai-generate')
+      .set(authHeaders())
+      .send({ prompt });
+
+    expect(previewResponse.status).toBe(200);
+    expect(generateResponse.status).toBe(201);
+    expect(openaiCreateMock).toHaveBeenCalledTimes(2);
+
+    const previewMessages = openaiCreateMock.mock.calls[0]?.[0]?.messages;
+    const generateMessages = openaiCreateMock.mock.calls[1]?.[0]?.messages;
+
+    expect(previewMessages).toEqual([
+      { role: 'system', content: activeAiPromptDescriptor.systemPrompt },
+      { role: 'user', content: prompt.trim() },
+    ]);
+    expect(generateMessages).toEqual(previewMessages);
   });
 });

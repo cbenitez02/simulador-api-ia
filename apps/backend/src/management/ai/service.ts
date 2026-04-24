@@ -2,7 +2,13 @@ import type { AuthenticatedActor } from '../../auth/types.js';
 import type { Env } from '../../config/env.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
 import { AppError } from '../../middleware/error-handler.js';
+import {
+  buildAiExecutionIdentity,
+  buildAiPreviewCacheKey,
+  type AiExecutionIdentity,
+} from './execution-identity.js';
 import { normalizeAiDraft } from './normalize-draft.js';
+import { activeAiPromptDescriptor } from './prompt-descriptor.js';
 import { AiProviderExecutionError, resolveAiProviderChain, type AiProvider } from './provider.js';
 import { createCompatAiProvider } from './providers/compat.js';
 import { createOpenAiProvider } from './providers/openai.js';
@@ -14,33 +20,6 @@ import {
   type AiPreviewResponseInput,
   type AiRawGeneratedEndpointInput,
 } from './schema.js';
-
-const SYSTEM_PROMPT = `You generate API endpoint mocks.
-Return ONLY valid JSON.
-
-Schema:
-{
-  "method": "GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS",
-  "path": "/resource/path",
-  "description": "short description",
-  "statusCode": 200,
-  "responseBody": {"any":"json"},
-  "scenarios": [
-    {
-      "name": "scenario name",
-      "type": "success|error|edge-case|timeout|empty",
-      "statusCode": 200,
-      "body": {"any":"json"},
-      "delayMs": 0,
-      "weight": 1
-    }
-  ]
-}
-
-Rules:
-- path must start with '/'
-- scenarios must include at least one success and one error scenario
-- do not include markdown or explanations, only raw JSON`;
 
 class AiShapeValidationError extends Error {
   constructor(message: string) {
@@ -72,14 +51,6 @@ function clonePreviewValue(value: AiPreviewResponseInput): AiPreviewResponseInpu
   return aiPreviewResponseSchema.parse(structuredClone(value));
 }
 
-function normalizePreviewCachePrompt(prompt: string): string {
-  return prompt.trim();
-}
-
-function buildPreviewCacheKey(projectId: string, prompt: string): string {
-  return `${projectId}:${normalizePreviewCachePrompt(prompt)}`;
-}
-
 function pruneExpiredPreviewCacheEntries(nowMs: number): void {
   for (const [key, entry] of previewCache.entries()) {
     if (entry.expiresAtMs <= nowMs) {
@@ -101,13 +72,12 @@ function evictPreviewCacheEntriesIfNeeded(): void {
 }
 
 function readPreviewCache(
-  projectId: string,
-  prompt: string,
+  identity: AiExecutionIdentity,
   nowMs: number
 ): AiPreviewResponseInput | null {
   pruneExpiredPreviewCacheEntries(nowMs);
 
-  const entry = previewCache.get(buildPreviewCacheKey(projectId, prompt));
+  const entry = previewCache.get(buildAiPreviewCacheKey(identity));
 
   if (!entry) {
     return null;
@@ -117,8 +87,7 @@ function readPreviewCache(
 }
 
 function writePreviewCache(
-  projectId: string,
-  prompt: string,
+  identity: AiExecutionIdentity,
   value: AiPreviewResponseInput,
   nowMs: number
 ): AiPreviewResponseInput {
@@ -127,7 +96,7 @@ function writePreviewCache(
 
   const clonedValue = clonePreviewValue(value);
 
-  previewCache.set(buildPreviewCacheKey(projectId, prompt), {
+  previewCache.set(buildAiPreviewCacheKey(identity), {
     value: clonedValue,
     expiresAtMs: nowMs + AI_PREVIEW_CACHE_TTL_MS,
   });
@@ -204,15 +173,13 @@ async function getEnv(): Promise<Env> {
   return env;
 }
 
-async function buildAiProviders(): Promise<AiProvider[]> {
-  const env = await getEnv();
-
+function buildAiProviders(env: Env): AiProvider[] {
   return resolveAiProviderChain(env).map((providerName) => {
     if (providerName === 'compat') {
-      return createCompatAiProvider(env, { systemPrompt: SYSTEM_PROMPT });
+      return createCompatAiProvider(env, { systemPrompt: activeAiPromptDescriptor.systemPrompt });
     }
 
-    return createOpenAiProvider(env, { systemPrompt: SYSTEM_PROMPT });
+    return createOpenAiProvider(env, { systemPrompt: activeAiPromptDescriptor.systemPrompt });
   });
 }
 
@@ -237,7 +204,7 @@ export async function createNormalizedDraftWithFallback(
   prompt: string,
   providers?: AiProvider[]
 ): Promise<AiPreviewResponseInput> {
-  const activeProviders = providers ?? (await buildAiProviders());
+  const activeProviders = providers ?? buildAiProviders(await getEnv());
 
   if (activeProviders.length === 0) {
     throw createAiMissingConfigError('No AI providers are configured');
@@ -358,15 +325,20 @@ export async function generateEndpointPreview(
 ) {
   await authorizeAiProjectMutation(actor, projectId);
 
+  const env = await getEnv();
+  const identity = buildAiExecutionIdentity(env, projectId, prompt, activeAiPromptDescriptor);
   const nowMs = runtimeOptions.nowMs ?? Date.now();
-  const cachedPreview = readPreviewCache(projectId, prompt, nowMs);
+  const cachedPreview = readPreviewCache(identity, nowMs);
 
   if (cachedPreview) {
     return cachedPreview;
   }
 
-  const preview = await generateNormalizedDraft(prompt, runtimeOptions.providers);
-  return writePreviewCache(projectId, prompt, preview, nowMs);
+  const preview = await generateNormalizedDraft(
+    identity.normalizedPrompt,
+    runtimeOptions.providers
+  );
+  return writePreviewCache(identity, preview, nowMs);
 }
 
 export async function generateEndpointWithAi(
@@ -376,7 +348,13 @@ export async function generateEndpointWithAi(
 ) {
   await authorizeAiProjectMutation(actor, projectId);
 
-  const previewDraft = await generateNormalizedDraft(prompt);
+  const identity = buildAiExecutionIdentity(
+    await getEnv(),
+    projectId,
+    prompt,
+    activeAiPromptDescriptor
+  );
+  const previewDraft = await generateNormalizedDraft(identity.normalizedPrompt);
   return persistGeneratedEndpoint(projectId, toPersistedDraft(previewDraft));
 }
 
