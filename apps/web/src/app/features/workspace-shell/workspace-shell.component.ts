@@ -1136,7 +1136,9 @@ export class WorkspaceShellComponent implements OnInit {
 
     try {
       const snapshot = await this.projectSnapshotsRepository.get(projectId, snapshotId);
-      const confirmed = window.confirm(`Restore snapshot “${snapshot.name}”? Live endpoints/config will be replaced.`);
+      const confirmed = globalThis.confirm(
+        `Restore snapshot “${snapshot.name}”? Live endpoints/config will be replaced.`,
+      );
       if (!confirmed) return;
 
       await this.projectSnapshotsRepository.restore(projectId, snapshotId);
