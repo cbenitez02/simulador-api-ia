@@ -86,7 +86,7 @@
         type="button"
         class="sidebar__nav-item"
         [class.sidebar__nav-item--active]="activeNav() === 'dashboard'"
-        (click)="selectNav('dashboard')"
+        routerLink="/dashboard"
         [attr.aria-current]="activeNav() === 'dashboard' ? 'page' : null"
       >
         <svg lucideLayoutGrid [size]="18" strokeWidth="1.75"></svg>
@@ -96,7 +96,8 @@
         type="button"
         class="sidebar__nav-item"
         [class.sidebar__nav-item--active]="activeNav() === 'endpoints'"
-        (click)="selectNav('endpoints')"
+        routerLink="/endpoints"
+        [attr.aria-current]="activeNav() === 'endpoints' ? 'page' : null"
       >
         <svg lucideArrowRightLeft [size]="18" strokeWidth="1.75"></svg>
         <span>Endpoints</span>
@@ -105,7 +106,8 @@
         type="button"
         class="sidebar__nav-item"
         [class.sidebar__nav-item--active]="activeNav() === 'logs'"
-        (click)="selectNav('logs')"
+        routerLink="/logs"
+        [attr.aria-current]="activeNav() === 'logs' ? 'page' : null"
       >
         <svg lucideFileText [size]="18" strokeWidth="1.75"></svg>
         <span>Logs</span>
@@ -114,7 +116,8 @@
         type="button"
         class="sidebar__nav-item"
         [class.sidebar__nav-item--active]="activeNav() === 'history'"
-        (click)="selectNav('history')"
+        routerLink="/history"
+        [attr.aria-current]="activeNav() === 'history' ? 'page' : null"
       >
         <svg lucideHistory [size]="18" strokeWidth="1.75"></svg>
         <span>History</span>
@@ -123,7 +126,8 @@
         type="button"
         class="sidebar__nav-item"
         [class.sidebar__nav-item--active]="activeNav() === 'workspace'"
-        (click)="selectNav('workspace')"
+        routerLink="/workspace"
+        [attr.aria-current]="activeNav() === 'workspace' ? 'page' : null"
       >
         <svg lucideUsers [size]="18" strokeWidth="1.75"></svg>
         <span>Workspace</span>
@@ -153,8 +157,10 @@
         <span class="sidebar__user-avatar sidebar__user-avatar--fallback" aria-hidden="true">{{ userInitials() }}</span>
       }
       <div class="sidebar__user-details">
-        <p class="sidebar__label sidebar__label--card">Signed in as</p>
         <p class="sidebar__user-name">{{ userDisplayName }}</p>
+        @if (userHandle(); as userHandle) {
+          <p class="sidebar__user-username">{{ userHandle }}</p>
+        }
       </div>
     </section>
   }

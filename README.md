@@ -4,10 +4,10 @@ Monorepo para diseñar, administrar y ejecutar APIs mockeadas con soporte para p
 
 ## Qué incluye este monorepo
 
-- **`apps/backend`**: API de gestión, runtime de mocks y persistencia con Prisma/PostgreSQL.
-- **`apps/web`**: interfaz Angular para operar el simulador desde navegador.
-- **`docs/sdd`**: artefactos del flujo Spec-Driven Development usado por el proyecto.
-- **`libs`**: espacio reservado para código compartido.
+- `**apps/backend**`: API de gestión, runtime de mocks y persistencia con Prisma/PostgreSQL.
+- `**apps/web**`: interfaz Angular para operar el simulador desde navegador.
+- `**docs/sdd**`: artefactos del flujo Spec-Driven Development usado por el proyecto.
+- `**libs**`: espacio reservado para código compartido.
 
 ## Estructura del repo
 
@@ -59,13 +59,11 @@ El backend carga variables desde `apps/backend/.env`.
 
 1. Copiá el ejemplo:
 
-   ```bash
-   cp apps/backend/.env.example apps/backend/.env
-   ```
+```bash
+ cp apps/backend/.env.example apps/backend/.env
+```
 
-   > En PowerShell podés usar: `Copy-Item apps/backend/.env.example apps/backend/.env`
-
-2. Valores disponibles:
+> En PowerShell podés usar: `Copy-Item apps/backend/.env.example apps/backend/.env` 2. Valores disponibles:
 
 | Variable               | Obligatoria                          | Uso                                                                   |
 | ---------------------- | ------------------------------------ | --------------------------------------------------------------------- |
@@ -206,7 +204,7 @@ pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 
 ## Troubleshooting rápido
 
-- **`DATABASE_URL` inválida o base inexistente** → Prisma no va a migrar ni arrancar. Verificá host, puerto, credenciales y nombre de base.
+- `**DATABASE_URL` inválida o base inexistente\*\* → Prisma no va a migrar ni arrancar. Verificá host, puerto, credenciales y nombre de base.
 - **Docker levantó solo `simulador_api_test`** → creá una base de desarrollo separada o apuntá conscientemente a la de tests si sabés lo que estás haciendo.
 - **El frontend no conecta** → revisá que el backend esté corriendo en `http://localhost:3000` o ajustá `apps/web/public/app-config.js` para tu entorno.
 - **La funcionalidad de IA falla** → el backend arranca sin `OPENAI_API_KEY`, pero las rutas de IA van a responder como no disponibles si no configurás una key real.
@@ -242,6 +240,6 @@ pnpm --dir apps/web exec tsc --project tsconfig.spec.json --noEmit
 
 ## Notas importantes
 
-- La rama de integración del equipo hoy es **`dev`**.
+- La rama de integración del equipo hoy es `**dev**`.
 - La CI valida lint, typecheck, tests y build de producción del frontend, más cobertura/integración del backend con DB.
 - Los cambios grandes del repo se vienen trabajando con **SDD (Spec-Driven Development)**.

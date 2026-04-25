@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   LucideArrowRightLeft,
   LucideCopy,
@@ -23,6 +24,7 @@ import type {
   styleUrls: ['./main-dashboard-sidebar.component.css'],
   standalone: true,
   imports: [
+    RouterLink,
     LucideArrowRightLeft,
     LucideHandMetal,
     LucideHistory,
@@ -41,6 +43,7 @@ export class MainDashboardSidebarComponent {
   readonly activeNav = input.required<WorkspaceNavId>();
   readonly showSignOut = input(false);
   readonly userDisplayName = input<string | null>(null);
+  readonly userUsername = input<string | null>(null);
   readonly userAvatarUrl = input<string | null>(null);
   readonly loading = input(false);
   readonly errorMessage = input<string | null>(null);
@@ -53,7 +56,6 @@ export class MainDashboardSidebarComponent {
   });
 
   readonly projectSelect = output<string>();
-  readonly navSelect = output<WorkspaceNavId>();
   readonly createProjectRequested = output<void>();
   readonly retryRequested = output<void>();
   readonly loadMoreRequested = output<void>();
@@ -88,6 +90,14 @@ export class MainDashboardSidebarComponent {
     return trimmed.length ? trimmed : null;
   });
 
+  protected readonly userHandle = computed(() => {
+    const username = this.userUsername();
+    if (!username) return null;
+    const trimmed = username.trim();
+    if (!trimmed.length) return null;
+    return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+  });
+
   protected readonly userInitials = computed(() => {
     const displayName = this.normalizedUserDisplayName();
     if (!displayName) return '?';
@@ -101,10 +111,6 @@ export class MainDashboardSidebarComponent {
 
   protected selectProject(id: string): void {
     this.projectSelect.emit(id);
-  }
-
-  protected selectNav(id: WorkspaceNavId): void {
-    this.navSelect.emit(id);
   }
 
   protected addProject(): void {

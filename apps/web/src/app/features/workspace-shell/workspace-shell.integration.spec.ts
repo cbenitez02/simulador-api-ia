@@ -124,6 +124,7 @@ describe('WorkspaceShellComponent integration', () => {
       state: 'authenticated',
       userId: 'user-1',
       displayName: 'Owner User',
+      username: 'owner.user',
       email: 'owner@example.com',
       emailVerified: true,
       headers: {
@@ -202,6 +203,7 @@ describe('WorkspaceShellComponent integration', () => {
       state: 'authenticated',
       userId: 'user-1',
       displayName: 'Owner User',
+      username: 'owner.user',
       email: 'owner@example.com',
       emailVerified: true,
       headers: {
