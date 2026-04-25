@@ -1,5 +1,5 @@
 import { TitleCasePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, type OnInit } from '@angular/core';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { ApiError } from '../../shared/http/api-error.mapper';
 import type { OpenApiContractAnalyzeDto } from '../../shared/http/api.types';
@@ -83,9 +83,10 @@ interface ContractImportReviewState {
   styleUrls: ['./workspace-shell.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WorkspaceShellComponent {
+export class WorkspaceShellComponent implements OnInit {
   private static readonly PROJECT_PAGE_LIMIT = 25;
   private static readonly ENDPOINT_PAGE_LIMIT = 25;
+  private initialized = false;
 
   private readonly authSession = inject(FrontendAuthSessionService);
   private readonly projectsRepository = inject(ProjectsRepository);
@@ -267,6 +268,16 @@ export class WorkspaceShellComponent {
   });
 
   constructor() {
+    queueMicrotask(() => this.initializeWorkspace());
+  }
+
+  ngOnInit(): void {
+    this.initializeWorkspace();
+  }
+
+  private initializeWorkspace(): void {
+    if (this.initialized) return;
+    this.initialized = true;
     void this.authSession.bootstrap();
     void this.reloadProjects();
   }
@@ -513,7 +524,9 @@ export class WorkspaceShellComponent {
     this.activeNav.set('endpoints');
   }
 
-  protected testAllEndpoints(): void {}
+  protected testAllEndpoints(): void {
+    //logica para testear todos los endpoints
+  }
 
   protected async createSnapshot(): Promise<void> {
     if (!this.canMutateActiveWorkspace()) return;
@@ -603,29 +616,16 @@ export class WorkspaceShellComponent {
   }
 
   private async reloadProjects(selectProjectId?: string, append = false): Promise<void> {
-    if (append) {
-      this.projectsLoadingMore.set(true);
-      this.projectsLoadMoreError.set(null);
-    } else {
-      this.projectsLoading.set(true);
-      this.projectsError.set(null);
-      this.projectsLoadMoreError.set(null);
-    }
+    this.setProjectsLoadingState(append);
 
     try {
       const projects = await this.projectsRepository.listProjects({
         limit: WorkspaceShellComponent.PROJECT_PAGE_LIMIT,
         offset: append ? this.projects().length : 0,
       });
+      const projectItems = this.resolveReloadedProjects(projects.items, append);
 
       this.projectsPage.set(projects.page);
-      const projectItems = append
-        ? [
-            ...this.projects(),
-            ...projects.items.filter((project) => !this.projects().some((current) => current.id === project.id)),
-          ]
-        : projects.items;
-
       this.authSession.markProtectedApiReady();
       this.projects.set(projectItems);
 
@@ -633,56 +633,102 @@ export class WorkspaceShellComponent {
         return;
       }
 
-      const currentSelected = selectProjectId ?? this.selectedProjectId();
-      const nextSelected =
-        projectItems.find((project) => project.id === currentSelected)?.id ?? projectItems[0]?.id ?? '';
-      this.selectedProjectId.set(nextSelected);
-
-      if (!nextSelected) {
-        this.workspaceMembers.set([]);
-        this.workspaceMembersError.set(null);
-      }
-
-      if (!this.endpointList().some((endpoint) => endpoint.id === this.selectedEndpointId())) {
-        this.selectedEndpointId.set(null);
-      }
-
-      if (nextSelected) {
-        await this.hydrateActiveProjectSummary(nextSelected);
-      }
+      await this.syncSelectedProjectAfterReload(projectItems, selectProjectId);
     } catch (error) {
-      if (this.authSession.handleProtectedApiError(error)) {
-        if (!append) {
-          this.projects.set([]);
-          this.selectedProjectId.set('');
-          this.projectsError.set(null);
-        } else {
-          this.projectsLoadMoreError.set(null);
-        }
-
+      if (this.handleReloadProjectsAuthError(error, append)) {
         return;
       }
 
-      if (append) {
-        this.projectsLoadMoreError.set(error instanceof Error ? error.message : 'Could not load more projects.');
-        return;
-      }
+      this.handleReloadProjectsFailure(error, append);
+    } finally {
+      this.setProjectsLoadingComplete(append);
+    }
+  }
 
-      this.projects.set([]);
-      this.projectsPage.set({ limit: WorkspaceShellComponent.PROJECT_PAGE_LIMIT, offset: 0, total: 0, hasMore: false });
-      this.endpointList.set([]);
+  private setProjectsLoadingState(append: boolean): void {
+    if (append) {
+      this.projectsLoadingMore.set(true);
+      this.projectsLoadMoreError.set(null);
+      return;
+    }
+
+    this.projectsLoading.set(true);
+    this.projectsError.set(null);
+    this.projectsLoadMoreError.set(null);
+  }
+
+  private setProjectsLoadingComplete(append: boolean): void {
+    if (append) {
+      this.projectsLoadingMore.set(false);
+      return;
+    }
+
+    this.projectsLoading.set(false);
+  }
+
+  private resolveReloadedProjects(items: DashboardProject[], append: boolean): DashboardProject[] {
+    if (!append) {
+      return items;
+    }
+
+    const currentProjects = this.projects();
+    const currentIds = new Set(currentProjects.map((project) => project.id));
+    return [...currentProjects, ...items.filter((project) => !currentIds.has(project.id))];
+  }
+
+  private async syncSelectedProjectAfterReload(
+    projectItems: DashboardProject[],
+    selectProjectId?: string,
+  ): Promise<void> {
+    const currentSelected = selectProjectId ?? this.selectedProjectId();
+    const nextSelected =
+      projectItems.find((project) => project.id === currentSelected)?.id ?? projectItems[0]?.id ?? '';
+    this.selectedProjectId.set(nextSelected);
+
+    if (!nextSelected) {
       this.workspaceMembers.set([]);
       this.workspaceMembersError.set(null);
-      this.contractImportReview.set(null);
-      this.selectedProjectId.set('');
-      this.projectsError.set(error instanceof Error ? error.message : 'Could not load projects.');
-    } finally {
-      if (append) {
-        this.projectsLoadingMore.set(false);
-      } else {
-        this.projectsLoading.set(false);
-      }
     }
+
+    if (!this.endpointList().some((endpoint) => endpoint.id === this.selectedEndpointId())) {
+      this.selectedEndpointId.set(null);
+    }
+
+    if (nextSelected) {
+      await this.hydrateActiveProjectSummary(nextSelected);
+    }
+  }
+
+  private handleReloadProjectsAuthError(error: unknown, append: boolean): boolean {
+    if (!this.authSession.handleProtectedApiError(error)) {
+      return false;
+    }
+
+    if (append) {
+      this.projectsLoadMoreError.set(null);
+      return true;
+    }
+
+    this.projects.set([]);
+    this.selectedProjectId.set('');
+    this.projectsError.set(null);
+    return true;
+  }
+
+  private handleReloadProjectsFailure(error: unknown, append: boolean): void {
+    if (append) {
+      this.projectsLoadMoreError.set(error instanceof Error ? error.message : 'Could not load more projects.');
+      return;
+    }
+
+    this.projects.set([]);
+    this.projectsPage.set({ limit: WorkspaceShellComponent.PROJECT_PAGE_LIMIT, offset: 0, total: 0, hasMore: false });
+    this.endpointList.set([]);
+    this.workspaceMembers.set([]);
+    this.workspaceMembersError.set(null);
+    this.contractImportReview.set(null);
+    this.selectedProjectId.set('');
+    this.projectsError.set(error instanceof Error ? error.message : 'Could not load projects.');
   }
 
   private async refreshProject(projectId: string): Promise<void> {
@@ -1090,7 +1136,9 @@ export class WorkspaceShellComponent {
 
     try {
       const snapshot = await this.projectSnapshotsRepository.get(projectId, snapshotId);
-      const confirmed = window.confirm(`Restore snapshot “${snapshot.name}”? Live endpoints/config will be replaced.`);
+      const confirmed = globalThis.confirm(
+        `Restore snapshot “${snapshot.name}”? Live endpoints/config will be replaced.`,
+      );
       if (!confirmed) return;
 
       await this.projectSnapshotsRepository.restore(projectId, snapshotId);

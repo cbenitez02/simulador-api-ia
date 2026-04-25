@@ -28,9 +28,11 @@ function createListResponse(
   items: AuditHistoryEntry[],
   serverTime = '2026-04-14T12:00:05.000Z',
 ): AuditHistoryListResult {
+  const lastItem = items.at(-1);
+
   return {
     items,
-    nextCursor: items.at(-1) ? { createdAt: items.at(-1)!.createdAt, id: items.at(-1)!.id } : null,
+    nextCursor: lastItem ? { createdAt: lastItem.createdAt, id: lastItem.id } : null,
     serverTime,
   };
 }
