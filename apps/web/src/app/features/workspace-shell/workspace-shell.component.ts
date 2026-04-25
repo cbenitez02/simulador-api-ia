@@ -1,5 +1,7 @@
 import { TitleCasePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal, type OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal, type OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { ApiError } from '../../shared/http/api-error.mapper';
 import type { OpenApiContractAnalyzeDto } from '../../shared/http/api.types';
@@ -59,6 +61,11 @@ interface ContractImportReviewState {
   analysis: OpenApiContractAnalyzeDto;
 }
 
+const WORKSPACE_NAV_ROUTES: readonly WorkspaceNavId[] = ['dashboard', 'endpoints', 'logs', 'history', 'workspace'];
+
+const isWorkspaceNavId = (value: string | null): value is WorkspaceNavId =>
+  typeof value === 'string' && WORKSPACE_NAV_ROUTES.includes(value as WorkspaceNavId);
+
 @Component({
   selector: 'app-workspace-shell',
   standalone: true,
@@ -89,6 +96,9 @@ export class WorkspaceShellComponent implements OnInit {
   private initialized = false;
 
   private readonly authSession = inject(FrontendAuthSessionService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly projectsRepository = inject(ProjectsRepository);
   private readonly endpointsRepository = inject(EndpointsRepository);
   private readonly globalConfigRepository = inject(GlobalConfigRepository);
@@ -272,6 +282,9 @@ export class WorkspaceShellComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      this.syncNavFromRoute(params.get('navId'));
+    });
     this.initializeWorkspace();
   }
 
@@ -353,7 +366,7 @@ export class WorkspaceShellComponent implements OnInit {
     this.createProjectError.set(null);
     this.createProjectPartialState.set(null);
     this.endpointMutationError.set(null);
-    this.activeNav.set('endpoints');
+    void this.navigateToNav('endpoints');
     this.selectedEndpointId.set(null);
     this.endpointWizardInitial.set(null);
     this.endpointWizardMode.set('manual');
@@ -425,7 +438,17 @@ export class WorkspaceShellComponent implements OnInit {
   }
 
   protected selectNav(id: WorkspaceNavId): void {
-    this.activeNav.set(id);
+    void this.navigateToNav(id);
+  }
+
+  private syncNavFromRoute(rawNavId: string | null): void {
+    const nextNav: WorkspaceNavId = isWorkspaceNavId(rawNavId) ? rawNavId : 'dashboard';
+    if (this.activeNav() === nextNav) return;
+    this.activeNav.set(nextNav);
+    this.applyNavState(nextNav);
+  }
+
+  private applyNavState(id: WorkspaceNavId): void {
     if (id === 'endpoints') {
       const projectId = this.selectedProjectId() || this.activeProject()?.id;
       if (projectId) {
@@ -456,6 +479,15 @@ export class WorkspaceShellComponent implements OnInit {
     }
   }
 
+  private async navigateToNav(id: WorkspaceNavId): Promise<void> {
+    if (this.route.snapshot.paramMap.get('navId') === id) {
+      this.syncNavFromRoute(id);
+      return;
+    }
+
+    await this.router.navigateByUrl(`/${id}`);
+  }
+
   protected selectEndpoint(id: string): void {
     this.selectedEndpointId.set(id);
   }
@@ -472,7 +504,7 @@ export class WorkspaceShellComponent implements OnInit {
     if (!this.hasProjects() || !this.canMutateActiveWorkspace()) return;
     this.endpointMutationError.set(null);
     this.navBeforeCreateFlow.set(this.activeNav());
-    this.activeNav.set('endpoints');
+    void this.navigateToNav('endpoints');
     this.selectedEndpointId.set(null);
     this.endpointWizardInitial.set(null);
     this.endpointWizardMode.set(mode);
@@ -483,7 +515,7 @@ export class WorkspaceShellComponent implements OnInit {
     if (!this.hasProjects() || !this.canMutateActiveWorkspace()) return;
     this.endpointMutationError.set(null);
     this.navBeforeCreateFlow.set(this.activeNav());
-    this.activeNav.set('endpoints');
+    void this.navigateToNav('endpoints');
     this.endpointWizardInitial.set(ep);
     this.endpointWizardMode.set('edit');
     this.createEndpointFlowOpen.set(true);
@@ -495,7 +527,7 @@ export class WorkspaceShellComponent implements OnInit {
     this.endpointWizardMode.set('ai');
     if (restorePreviousNav) {
       const prev = this.navBeforeCreateFlow();
-      if (prev !== null) this.activeNav.set(prev);
+      if (prev !== null) void this.navigateToNav(prev);
     }
     this.navBeforeCreateFlow.set(null);
   }
@@ -504,7 +536,7 @@ export class WorkspaceShellComponent implements OnInit {
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     if (!projectId) return;
     this.selectedEndpointId.set(ep.id);
-    this.activeNav.set('endpoints');
+    void this.navigateToNav('endpoints');
     this.closeCreateEndpointWizard(false);
     void this.refreshProject(projectId);
   }
@@ -517,11 +549,11 @@ export class WorkspaceShellComponent implements OnInit {
   }
 
   protected openLogs(): void {
-    this.activeNav.set('logs');
+    void this.navigateToNav('logs');
   }
 
   protected openEndpoints(): void {
-    this.activeNav.set('endpoints');
+    void this.navigateToNav('endpoints');
   }
 
   protected testAllEndpoints(): void {
@@ -696,6 +728,12 @@ export class WorkspaceShellComponent implements OnInit {
 
     if (nextSelected) {
       await this.hydrateActiveProjectSummary(nextSelected);
+      if (this.activeNav() === 'endpoints') {
+        await this.reloadEndpointList(nextSelected);
+      }
+      if (this.activeNav() === 'history') {
+        await this.loadSnapshotHistory(nextSelected);
+      }
     }
   }
 
@@ -878,7 +916,7 @@ export class WorkspaceShellComponent implements OnInit {
       await this.reloadProjects(projectId);
       this.selectedProjectId.set(projectId);
       this.selectedEndpointId.set(endpoint.id);
-      this.activeNav.set('endpoints');
+      void this.navigateToNav('endpoints');
       this.createProjectModalOpen.set(false);
       this.createProjectPartialState.set(null);
       this.selectedLog.set(null);
@@ -894,7 +932,7 @@ export class WorkspaceShellComponent implements OnInit {
         retryable: true,
       });
       this.createProjectModalOpen.set(true);
-      this.activeNav.set('dashboard');
+      void this.navigateToNav('dashboard');
       this.createProjectError.set(this.mapCreateProjectGenerationError(error));
     } finally {
       this.createProjectModalLoading.set(false);
@@ -1031,7 +1069,7 @@ export class WorkspaceShellComponent implements OnInit {
       this.deleteProjectDialogOpen.set(false);
       this.deleteProjectTargetId.set(null);
       this.deleteProjectTargetName.set('');
-      if (!nextProjectId) this.activeNav.set('dashboard');
+      if (!nextProjectId) void this.navigateToNav('dashboard');
       await this.reloadProjects(nextProjectId);
     } catch (error) {
       this.deleteProjectError.set(error instanceof Error ? error.message : 'Could not delete project.');

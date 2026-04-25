@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { provideRouter, RouterLink } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveAngularExternalResources, setupAngularVitest } from '../../../../testing/angular-vitest';
 import { MainDashboardSidebarComponent } from './main-dashboard-sidebar.component';
@@ -15,11 +17,13 @@ const projectFixture = {
 async function renderComponent(options?: {
   showSignOut?: boolean;
   userDisplayName?: string | null;
+  userUsername?: string | null;
   userAvatarUrl?: string | null;
 }) {
   await resolveAngularExternalResources();
   await TestBed.configureTestingModule({
     imports: [MainDashboardSidebarComponent],
+    providers: [provideRouter([])],
   }).compileComponents();
 
   const fixture = TestBed.createComponent(MainDashboardSidebarComponent);
@@ -29,6 +33,7 @@ async function renderComponent(options?: {
     activeNav: () => 'dashboard' | 'logs' | 'endpoints' | 'history' | 'workspace';
     showSignOut: () => boolean;
     userDisplayName: () => string | null;
+    userUsername: () => string | null;
     userAvatarUrl: () => string | null;
   };
   component.projects = () => [projectFixture];
@@ -36,6 +41,7 @@ async function renderComponent(options?: {
   component.activeNav = () => 'dashboard';
   component.showSignOut = () => options?.showSignOut ?? true;
   component.userDisplayName = () => options?.userDisplayName ?? null;
+  component.userUsername = () => options?.userUsername ?? null;
   component.userAvatarUrl = () => options?.userAvatarUrl ?? null;
   fixture.detectChanges();
   await fixture.whenStable();
@@ -84,27 +90,25 @@ describe('MainDashboardSidebarComponent', () => {
     expect(navLabels).toEqual(['Dashboard', 'Endpoints', 'Logs', 'History', 'Workspace']);
   });
 
-  it('emits navSelect with "workspace" when the user activates the Workspace entry', async () => {
+  it('binds the Workspace navigation entry to the /workspace route', async () => {
     const fixture = await renderComponent();
-    const component = fixture.componentInstance;
-    const emitSpy = vi.fn();
-    component.navSelect.subscribe(emitSpy);
+    const navButtons = fixture.debugElement.queryAll(By.directive(RouterLink));
+    const workspaceButton = navButtons.find((btn) => btn.nativeElement.textContent?.trim().includes('Workspace'));
+    const workspaceLink = workspaceButton?.injector.get(RouterLink);
 
-    const buttons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.sidebar__nav-item');
-    const workspaceButton = Array.from(buttons).find((btn) => btn.textContent?.trim().includes('Workspace'));
-    workspaceButton?.click();
-
-    expect(emitSpy).toHaveBeenCalledWith('workspace');
+    expect(workspaceLink?.urlTree?.toString()).toBe('/workspace');
   });
 
   it('renders the signed-in user block with avatar and name', async () => {
     const fixture = await renderComponent({
       userDisplayName: 'Owner User',
+      userUsername: 'owner.user',
       userAvatarUrl: 'https://cdn.example.com/avatar.png',
     });
     const element = fixture.nativeElement as HTMLElement;
 
     expect(element.querySelector('.sidebar__user-name')?.textContent).toContain('Owner User');
+    expect(element.querySelector('.sidebar__user-username')?.textContent).toContain('@owner.user');
     expect(element.querySelector('.sidebar__user-avatar')?.getAttribute('src')).toBe(
       'https://cdn.example.com/avatar.png',
     );

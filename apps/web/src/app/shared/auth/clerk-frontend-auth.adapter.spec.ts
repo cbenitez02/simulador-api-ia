@@ -53,6 +53,7 @@ describe('ClerkFrontendAuthAdapter', () => {
       user: {
         id: 'user_clerk_123',
         fullName: 'Owner User',
+        username: 'owner.user',
         imageUrl: 'https://cdn.clerk.dev/avatar.png',
         primaryEmailAddress: {
           emailAddress: 'owner@example.com',
@@ -81,6 +82,7 @@ describe('ClerkFrontendAuthAdapter', () => {
       userId: 'user_clerk_123',
       email: 'owner@example.com',
       displayName: 'Owner User',
+      username: 'owner.user',
       avatarUrl: 'https://cdn.clerk.dev/avatar.png',
       headers: {
         authStatus: 'signed-in',

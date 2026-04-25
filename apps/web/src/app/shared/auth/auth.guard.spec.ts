@@ -15,6 +15,7 @@ describe('authGuard', () => {
         state: options?.snapshotState ?? 'authenticated',
         userId: null,
         displayName: null,
+        username: null,
         avatarUrl: null,
         email: null,
         emailVerified: false,
