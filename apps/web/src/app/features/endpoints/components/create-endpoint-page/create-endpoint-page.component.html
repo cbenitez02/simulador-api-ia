@@ -5,7 +5,7 @@
         <svg lucideRoute class="cep-wizard__logo-icon" [size]="24" strokeWidth="2"></svg>
       </div>
       <div>
-        <h1 class="cep-wizard__title">{{ isEditing() ? 'Edit endpoint' : 'Create endpoint' }}</h1>
+        <h1 class="cep-wizard__title">{{ wizardTitle() }}</h1>
         <p class="cep-wizard__subtitle">{{ wizardSubtitle() }}</p>
       </div>
     </div>
@@ -58,6 +58,7 @@
         }
         @case ('review') {
           <app-create-endpoint-review-step
+            [mode]="mode() === 'manual' ? 'manual' : 'ai'"
             [method]="reviewMethod()"
             [route]="reviewRoute()"
             [methodLocked]="draft()?.locks?.method ?? false"
@@ -71,6 +72,7 @@
           @if (draft(); as d) {
             <app-create-endpoint-editor-step
               [draft]="d"
+              [mode]="mode()"
               [sourcePrompt]="sourcePrompt()"
               [apiBaseUrl]="apiBaseUrl()"
               (draftChange)="onDraftChange($event)"
@@ -88,15 +90,17 @@
       </button>
     }
     @if (step() === 'review') {
-      <button
-        type="button"
-        class="cep-wizard__btn cep-wizard__btn--outline"
-        [disabled]="saving()"
-        (click)="backToPrompt()"
-      >
-        <svg lucideArrowLeft [size]="18" strokeWidth="2"></svg>
-        Back
-      </button>
+      @if (mode() !== 'manual') {
+        <button
+          type="button"
+          class="cep-wizard__btn cep-wizard__btn--outline"
+          [disabled]="saving()"
+          (click)="backToPrompt()"
+        >
+          <svg lucideArrowLeft [size]="18" strokeWidth="2"></svg>
+          Back
+        </button>
+      }
       <button
         type="button"
         class="cep-wizard__btn cep-wizard__btn--primary"

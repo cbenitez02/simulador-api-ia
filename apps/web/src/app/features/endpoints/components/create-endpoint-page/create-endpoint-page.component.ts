@@ -10,17 +10,23 @@ import {
   untracked,
 } from '@angular/core';
 import { LucideArrowLeft, LucideArrowRight, LucideCircleCheck, LucideRoute } from '@lucide/angular';
+import { HTTP_METHOD_SELECT_OPTIONS } from '../../../../shared/constants/http-method-select-options';
 import { ApiError } from '../../../../shared/http/api-error.mapper';
 import type { EndpointPreview, HttpMethod } from '../../../../shared/models/endpoint-preview.model';
-import { HTTP_METHOD_SELECT_OPTIONS } from '../../../../shared/constants/http-method-select-options';
-import type { CreateEndpointStep, EndpointDraft } from '../../models/endpoint-draft.model';
+import { InlineAlertComponent } from '../../../../shared/ui/inline-alert/inline-alert.component';
+import {
+  endpointSaveRecoveryMessage,
+  endpointWizardSubtitle,
+  endpointWizardTitle,
+} from '../../../../shared/utils/endpoint-flow-ui';
+import { EndpointSaveError, EndpointsRepository } from '../../data-access/endpoints.repository';
+import type { CreateEndpointStep, EndpointDraft, EndpointFlowMode } from '../../models/endpoint-draft.model';
+import { createManualEndpointDraft } from '../../models/endpoint-draft.model';
 import { EndpointAiGeneratorService } from '../../services/endpoint-ai-generator.service';
 import { endpointPreviewToDraft, statusCodeForMethod } from '../../services/endpoint-draft.mapper';
 import { CreateEndpointEditorStepComponent } from '../create-endpoint-editor-step/create-endpoint-editor-step.component';
 import { CreateEndpointPromptStepComponent } from '../create-endpoint-prompt-step/create-endpoint-prompt-step.component';
 import { CreateEndpointReviewStepComponent } from '../create-endpoint-review-step/create-endpoint-review-step.component';
-import { EndpointsRepository } from '../../data-access/endpoints.repository';
-import { InlineAlertComponent } from '../../../../shared/ui/inline-alert/inline-alert.component';
 
 function normalizeReviewRoute(raw: string): string {
   let t = raw.trim();
@@ -54,7 +60,7 @@ export class CreateEndpointPageComponent {
   readonly open = input(false);
   readonly projectId = input<string | null>(null);
   readonly initialEndpoint = input<EndpointPreview | null>(null);
-  readonly isEditing = input(false);
+  readonly mode = input<EndpointFlowMode>('ai');
   /** Mock base URL for the preview tab (e.g. https://mock.apisim.dev/v1). */
   readonly apiBaseUrl = input('');
 
@@ -80,24 +86,14 @@ export class CreateEndpointPageComponent {
   protected readonly loadingError = signal<string | null>(null);
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
+  protected readonly wizardTitle = computed(() => endpointWizardTitle(this.mode()));
 
-  protected readonly wizardSubtitle = computed(() => {
-    if (this.isEditing()) return 'Configure endpoint';
-    switch (this.step()) {
-      case 'prompt':
-        return 'Describe your endpoint';
-      case 'review':
-        return 'Review basics';
-      case 'editor':
-        return 'Configure endpoint';
-      default:
-        return '';
-    }
-  });
+  protected readonly wizardSubtitle = computed(() => endpointWizardSubtitle(this.mode(), this.step()));
 
   /** 1-based index for the header stepper. */
   protected readonly wizardStepIndex = computed(() => {
-    if (this.isEditing()) return 3;
+    if (this.mode() === 'edit') return 3;
+    if (this.mode() === 'manual') return this.step() === 'review' ? 1 : 2;
     switch (this.step()) {
       case 'prompt':
         return 1;
@@ -124,27 +120,30 @@ export class CreateEndpointPageComponent {
 
   private bootstrapSession(): void {
     const ep = this.initialEndpoint();
+    const mode = this.mode();
     this.loadingError.set(null);
     this.saveError.set(null);
-    if (ep && this.projectId()) {
+    if (mode === 'edit' && ep && this.projectId()) {
       this.editingEndpointId.set(ep.id);
       void this.hydrateDraft(this.projectId()!, ep);
     } else {
       this.editingEndpointId.set(null);
-      this.resetCreateFlow();
+      this.resetCreateFlow(mode);
     }
   }
 
-  private resetCreateFlow(): void {
-    this.step.set('prompt');
+  private resetCreateFlow(mode: EndpointFlowMode): void {
+    const isManual = mode === 'manual';
+    this.step.set(isManual ? 'review' : 'prompt');
     this.promptText.set('');
     this.promptError.set(null);
     this.generationError.set(null);
     this.generating.set(false);
-    this.draft.set(null);
-    this.reviewMethod.set('GET');
-    this.reviewRoute.set('');
-    this.sourcePrompt.set('');
+    const manualDraft = isManual ? createManualEndpointDraft() : null;
+    this.draft.set(manualDraft);
+    this.reviewMethod.set(manualDraft?.method ?? 'GET');
+    this.reviewRoute.set(manualDraft?.route ?? '');
+    this.sourcePrompt.set(isManual ? 'Manual endpoint setup' : '');
   }
 
   protected stepComplete(stepNum: number): boolean {
@@ -211,6 +210,7 @@ export class CreateEndpointPageComponent {
 
   protected backToPrompt(): void {
     if (this.saving()) return;
+    if (this.mode() === 'manual') return;
     this.step.set('prompt');
   }
 
@@ -234,7 +234,7 @@ export class CreateEndpointPageComponent {
 
   protected onEditorBack(): void {
     if (this.saving()) return;
-    if (this.isEditing()) {
+    if (this.mode() === 'edit') {
       this.cancelled.emit();
       return;
     }
@@ -261,7 +261,32 @@ export class CreateEndpointPageComponent {
       const ep = await this.endpointsRepository.saveEndpoint(projectId, d, this.editingEndpointId());
       this.saved.emit(ep);
     } catch (error) {
-      this.saveError.set(error instanceof Error ? error.message : 'Could not save endpoint.');
+      if (error instanceof EndpointSaveError) {
+        this.editingEndpointId.set(error.endpointId);
+        const currentDraft = this.draft();
+        this.draft.set(
+          currentDraft
+            ? {
+                ...currentDraft,
+                locks: error.partial
+                  ? {
+                      ...currentDraft.locks,
+                      method: true,
+                      path: true,
+                    }
+                  : currentDraft.locks,
+                saveState: {
+                  stage: error.stage,
+                  endpointId: error.endpointId,
+                  partial: error.partial,
+                },
+              }
+            : currentDraft,
+        );
+        this.saveError.set(endpointSaveRecoveryMessage(error.stage, error.message, error.partial));
+      } else {
+        this.saveError.set(error instanceof Error ? error.message : 'Could not save endpoint.');
+      }
     } finally {
       this.saving.set(false);
     }
@@ -273,7 +298,7 @@ export class CreateEndpointPageComponent {
     if (this.generating()) {
       this.generationRequestId += 1;
       this.generating.set(false);
-      this.resetCreateFlow();
+      this.resetCreateFlow(this.mode());
     }
 
     this.cancelled.emit();

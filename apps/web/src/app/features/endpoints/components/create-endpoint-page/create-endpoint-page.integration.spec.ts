@@ -5,7 +5,7 @@ import { ApiError } from '../../../../shared/http/api-error.mapper';
 import type { EndpointPreview } from '../../../../shared/models/endpoint-preview.model';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../../../testing/angular-vitest';
 import { EndpointsRepository } from '../../data-access/endpoints.repository';
-import type { EndpointDraft } from '../../models/endpoint-draft.model';
+import type { EndpointDraft, EndpointFlowMode } from '../../models/endpoint-draft.model';
 import { EndpointAiGeneratorService } from '../../services/endpoint-ai-generator.service';
 import { CreateEndpointPageComponent } from './create-endpoint-page.component';
 
@@ -24,7 +24,7 @@ type CreateEndpointPageHarness = {
   projectId: () => string | null;
   apiBaseUrl: () => string;
   initialEndpoint: () => EndpointPreview | null;
-  isEditing: () => boolean;
+  mode: () => EndpointFlowMode;
   promptText: WritableSignalHarness<string>;
   generating: () => boolean;
   generationError: () => string | null;
@@ -52,7 +52,7 @@ type RenderSnapshot = {
 };
 
 function renderSnapshot(component: CreateEndpointPageHarness): RenderSnapshot {
-  const content: string[] = [component.isEditing() ? 'Edit endpoint' : 'Create endpoint'];
+  const content: string[] = [component.mode() === 'edit' ? 'Edit endpoint' : 'Create endpoint'];
   const draft = component.draft();
 
   if (component.loadingError()) content.push(component.loadingError()!);
@@ -224,21 +224,24 @@ describe('CreateEndpointPageComponent integration', () => {
     expect(renderSnapshot(component).content).not.toContain('Could not save endpoint.');
   });
 
-  it('keeps the wizard open and shows a failure message after a partial save failure', async () => {
-    api.post.mockResolvedValue({
-      id: 'e1',
-      projectId: 'p1',
-      method: 'POST',
-      path: '/users',
-      description: 'Create user',
-      statusCode: 201,
-      responseBody: { ok: true },
+  it('keeps the wizard open and shows recovery copy after a partial save failure', async () => {
+    api.post.mockImplementation(async (path: string) => {
+      if (path === '/projects/p1/endpoints') {
+        return {
+          id: 'e1',
+          projectId: 'p1',
+          method: 'POST',
+          path: '/users',
+          description: 'Create user',
+          statusCode: 201,
+          responseBody: { ok: true },
+        };
+      }
+
+      throw new Error(`Unexpected POST ${path}`);
     });
     api.put.mockRejectedValue(new Error('Config persistence failed'));
-    api.get.mockImplementation(async (path: string) => {
-      if (path === '/endpoints/e1/scenarios') return [];
-      throw new Error(`Unexpected GET ${path}`);
-    });
+    api.get.mockResolvedValue([]);
 
     const component = createComponent();
     component.projectId = () => 'p1';
@@ -249,8 +252,31 @@ describe('CreateEndpointPageComponent integration', () => {
 
     const snapshot = renderSnapshot(component);
     expect(snapshot.content).toContain('Create endpoint');
+    expect(snapshot.content).toContain('Endpoint basics were saved');
     expect(snapshot.content).toContain('Config persistence failed');
     expect(snapshot.content).toContain('Save endpoint');
+  });
+
+  it('shows manual setup copy when bootstrapped in manual mode', () => {
+    const component = createComponent();
+
+    (component as unknown as { resetCreateFlow(mode: EndpointFlowMode): void }).resetCreateFlow('manual');
+
+    expect(component.step()).toBe('review');
+    expect(component.reviewMethod()).toBe('GET');
+    expect(component.reviewRoute()).toBe('/resource');
+    expect(component.draft()?.source).toBe('manual');
+  });
+
+  it('starts ai mode directly on the prompt step before any preview exists', () => {
+    const component = createComponent();
+
+    (component as unknown as { resetCreateFlow(mode: EndpointFlowMode): void }).resetCreateFlow('ai');
+
+    expect(component.step()).toBe('prompt');
+    expect(component.draft()).toBeNull();
+    expect(component.promptText()).toBe('');
+    expect(component.generationError()).toBeNull();
   });
 
   it('runs prompt -> preview -> review -> editor -> save using the backend preview contract', async () => {
@@ -520,7 +546,7 @@ describe('CreateEndpointPageComponent integration', () => {
     });
 
     const component = createComponent();
-    component.isEditing = () => true;
+    component.mode = () => 'edit';
 
     await component.hydrateDraft('p1', previewFixture);
 
@@ -546,7 +572,7 @@ describe('CreateEndpointPageComponent integration', () => {
     });
 
     const component = createComponent();
-    component.isEditing = () => true;
+    component.mode = () => 'edit';
 
     await component.hydrateDraft('p1', { ...previewFixture, method: 'PUT', description: 'Replace user' });
 

@@ -5,28 +5,28 @@
         <h1 class="endpoints-page__title">Endpoints</h1>
         <p class="endpoints-page__sub">Select an endpoint to preview details on the right</p>
       </div>
-      <button
-        type="button"
-        class="endpoints-page__create"
-        [disabled]="!canMutate()"
-        (click)="createEndpoint.emit()"
-        aria-label="Create new endpoint"
-      >
-        <span class="endpoints-page__create-icon" aria-hidden="true">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          >
-            <path d="M12 5v14M5 12h14"></path>
-          </svg>
-        </span>
-        Create endpoint
-      </button>
+      <div class="endpoints-page__actions">
+        <button
+          type="button"
+          class="endpoints-page__create endpoints-page__create--secondary"
+          [disabled]="!canMutate()"
+          (click)="onCreateEndpointRequested('header', 'manual')"
+        >
+          Create endpoint
+        </button>
+        <button
+          type="button"
+          class="endpoints-page__create"
+          [disabled]="!canMutate()"
+          (click)="onCreateEndpointRequested('header', 'ai')"
+          aria-label="Create endpoint with AI"
+        >
+          <span class="endpoints-page__create-icon" aria-hidden="true">
+            <svg lucideSparkles [size]="16" strokeWidth="1.75"></svg>
+          </span>
+          Create endpoint with AI
+        </button>
+      </div>
     </div>
   </header>
   <app-endpoints-list
@@ -38,7 +38,7 @@
     [loading]="loading()"
     [hasMore]="hasMore()"
     (endpointSelect)="endpointSelect.emit($event)"
-    (createEndpointRequest)="createEndpoint.emit()"
+    (createEndpointRequest)="onCreateEndpointRequested('list', 'ai')"
     (searchQueryChange)="searchQueryChange.emit($event)"
     (methodFilterChange)="methodFilterChange.emit($event)"
     (sortOptionChange)="sortOptionChange.emit($event)"

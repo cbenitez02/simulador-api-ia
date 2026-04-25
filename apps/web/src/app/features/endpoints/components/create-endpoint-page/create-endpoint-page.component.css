@@ -18,6 +18,9 @@
   min-height: 0;
   background: var(--cep-wizard-bg);
   color: var(--cep-wizard-text);
+  position: relative;
+  --cep-topbar-offset: 0px;
+  --cep-bottombar-offset: 0px;
 }
 
 .cep-wizard__header {
@@ -29,6 +32,10 @@
   padding: 1.25rem 1.5rem 1rem;
   border-bottom: 1px solid var(--cep-wizard-border);
   flex-shrink: 0;
+  position: sticky;
+  top: var(--cep-topbar-offset);
+  z-index: 4;
+  background: var(--cep-wizard-bg);
 }
 
 .cep-wizard__header-left {
@@ -128,10 +135,12 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0.5rem 0 1rem;
+  padding: 0.5rem 0 calc(1rem + var(--cep-bottombar-offset));
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
+  scroll-padding-top: calc(var(--cep-topbar-offset) + 1rem);
+  scroll-padding-bottom: calc(var(--cep-bottombar-offset) + 7rem);
 }
 
 .cep-wizard__footer {
@@ -144,6 +153,9 @@
   border-top: 1px solid var(--cep-wizard-border);
   flex-shrink: 0;
   background: var(--cep-wizard-bg);
+  position: sticky;
+  bottom: var(--cep-bottombar-offset);
+  z-index: 4;
 }
 
 .cep-wizard__btn {

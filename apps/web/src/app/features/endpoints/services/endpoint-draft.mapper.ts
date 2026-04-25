@@ -7,7 +7,12 @@ import type {
   EndpointDraft,
   EndpointScenario,
 } from '../models/endpoint-draft.model';
-import { defaultEndpointBehavior, newScenarioId, unlockedEndpointDraftLocks } from '../models/endpoint-draft.model';
+import {
+  defaultEndpointBehavior,
+  endpointDraftLocksForMode,
+  newScenarioId,
+  statusCodeForDraftMethod,
+} from '../models/endpoint-draft.model';
 
 function normalizeRoute(raw: string): string {
   const t = raw.trim();
@@ -125,8 +130,9 @@ export function endpointPreviewToDraft(ep: EndpointPreview): EndpointDraft {
     responseBody: ep.responseBody,
     scenarios,
     behavior,
-    locks: unlockedEndpointDraftLocks(),
+    locks: endpointDraftLocksForMode('edit'),
     source: 'existing',
+    saveState: null,
   };
 }
 
@@ -162,9 +168,7 @@ function newEndpointId(): string {
 }
 
 export function statusCodeForMethod(method: HttpMethod): number {
-  if (method === 'POST') return 201;
-  if (method === 'DELETE') return 204;
-  return 200;
+  return statusCodeForDraftMethod(method);
 }
 
 export function aiShapeToDraft(shape: AiGeneratedEndpointShape): EndpointDraft {
@@ -176,7 +180,8 @@ export function aiShapeToDraft(shape: AiGeneratedEndpointShape): EndpointDraft {
     responseBody: shape.responseBody,
     scenarios: shape.scenarios.map((s) => ({ ...s })),
     behavior: defaultEndpointBehavior(),
-    locks: unlockedEndpointDraftLocks(),
+    locks: endpointDraftLocksForMode('manual'),
     source: 'manual',
+    saveState: null,
   };
 }

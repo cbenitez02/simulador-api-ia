@@ -695,6 +695,42 @@ describe('WorkspaceShellComponent integration', () => {
       message: 'Your project is ready, but AI is unavailable right now. Retry generation or continue manually.',
     });
   });
+
+  it('opens the shared manual endpoint flow after partial project recovery', async () => {
+    api.get.mockImplementation(async (path: string) => {
+      if (path === projectListPath) {
+        return createProjectListResponse(0);
+      }
+
+      if (path === '/projects/p1/dashboard-summary') {
+        return createDashboardSummary(0);
+      }
+
+      throw new Error(`Unexpected GET ${path}`);
+    });
+
+    const { component } = createComponent();
+    await flushAsyncWork();
+
+    component.createProjectPartialState.set({
+      createdProjectId: 'p1',
+      projectName: 'Generated project',
+      endpointPrompt: 'Create a users endpoint',
+      message: 'Your project is ready, but endpoint setup is still pending.',
+      retryable: true,
+    });
+    (component as unknown as { continueCreateProjectManually(): void }).continueCreateProjectManually();
+    await flushAsyncWork();
+
+    expect(component.selectedProjectId()).toBe('p1');
+    expect(component.activeNav()).toBe('endpoints');
+    expect(component.createProjectModalOpen()).toBe(false);
+    expect(component.createProjectPartialState()).toBeNull();
+    expect((component as unknown as { createEndpointFlowOpen: () => boolean }).createEndpointFlowOpen()).toBe(true);
+    expect((component as unknown as { endpointWizardMode: () => 'ai' | 'manual' | 'edit' }).endpointWizardMode()).toBe(
+      'manual',
+    );
+  });
 });
 
 type LogsComponentHarness = {

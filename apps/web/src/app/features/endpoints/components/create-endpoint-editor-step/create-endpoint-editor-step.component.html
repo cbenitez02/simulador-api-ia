@@ -23,8 +23,12 @@
         (input)="onRouteInput($event)"
       />
     </div>
-    <p class="cep-editor__prompt-ref" [attr.title]="sourcePrompt()">{{ sourcePrompt() }}</p>
+    <p class="cep-editor__prompt-ref" [attr.title]="metadataLabel()">{{ metadataLabel() }}</p>
   </div>
+
+  @if (editMethodPathNotice(mode()); as methodPathNotice) {
+    <app-inline-alert [message]="methodPathNotice" />
+  }
 
   <app-icon-tab-strip
     ariaLabel="Editor sections"
@@ -93,7 +97,7 @@
             />
           }
           @for (s of draft().scenarios; track s.id; let i = $index) {
-            <div class="cep-editor__scenario">
+            <div class="cep-editor__scenario" [attr.data-scenario-id]="s.id">
               <div class="cep-editor__scenario-head">
                 @if (isSuccessScenario(s)) {
                   <span class="cep-editor__scenario-tag"

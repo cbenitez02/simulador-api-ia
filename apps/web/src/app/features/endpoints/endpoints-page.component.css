@@ -43,6 +43,12 @@
   color: var(--cp-text-subtle);
 }
 
+.endpoints-page__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .endpoints-page__create {
   flex-shrink: 0;
   display: inline-flex;
@@ -73,4 +79,15 @@
 
 .endpoints-page__create-icon {
   display: flex;
+}
+
+.endpoints-page__create--secondary {
+  border: 1px solid var(--cp-border-default);
+  background: var(--cp-surface-app);
+  color: var(--cp-text-body);
+}
+
+.endpoints-page__create--secondary:hover {
+  background: var(--cp-surface-overlay);
+  border-color: var(--cp-border-input-hover);
 }

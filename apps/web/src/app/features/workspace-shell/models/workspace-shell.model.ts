@@ -25,7 +25,7 @@ export interface PaginationState {
 
 export interface EndpointListState extends PaginationState {
   q: string;
-  method: 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method: 'all' | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
   sort: 'path-asc' | 'path-desc' | 'method';
 }
 

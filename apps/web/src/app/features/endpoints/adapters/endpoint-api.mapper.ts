@@ -8,9 +8,9 @@ import type {
   UpdateEndpointDto,
 } from '../../../shared/http/api.types';
 import type { EndpointDraft, EndpointScenario } from '../models/endpoint-draft.model';
-import { newScenarioId, unlockedEndpointDraftLocks } from '../models/endpoint-draft.model';
+import { endpointDraftLocksForMode, newScenarioId } from '../models/endpoint-draft.model';
 
-const HTTP_METHODS = new Set<HttpMethod>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
+const HTTP_METHODS = new Set<HttpMethod>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
 function normalizeMethod(method: string): HttpMethod {
   return HTTP_METHODS.has(method as HttpMethod) ? (method as HttpMethod) : 'GET';
@@ -86,8 +86,9 @@ export function mapEndpointDraftFromApi(endpoint: EndpointDto): EndpointDraft {
       errorRate: 0,
       useScenarioWeights: config?.useScenarioWeights ?? true,
     },
-    locks: unlockedEndpointDraftLocks(),
+    locks: endpointDraftLocksForMode('edit'),
     source: 'existing',
+    saveState: null,
   };
 }
 
@@ -114,6 +115,7 @@ export function mapAiDraftFromApi(draft: AiEndpointPreviewDto): EndpointDraft {
       scenarioType: draft.locks.scenarioType,
     },
     source: 'ai-preview',
+    saveState: null,
   };
 }
 

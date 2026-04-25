@@ -20,6 +20,7 @@ import type { ApiLogEntry } from '../logs/models/api-log.model';
 import type { CreateProjectAiFlowState } from './models/workspace-shell.model';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 import { signal } from '@angular/core';
+import type { EndpointFlowMode } from '../endpoints/models/endpoint-draft.model';
 
 setupAngularVitest();
 
@@ -46,6 +47,7 @@ type WorkspaceShellTestApi = {
   globalConfigLoading: () => boolean;
   globalConfigSaving: () => boolean;
   createEndpointFlowOpen: WritableSignalLike<boolean>;
+  endpointWizardMode: WritableSignalLike<EndpointFlowMode>;
   createProjectModalOpen: WritableSignalLike<boolean>;
   createProjectModalLoading: () => boolean;
   createProjectError: () => string | null;
@@ -66,7 +68,8 @@ type WorkspaceShellTestApi = {
   openDeleteProjectDialog(): void;
   closeDeleteProjectDialog(): void;
   confirmDeleteProject(): void;
-  createEndpoint(): void;
+  createEndpoint(mode?: EndpointFlowMode): void;
+  editEndpoint(ep: EndpointPreview): void;
   onGlobalConfigSaved(config: GlobalConfig): void;
   addWorkspaceMember(input: { email: string; role: 'owner' | 'editor' | 'viewer' }): void;
   removeWorkspaceMember(memberUserId: string): void;
@@ -701,6 +704,26 @@ describe('WorkspaceShellComponent', () => {
     expect(component.selectedProjectId()).toBe('project-2');
   });
 
+  it('opens the wizard in ai, manual, and edit modes without mixing caller state', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.createEndpoint();
+    expect(component.createEndpointFlowOpen()).toBe(true);
+    expect(component.endpointWizardMode()).toBe('ai');
+
+    component.createEndpointFlowOpen.set(false);
+    component.createEndpoint('manual');
+    expect(component.createEndpointFlowOpen()).toBe(true);
+    expect(component.endpointWizardMode()).toBe('manual');
+
+    component.editEndpoint(endpointFixture);
+    expect(component.createEndpointFlowOpen()).toBe(true);
+    expect(component.endpointWizardMode()).toBe('edit');
+  });
+
   it('prevents duplicate create-project submissions while the AI generation flow is still pending', async () => {
     let resolveCreate!: (value: DashboardProject) => void;
     let resolveGenerate!: (value: EndpointPreview) => void;
@@ -772,7 +795,9 @@ describe('WorkspaceShellComponent', () => {
     expect(component.selectedProjectId()).toBe('project-1');
     expect(component.createProjectModalOpen()).toBe(false);
     expect(component.createProjectPartialState()).toBe(null);
-    expect(component.activeNav()).toBe('dashboard');
+    expect(component.activeNav()).toBe('endpoints');
+    expect(component.createEndpointFlowOpen()).toBe(true);
+    expect(component.endpointWizardMode()).toBe('manual');
   });
 
   it('updates the active project and keeps it selected after a successful edit', async () => {

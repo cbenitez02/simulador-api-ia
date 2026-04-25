@@ -38,7 +38,6 @@ type CreateProjectModalHarness = {
   onPrimaryClick(): void;
   onContinueManuallyClick(): void;
   saveProject: { emit(value: EditProjectModalPayload): void };
-  retryEndpointGeneration: { emit(value: CreateProjectPartialSuccessState): void };
   continueManually: { emit(value: string): void };
 };
 
@@ -150,7 +149,7 @@ describe('CreateProjectModalComponent', () => {
     expect(component.primaryDisabled()).toBe(false);
   });
 
-  it('switches to partial-success copy and retry/continue actions after project creation succeeds but endpoint generation fails', () => {
+  it('switches to partial-success copy that confirms project creation and routes into manual setup', () => {
     const component = createComponent();
     component.mode = () => 'create';
     component.partialSuccessState = () => ({
@@ -161,20 +160,20 @@ describe('CreateProjectModalComponent', () => {
       retryable: true,
     });
 
-    const retryEmit = vi.spyOn(component.retryEndpointGeneration, 'emit');
     const continueEmit = vi.spyOn(component.continueManually, 'emit');
 
     expect(component.isPartialSuccess()).toBe(true);
     expect(component.modalTitle()).toContain('Project created');
-    expect(component.modalSubtitle()).toContain('Retry generation or continue manually');
-    expect(component.primaryLabel()).toBe('Retry generation');
+    expect(component.modalSubtitle()).toContain('Continue with manual endpoint setup');
+    expect(component.primaryLabel()).toBe('Continue manually');
     expect(component.primaryDisabled()).toBe(false);
 
     component.onPrimaryClick();
     component.onContinueManuallyClick();
 
-    expect(retryEmit).toHaveBeenCalledWith(expect.objectContaining({ createdProjectId: 'p1' }));
-    expect(continueEmit).toHaveBeenCalledWith('p1');
+    expect(continueEmit).toHaveBeenCalledTimes(2);
+    expect(continueEmit).toHaveBeenNthCalledWith(1, 'p1');
+    expect(continueEmit).toHaveBeenNthCalledWith(2, 'p1');
   });
 
   it('keeps submit actions blocked while create-project plus endpoint generation is still running', () => {

@@ -21,6 +21,7 @@ import { CreateEndpointPageComponent } from '../endpoints/components/create-endp
 import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { EndpointsPageComponent } from '../endpoints/endpoints-page.component';
+import type { EndpointFlowMode } from '../endpoints/models/endpoint-draft.model';
 import { GlobalConfigDrawerComponent } from '../global-config/components/global-config-drawer/global-config-drawer.component';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import { createDefaultGlobalConfig, type GlobalConfig } from '../global-config/models/global-config.model';
@@ -217,6 +218,7 @@ export class WorkspaceShellComponent {
   protected readonly deleteProjectTargetName = signal('');
 
   protected readonly createEndpointFlowOpen = signal(false);
+  protected readonly endpointWizardMode = signal<EndpointFlowMode>('ai');
   protected readonly endpointWizardInitial = signal<EndpointPreview | null>(null);
   protected readonly navBeforeCreateFlow = signal<WorkspaceNavId | null>(null);
   private activeSummaryRequestId = 0;
@@ -322,7 +324,12 @@ export class WorkspaceShellComponent {
     this.createProjectModalOpen.set(false);
     this.createProjectError.set(null);
     this.createProjectPartialState.set(null);
-    this.activeNav.set('dashboard');
+    this.endpointMutationError.set(null);
+    this.activeNav.set('endpoints');
+    this.selectedEndpointId.set(null);
+    this.endpointWizardInitial.set(null);
+    this.endpointWizardMode.set('manual');
+    this.createEndpointFlowOpen.set(true);
   }
 
   protected onEditProjectModalSave(payload: EditProjectModalPayload): void {
@@ -406,6 +413,7 @@ export class WorkspaceShellComponent {
     if (id !== 'endpoints') {
       this.selectedEndpointId.set(null);
       this.createEndpointFlowOpen.set(false);
+      this.endpointWizardMode.set('ai');
       this.endpointWizardInitial.set(null);
       this.navBeforeCreateFlow.set(null);
     }
@@ -426,13 +434,14 @@ export class WorkspaceShellComponent {
     this.selectedLog.set(null);
   }
 
-  protected createEndpoint(): void {
+  protected createEndpoint(mode: EndpointFlowMode = 'ai'): void {
     if (!this.hasProjects() || !this.canMutateActiveWorkspace()) return;
     this.endpointMutationError.set(null);
     this.navBeforeCreateFlow.set(this.activeNav());
     this.activeNav.set('endpoints');
     this.selectedEndpointId.set(null);
     this.endpointWizardInitial.set(null);
+    this.endpointWizardMode.set(mode);
     this.createEndpointFlowOpen.set(true);
   }
 
@@ -442,11 +451,13 @@ export class WorkspaceShellComponent {
     this.navBeforeCreateFlow.set(this.activeNav());
     this.activeNav.set('endpoints');
     this.endpointWizardInitial.set(ep);
+    this.endpointWizardMode.set('edit');
     this.createEndpointFlowOpen.set(true);
   }
 
   protected closeCreateEndpointWizard(restorePreviousNav = false): void {
     this.createEndpointFlowOpen.set(false);
+    this.endpointWizardMode.set('ai');
     this.endpointWizardInitial.set(null);
     if (restorePreviousNav) {
       const prev = this.navBeforeCreateFlow();

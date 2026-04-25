@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { LucideSparkles } from '@lucide/angular';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { EndpointsListComponent } from './components/endpoints-list/endpoints-list.component';
 import type {
@@ -9,7 +10,7 @@ import type {
 @Component({
   selector: 'app-endpoints-page',
   standalone: true,
-  imports: [EndpointsListComponent],
+  imports: [EndpointsListComponent, LucideSparkles],
   templateUrl: './endpoints-page.component.html',
   styleUrls: ['./endpoints-page.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,8 +27,17 @@ export class EndpointsPageComponent {
 
   readonly endpointSelect = output<string>();
   readonly createEndpoint = output<void>();
+  readonly createEndpointManual = output<void>();
   readonly searchQueryChange = output<string>();
   readonly methodFilterChange = output<EndpointsListMethodFilter>();
   readonly sortOptionChange = output<EndpointsListSortOption>();
   readonly loadMore = output<void>();
+
+  protected onCreateEndpointRequested(source: 'header' | 'list', mode: 'ai' | 'manual' = 'ai'): void {
+    if (mode === 'manual') {
+      this.createEndpointManual.emit();
+      return;
+    }
+    this.createEndpoint.emit();
+  }
 }
