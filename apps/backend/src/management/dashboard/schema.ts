@@ -14,6 +14,7 @@ export const workspaceCapabilitiesSchema = z.object({
 export const workspaceSummarySchema = z.object({
   id: z.string(),
   role: workspaceRoleSchema,
+  isPersonal: z.boolean(),
   capabilities: workspaceCapabilitiesSchema,
 });
 

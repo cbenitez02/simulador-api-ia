@@ -529,6 +529,7 @@ describe('app integration', () => {
       expect(response.body.project.workspace).toEqual({
         id: 'workspace-1',
         role: 'viewer',
+        isPersonal: true,
         capabilities: { canEdit: false, canManageMembers: false },
       });
     } finally {
@@ -572,6 +573,7 @@ describe('app integration', () => {
     expect(response.body.workspace).toEqual({
       id: 'workspace-1',
       role: 'editor',
+      isPersonal: true,
       capabilities: { canEdit: true, canManageMembers: false },
     });
   });
@@ -824,6 +826,7 @@ describe('app integration', () => {
         workspace: {
           id: 'workspace-1',
           role: 'owner',
+          isPersonal: true,
           capabilities: { canEdit: true, canManageMembers: true },
         },
         updatedAt: '2026-04-08T10:00:00.000Z',
@@ -990,6 +993,17 @@ describe('app integration', () => {
         },
       },
     });
+  });
+
+  it('bloquea remover la propia membresía del personal workspace', async () => {
+    const response = await request(app)
+      .delete('/api/v1/workspaces/workspace-1/members/user-1')
+      .set(authHeaders());
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('PERSONAL_WORKSPACE_OWNER_MEMBERSHIP_REQUIRED');
+    expect(prismaMock.workspaceMembership.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.workspaceMembership.delete).not.toHaveBeenCalled();
   });
 
   it('GET /api/v1/projects/:projectId/dashboard-summary responde 404 cuando falta el proyecto', async () => {
