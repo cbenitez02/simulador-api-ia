@@ -1,41 +1,97 @@
 <section class="audit-history" aria-label="Audit history">
   <header class="audit-history__head">
-    <div>
+    <div class="audit-history__titles">
       <h1 class="audit-history__title">Audit history</h1>
       <p class="audit-history__sub">Recent management changes for this project.</p>
     </div>
+    @if (!loading() && !errorMessage() && entries().length > 0) {
+      <span class="audit-history__count"
+        >{{ entries().length }} {{ entries().length === 1 ? 'entry' : 'entries' }}</span
+      >
+    }
   </header>
 
-  @if (loading()) {
-    <p class="audit-history__status">Loading audit history...</p>
-  } @else if (errorMessage(); as errorMessage) {
-    <p class="audit-history__status audit-history__status--error">{{ errorMessage }}</p>
-  } @else if (entries().length === 0) {
-    <p class="audit-history__status">{{ emptyStateMessage() }}</p>
-  } @else {
-    <ul class="audit-history__list">
-      @for (entry of entries(); track entry.id) {
-        <li class="audit-history__row">
-          <div class="audit-history__meta">
-            <span class="audit-history__time">{{ entry.timeLabel }}</span>
-            <span class="audit-history__actor">{{ entry.actorLabel }}</span>
-            <span class="audit-history__action">{{ entry.actionLabel }}</span>
-            <span class="audit-history__resource">{{ entry.resourceLabel }}</span>
-          </div>
-          <p class="audit-history__summary">{{ entry.summary }}</p>
-          @if (canRestoreEntry(entry)) {
-            <button type="button" class="audit-history__load-more" (click)="requestRestore(entry)">
-              Restore snapshot
-            </button>
-          }
-        </li>
-      }
-    </ul>
+  <div class="audit-history__body cp-scrollbar">
+    @if (loading()) {
+      <p class="audit-history__status">Loading audit history…</p>
+    } @else if (errorMessage(); as errorMessage) {
+      <p class="audit-history__status audit-history__status--error">{{ errorMessage }}</p>
+    } @else if (entries().length === 0) {
+      <p class="audit-history__empty">{{ emptyStateMessage() }}</p>
+    } @else {
+      <div class="audit-history__filters" role="tablist" aria-label="History filters">
+        @for (filter of actionFilters(); track filter) {
+          <button
+            type="button"
+            class="audit-history__filter"
+            [class.audit-history__filter--active]="isFilterActive(filter)"
+            [attr.aria-pressed]="isFilterActive(filter)"
+            (click)="setFilter(filter)"
+          >
+            {{ filterLabel(filter) }}
+          </button>
+        }
+      </div>
 
-    @if (olderHistoryAvailable()) {
-      <button type="button" class="audit-history__load-more" (click)="loadOlder()" [disabled]="loadingOlder()">
-        {{ loadingOlder() ? 'Loading…' : 'Load older history' }}
-      </button>
+      @if (groupedEntries().length === 0) {
+        <p class="audit-history__empty">No entries match this filter.</p>
+      } @else {
+        <div class="audit-history__groups">
+          @for (group of groupedEntries(); track group.key) {
+            <section class="audit-history__group" [attr.aria-label]="group.label">
+              <header class="audit-history__group-head">
+                <span class="audit-history__group-label">{{ group.label }}</span>
+                <span class="audit-history__group-count">{{ group.items.length }}</span>
+              </header>
+
+              <ol class="audit-history__list">
+                @for (entry of group.items; track entry.id) {
+                  <li class="audit-history__item">
+                    <span class="audit-history__dot" [attr.data-action]="entry.action" aria-hidden="true"></span>
+                    <article class="audit-history__row">
+                      <div class="audit-history__row-head">
+                        <div class="audit-history__pills">
+                          <span class="audit-history__action-pill" [attr.data-action]="entry.action">
+                            {{ entry.actionLabel }}
+                          </span>
+                          <span class="audit-history__resource-type" [attr.data-resource]="entry.resourceType">
+                            {{ entry.resourceType }}
+                          </span>
+                        </div>
+                        <div class="audit-history__resource-block">
+                          <time class="audit-history__time" [attr.datetime]="entry.createdAt">{{
+                            entry.timeLabel
+                          }}</time>
+                          <span class="audit-history__resource" [title]="entry.resourceLabel">{{
+                            entry.resourceLabel
+                          }}</span>
+                        </div>
+                      </div>
+                      <p class="audit-history__summary">{{ entry.summary }}</p>
+                      <div class="audit-history__row-foot">
+                        <span class="audit-history__actor"
+                          >By <strong>{{ entry.actorLabel }}</strong></span
+                        >
+                        @if (canRestoreEntry(entry)) {
+                          <button type="button" class="audit-history__restore" (click)="requestRestore(entry)">
+                            Restore snapshot
+                          </button>
+                        }
+                      </div>
+                    </article>
+                  </li>
+                }
+              </ol>
+            </section>
+          }
+        </div>
+      }
+
+      @if (olderHistoryAvailable()) {
+        <button type="button" class="audit-history__load-more" (click)="loadOlder()" [disabled]="loadingOlder()">
+          {{ loadingOlder() ? 'Loading…' : 'Load older history' }}
+        </button>
+      }
     }
-  }
+  </div>
 </section>
