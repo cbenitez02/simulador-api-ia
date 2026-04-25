@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../../../testing/angular-vitest';
 import { Injector, runInInjectionContext } from '@angular/core';
+import { readFile } from 'node:fs/promises';
 import type { EndpointPreview } from '../../../../shared/models/endpoint-preview.model';
 import type { EndpointDraft, EndpointFlowMode } from '../../models/endpoint-draft.model';
 import { EndpointsRepository, EndpointSaveError } from '../../data-access/endpoints.repository';
@@ -35,6 +36,14 @@ type CreateEndpointPageTestApi = {
   continueFromReview(): void;
   saveEndpoint(): Promise<void>;
   hydrateDraft(projectId: string, preview: EndpointPreview): Promise<void>;
+};
+
+const repository = {
+  saveEndpoint: vi.fn(),
+  loadDraft: vi.fn(),
+};
+const aiService = {
+  generateFromPrompt: vi.fn(),
 };
 
 function deferred<T>() {
@@ -98,14 +107,6 @@ const previewFixture: EndpointPreview = {
 };
 
 describe('CreateEndpointPageComponent', () => {
-  const repository = {
-    saveEndpoint: vi.fn(),
-    loadDraft: vi.fn(),
-  };
-  const aiService = {
-    generateFromPrompt: vi.fn(),
-  };
-
   function createComponent() {
     const injector = Injector.create({
       providers: [
@@ -292,5 +293,28 @@ describe('CreateEndpointPageComponent', () => {
       }),
       'e1',
     );
+  });
+
+  it('renders Cancel in manual review and editor steps in template', async () => {
+    const template = await readFile(
+      'src/app/features/endpoints/components/create-endpoint-page/create-endpoint-page.component.html',
+      'utf8',
+    );
+
+    expect(template).toContain("@if (step() === 'review')");
+    expect(template).toContain("@if (mode() === 'manual')");
+    expect(template).toContain("@if (step() === 'editor')");
+    expect(template).toContain('(click)="cancel()"');
+  });
+
+  it('emits cancelled from manual flow when cancel action is invoked', () => {
+    const component = createComponent();
+    component.mode = () => 'manual';
+    const cancelledEmit = vi.spyOn(component.cancelled, 'emit');
+    component.step.set('review');
+    (component as unknown as { cancel(): void }).cancel();
+    component.step.set('editor');
+    (component as unknown as { cancel(): void }).cancel();
+    expect(cancelledEmit).toHaveBeenCalledTimes(2);
   });
 });
