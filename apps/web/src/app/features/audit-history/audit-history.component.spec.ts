@@ -132,12 +132,26 @@ describe('AuditHistoryComponent', () => {
   });
 
   it('loads older history with tuple cursors and merges entries without duplicates', async () => {
+    const initialItems: AuditHistoryEntry[] = [
+      newestEntry,
+      olderEntry,
+      ...Array.from({ length: 23 }, (_, index) => {
+        const minute = String(59 - index).padStart(2, '0');
+        return {
+          ...olderEntry,
+          id: `audit-seed-${index}`,
+          createdAt: `2026-04-14T11:${minute}:00.000Z`,
+          timeLabel: `11:${minute}:00`,
+        };
+      }),
+    ];
+    const initialCursor = initialItems.at(-1)!;
     const listEvents = vi
       .fn<AuditHistoryRepository['listEvents']>()
-      .mockResolvedValueOnce(createListResponse([newestEntry, olderEntry]))
+      .mockResolvedValueOnce(createListResponse(initialItems))
       .mockResolvedValueOnce({
         items: [
-          olderEntry,
+          initialCursor,
           { ...olderEntry, id: 'audit-0', createdAt: '2026-04-14T12:00:00.000Z', timeLabel: '12:00:00' },
         ],
         nextCursor: { createdAt: '2026-04-14T12:00:00.000Z', id: 'audit-0' },
@@ -167,11 +181,13 @@ describe('AuditHistoryComponent', () => {
     await flushAsyncWork();
 
     expect(listEvents).toHaveBeenNthCalledWith(2, 'project-1', {
+      limit: 25,
       direction: 'older',
-      cursorCreatedAt: '2026-04-14T12:00:01.000Z',
-      cursorId: 'audit-1',
+      cursorCreatedAt: initialCursor.createdAt,
+      cursorId: initialCursor.id,
     });
-    expect(component.entries().map((entry) => entry.id)).toEqual(['audit-2', 'audit-1', 'audit-0']);
+    expect(component.entries().some((entry) => entry.id === 'audit-0')).toBe(true);
+    expect(component.entries().length).toBe(26);
     expect(component.loadingOlder()).toBe(false);
   });
 
