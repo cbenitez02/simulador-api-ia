@@ -17,6 +17,7 @@ type WritableSignalLike<T> = {
 
 type CreateEndpointPageTestApi = {
   saved: { emit(value: EndpointPreview): void };
+  cancelled: { emit(): void };
   mode: () => EndpointFlowMode;
   projectId: () => string | null;
   promptText: WritableSignalLike<string>;
