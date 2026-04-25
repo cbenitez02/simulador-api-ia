@@ -2,6 +2,9 @@
   [projects]="sidebarProjects()"
   [selectedProjectId]="selectedProjectId()"
   [activeNav]="activeNav()"
+  [showSignOut]="authSnapshot().state === 'authenticated' || protectedApiAccessState() === 'unauthorized'"
+  [userDisplayName]="authSnapshot().displayName"
+  [userAvatarUrl]="authSnapshot().avatarUrl"
   [loading]="projectsLoading()"
   [errorMessage]="projectsError()"
   [pagination]="sidebarProjectPagination()"
@@ -10,6 +13,7 @@
   (createProjectRequested)="openCreateProjectModal()"
   (retryRequested)="retryLoadProjects()"
   (loadMoreRequested)="loadMoreProjects()"
+  (signOutRequested)="signOut()"
 />
 
 @if (createEndpointFlowOpen()) {
@@ -166,6 +170,20 @@
       (loadMore)="loadMoreEndpoints()"
     />
   </main>
+} @else if (activeNav() === 'workspace') {
+  <main class="workspace__main" aria-label="Workspace members">
+    <app-workspace-members-page
+      [workspace]="activeWorkspaceSummary()"
+      [currentUserId]="authSnapshot().userId"
+      [currentUserEmail]="authSnapshot().email"
+      [members]="workspaceMembers()"
+      [loading]="workspaceMembersLoading()"
+      [errorMessage]="workspaceMembersError()"
+      [mutationPending]="workspaceMemberMutationPending()"
+      (addMember)="addWorkspaceMember($event)"
+      (removeMember)="removeWorkspaceMember($event)"
+    />
+  </main>
 }
 
 @if (contractImportReview(); as review) {
@@ -220,10 +238,6 @@
     <app-main-dashboard-utility-sidebar
       [project]="project"
       [canMutate]="canMutateActiveWorkspace()"
-      [workspaceMembers]="workspaceMembers()"
-      [workspaceMembersLoading]="workspaceMembersLoading()"
-      [workspaceMembersError]="workspaceMembersError()"
-      [workspaceMemberMutationPending]="workspaceMemberMutationPending()"
       (createEndpoint)="createEndpoint()"
       (createManualEndpoint)="createEndpoint('manual')"
       (createSnapshot)="createSnapshot()"
@@ -231,8 +245,6 @@
       (exportConfig)="exportConfig()"
       (importEndpoints)="importEndpoints()"
       (editGlobalConfig)="editGlobalConfig()"
-      (addWorkspaceMember)="addWorkspaceMember($event)"
-      (removeWorkspaceMember)="removeWorkspaceMember($event)"
     />
   }
 } @else if (activeNav() === 'endpoints' && !createEndpointFlowOpen() && hasProjects()) {

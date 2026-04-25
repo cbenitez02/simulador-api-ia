@@ -73,6 +73,7 @@ export interface DashboardEndpointRowsMeta {
 export interface DashboardWorkspaceSummary {
   id: string;
   role: WorkspaceRoleDto;
+  isPersonal?: boolean;
   capabilities: WorkspaceCapabilitiesDto;
 }
 

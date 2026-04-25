@@ -1,12 +1,8 @@
 import { TitleCasePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { ApiError } from '../../shared/http/api-error.mapper';
 import type { OpenApiContractAnalyzeDto } from '../../shared/http/api.types';
-import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
-import { AuditHistoryComponent } from '../audit-history/audit-history.component';
-import { ProjectContractsRepository } from './data-access/project-contracts.repository';
-import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
-import type { ProjectSnapshot } from '../project-snapshots/models/project-snapshot.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
@@ -17,8 +13,13 @@ import type {
   ProjectModalInitialValues,
   ProjectModalMode,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
+import { AuditHistoryComponent } from '../audit-history/audit-history.component';
 import { CreateEndpointPageComponent } from '../endpoints/components/create-endpoint-page/create-endpoint-page.component';
 import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
+import type {
+  EndpointsListMethodFilter,
+  EndpointsListSortOption,
+} from '../endpoints/components/endpoints-list/endpoints-list.constants';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { EndpointsPageComponent } from '../endpoints/endpoints-page.component';
 import type { EndpointFlowMode } from '../endpoints/models/endpoint-draft.model';
@@ -34,12 +35,15 @@ import { MainDashboardSidebarComponent } from '../main-dashboard/components/main
 import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/components/main-dashboard-utility-sidebar/main-dashboard-utility-sidebar.component';
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
+import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
+import type { ProjectSnapshot } from '../project-snapshots/models/project-snapshot.model';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
 import type { WorkspaceMember } from '../workspace-members/models/workspace-member.model';
-import type {
-  EndpointsListMethodFilter,
-  EndpointsListSortOption,
-} from '../endpoints/components/endpoints-list/endpoints-list.constants';
+import {
+  WorkspaceMembersPageComponent,
+  type WorkspacePageWorkspaceSummary,
+} from '../workspace-members/workspace-members-page.component';
+import { ProjectContractsRepository } from './data-access/project-contracts.repository';
 import type {
   CreateProjectAiFlowState,
   EndpointListState,
@@ -73,6 +77,7 @@ interface ContractImportReviewState {
     GlobalConfigDrawerComponent,
     CreateProjectModalComponent,
     ConfirmDialogComponent,
+    WorkspaceMembersPageComponent,
   ],
   templateUrl: './workspace-shell.component.html',
   styleUrls: ['./workspace-shell.component.css'],
@@ -167,6 +172,18 @@ export class WorkspaceShellComponent {
   protected readonly workspaceMembersLoading = signal(false);
   protected readonly workspaceMembersError = signal<string | null>(null);
   protected readonly workspaceMemberMutationPending = signal(false);
+
+  protected readonly activeWorkspaceSummary = computed((): WorkspacePageWorkspaceSummary | null => {
+    const project = this.activeProject();
+    if (!project) return null;
+    return {
+      id: project.workspace.id,
+      name: project.name,
+      role: project.workspace.role,
+      isPersonal: project.workspace.isPersonal,
+      capabilities: project.workspace.capabilities,
+    };
+  });
 
   protected readonly endpointList = signal<EndpointPreview[]>([]);
   protected readonly endpointListLoading = signal(false);
@@ -410,6 +427,12 @@ export class WorkspaceShellComponent {
         void this.loadSnapshotHistory(projectId);
       }
     }
+    if (id === 'workspace') {
+      const workspaceId = this.activeProject()?.workspace.id;
+      if (workspaceId) {
+        void this.reloadWorkspaceMembers(workspaceId);
+      }
+    }
     if (id !== 'endpoints') {
       this.selectedEndpointId.set(null);
       this.createEndpointFlowOpen.set(false);
@@ -457,8 +480,8 @@ export class WorkspaceShellComponent {
 
   protected closeCreateEndpointWizard(restorePreviousNav = false): void {
     this.createEndpointFlowOpen.set(false);
-    this.endpointWizardMode.set('ai');
     this.endpointWizardInitial.set(null);
+    this.endpointWizardMode.set('ai');
     if (restorePreviousNav) {
       const prev = this.navBeforeCreateFlow();
       if (prev !== null) this.activeNav.set(prev);

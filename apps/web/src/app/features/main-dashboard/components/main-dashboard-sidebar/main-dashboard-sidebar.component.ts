@@ -6,7 +6,9 @@ import {
   LucideHandMetal,
   LucideHistory,
   LucideLayoutGrid,
+  LucideLogOut,
   LucidePlus,
+  LucideUsers,
 } from '@lucide/angular';
 
 import type {
@@ -27,7 +29,9 @@ import type {
     LucideCopy,
     LucideFileText,
     LucideLayoutGrid,
+    LucideLogOut,
     LucidePlus,
+    LucideUsers,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -35,6 +39,9 @@ export class MainDashboardSidebarComponent {
   readonly projects = input.required<SidebarProjectRow[]>();
   readonly selectedProjectId = input.required<string>();
   readonly activeNav = input.required<WorkspaceNavId>();
+  readonly showSignOut = input(false);
+  readonly userDisplayName = input<string | null>(null);
+  readonly userAvatarUrl = input<string | null>(null);
   readonly loading = input(false);
   readonly errorMessage = input<string | null>(null);
   readonly pagination = input<SidebarProjectPaginationState>({
@@ -50,12 +57,13 @@ export class MainDashboardSidebarComponent {
   readonly createProjectRequested = output<void>();
   readonly retryRequested = output<void>();
   readonly loadMoreRequested = output<void>();
+  readonly signOutRequested = output<void>();
 
   protected readonly activeProject = computed((): SidebarProjectRow | null => {
     const list = this.projects();
     if (!list.length) return null;
     const id = this.selectedProjectId();
-    return list.find((p) => p.id === id) ?? list[0]!;
+    return list.find((p) => p.id === id) ?? list[0] ?? null;
   });
 
   protected readonly displayMockUrl = computed(() => {
@@ -64,6 +72,31 @@ export class MainDashboardSidebarComponent {
     const url = ap.mockUrl;
     const max = 20;
     return url.length <= max ? url : `${url.slice(0, max)}...`;
+  });
+
+  protected readonly normalizedUserDisplayName = computed(() => {
+    const displayName = this.userDisplayName();
+    if (!displayName) return null;
+    const trimmed = displayName.trim();
+    return trimmed.length ? trimmed : null;
+  });
+
+  protected readonly normalizedUserAvatarUrl = computed(() => {
+    const avatarUrl = this.userAvatarUrl();
+    if (!avatarUrl) return null;
+    const trimmed = avatarUrl.trim();
+    return trimmed.length ? trimmed : null;
+  });
+
+  protected readonly userInitials = computed(() => {
+    const displayName = this.normalizedUserDisplayName();
+    if (!displayName) return '?';
+    const words = displayName.split(/\s+/).filter(Boolean);
+    if (words.length === 1) return (words[0] ?? '').slice(0, 2).toUpperCase();
+    return words
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() ?? '')
+      .join('');
   });
 
   protected selectProject(id: string): void {
@@ -90,5 +123,9 @@ export class MainDashboardSidebarComponent {
     const ap = this.activeProject();
     if (!ap) return;
     void navigator.clipboard.writeText(ap.mockUrl);
+  }
+
+  protected signOut(): void {
+    this.signOutRequested.emit();
   }
 }

@@ -1,0 +1,101 @@
+@if (workspace(); as ws) {
+  <main class="workspace-members-page" aria-label="Workspace">
+    <header class="workspace-members-page__head">
+      <div class="workspace-members-page__head-row">
+        <div class="workspace-members-page__titles">
+          <h1 class="workspace-members-page__title">Workspace</h1>
+          <p class="workspace-members-page__sub">
+            Manage members and roles for <strong>{{ ws.name }}</strong>
+          </p>
+        </div>
+        <div class="workspace-members-page__head-meta">
+          <span class="workspace-members-page__role-pill">Your role: {{ roleLabel() }}</span>
+          <span class="workspace-members-page__count">{{ memberCountLabel() }}</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="workspace-members-page__body">
+      @if (errorMessage(); as err) {
+        <p class="workspace-members-page__error" role="alert">{{ err }}</p>
+      }
+
+      @if (loading()) {
+        <p class="workspace-members-page__empty">Loading workspace members…</p>
+      } @else if (members().length > 0) {
+        <ul class="workspace-members-page__list">
+          @for (member of members(); track member.userId) {
+            <li class="workspace-members-page__row">
+              <div class="workspace-members-page__avatar" aria-hidden="true">
+                <svg lucideUsers [size]="18" strokeWidth="1.75"></svg>
+              </div>
+              <div class="workspace-members-page__meta">
+                <div class="workspace-members-page__name-row">
+                  <strong class="workspace-members-page__name">
+                    {{ member.displayName || member.email || member.userId }}
+                  </strong>
+                  @if (member.role === 'owner') {
+                    <span class="workspace-members-page__badge workspace-members-page__badge--owner">Owner</span>
+                  }
+                  @if (isCurrentUser(member)) {
+                    <span class="workspace-members-page__badge workspace-members-page__badge--self">You</span>
+                  }
+                </div>
+                <span class="workspace-members-page__details">
+                  {{ member.email || 'No email' }} · {{ member.role }}
+                </span>
+              </div>
+              @if (canManageMembers() && canRemoveMember(member)) {
+                <button
+                  type="button"
+                  class="workspace-members-page__remove"
+                  [disabled]="mutationPending()"
+                  (click)="onRemoveMember(member.userId)"
+                >
+                  Remove
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="workspace-members-page__empty">No workspace members yet.</p>
+      }
+
+      @if (canManageMembers()) {
+        <form
+          class="workspace-members-page__form"
+          #memberForm="ngForm"
+          (ngSubmit)="onAddMember(memberEmail.value, memberRole.value); memberForm.resetForm({ role: 'viewer' })"
+        >
+          <div class="workspace-members-page__form-fields">
+            <input
+              #memberEmail
+              type="email"
+              name="email"
+              required
+              placeholder="colleague@example.com"
+              class="workspace-members-page__input"
+            />
+            <select #memberRole name="role" class="workspace-members-page__select">
+              <option value="viewer">Viewer</option>
+              <option value="editor">Editor</option>
+              <option value="owner">Owner</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            class="workspace-members-page__submit"
+            [disabled]="mutationPending() || !memberForm.form.valid"
+          >
+            Add member
+          </button>
+        </form>
+      }
+    </section>
+  </main>
+} @else {
+  <main class="workspace-members-page workspace-members-page--placeholder" aria-label="Workspace">
+    <p class="workspace-members-page__empty">Select a project to view its workspace members.</p>
+  </main>
+}

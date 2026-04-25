@@ -1,34 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import {
-  LucideClock,
-  LucideDownload,
-  LucideGitBranch,
-  LucidePlay,
-  LucidePlus,
-  LucideSparkles,
-  LucideSettings,
-  LucideUpload,
-} from '@lucide/angular';
+import { LucideDownload, LucidePlay, LucidePlus, LucideSparkles, LucideSettings, LucideUpload } from '@lucide/angular';
 
 import type { DashboardProject } from '../../models/dashboard-project.model';
-import type { WorkspaceRoleDto } from '../../../../shared/http/api.types';
-import type { WorkspaceMember } from '../../../workspace-members/models/workspace-member.model';
-
-export interface UtilitySidebarRequestItem {
-  id: string;
-  requestLabel: string;
-  statusCode: number;
-  latencyMs: number;
-  scenarioType: string;
-  timeLabel: string;
-}
 
 interface UtilityQuickAction {
   id: 'create' | 'create-manual' | 'snapshot' | 'test' | 'export' | 'import';
   title: string;
   subtitle: string;
   icon: 'plus' | 'play' | 'download' | 'upload' | 'sparkles';
+  featured?: boolean;
   disabled?: boolean;
 }
 
@@ -37,26 +17,12 @@ interface UtilityQuickAction {
   templateUrl: './main-dashboard-utility-sidebar.component.html',
   styleUrls: ['./main-dashboard-utility-sidebar.component.css'],
   standalone: true,
-  imports: [
-    FormsModule,
-    LucideClock,
-    LucideDownload,
-    LucideGitBranch,
-    LucidePlay,
-    LucidePlus,
-    LucideSparkles,
-    LucideSettings,
-    LucideUpload,
-  ],
+  imports: [LucideDownload, LucidePlay, LucidePlus, LucideSparkles, LucideSettings, LucideUpload],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardUtilitySidebarComponent {
   readonly project = input.required<DashboardProject>();
   readonly canMutate = input(true);
-  readonly workspaceMembers = input<WorkspaceMember[]>([]);
-  readonly workspaceMembersLoading = input(false);
-  readonly workspaceMembersError = input<string | null>(null);
-  readonly workspaceMemberMutationPending = input(false);
 
   readonly createEndpoint = output<void>();
   readonly createManualEndpoint = output<void>();
@@ -65,8 +31,6 @@ export class MainDashboardUtilitySidebarComponent {
   readonly exportConfig = output<void>();
   readonly importEndpoints = output<void>();
   readonly editGlobalConfig = output<void>();
-  readonly addWorkspaceMember = output<{ email: string; role: WorkspaceRoleDto }>();
-  readonly removeWorkspaceMember = output<string>();
 
   protected readonly quickActions: UtilityQuickAction[] = [
     {
@@ -74,6 +38,7 @@ export class MainDashboardUtilitySidebarComponent {
       title: 'Create endpoint with AI',
       subtitle: 'Add a new mock endpoint',
       icon: 'sparkles' as const,
+      featured: true,
     },
     {
       id: 'create-manual',
@@ -108,29 +73,27 @@ export class MainDashboardUtilitySidebarComponent {
     },
   ];
 
-  protected readonly recentRequests = computed((): UtilitySidebarRequestItem[] =>
-    this.project().recentRequests.map((request) => ({
-      id: request.id,
-      requestLabel: `${request.method} ${request.path}`,
-      statusCode: request.statusCode,
-      latencyMs: request.latencyMs,
-      scenarioType: request.scenarioType,
-      timeLabel: request.timeLabel,
-    })),
-  );
-
   protected readonly globalConfigRows = computed(() => {
     const config = this.project().configSummary;
+    let defaultLatencyBadge = 'Disabled';
+    if (config.latency.enabled) {
+      defaultLatencyBadge =
+        config.latency.mode === 'range'
+          ? `${config.latency.minMs}–${config.latency.maxMs}ms`
+          : `${config.latency.maxMs}ms`;
+    }
+    let loggingBadge: 'Full' | 'Off' | 'Basic' = 'Basic';
+    if (config.logging.level === 'full') {
+      loggingBadge = 'Full';
+    } else if (config.logging.level === 'off') {
+      loggingBadge = 'Off';
+    }
 
     return [
       {
         label: 'Default latency',
-        badge: config.latency.enabled
-          ? config.latency.mode === 'range'
-            ? `${config.latency.minMs}–${config.latency.maxMs}ms`
-            : `${config.latency.maxMs}ms`
-          : 'Disabled',
-        tone: config.latency.enabled ? ('neutral' as const) : ('neutral' as const),
+        badge: defaultLatencyBadge,
+        tone: 'neutral' as const,
       },
       {
         label: 'Error simulation',
@@ -146,39 +109,11 @@ export class MainDashboardUtilitySidebarComponent {
       },
       {
         label: 'Logging',
-        badge: config.logging.level === 'full' ? 'Full' : config.logging.level === 'off' ? 'Off' : 'Basic',
+        badge: loggingBadge,
         tone: 'neutral' as const,
       },
     ];
   });
-
-  protected readonly workspaceRoleLabel = computed(() => {
-    switch (this.project().workspace.role) {
-      case 'owner':
-        return 'Owner';
-      case 'editor':
-        return 'Editor';
-      default:
-        return 'Viewer';
-    }
-  });
-
-  protected readonly canManageMembers = computed(() => this.project().workspace.capabilities.canManageMembers);
-
-  protected addMember(email: string, role: string): void {
-    if (!this.canManageMembers() || this.workspaceMemberMutationPending()) return;
-
-    const normalizedEmail = email.trim();
-    if (!normalizedEmail) return;
-
-    const nextRole: WorkspaceRoleDto = role === 'owner' || role === 'editor' ? role : 'viewer';
-    this.addWorkspaceMember.emit({ email: normalizedEmail, role: nextRole });
-  }
-
-  protected onRemoveMember(memberUserId: string): void {
-    if (!this.canManageMembers() || this.workspaceMemberMutationPending()) return;
-    this.removeWorkspaceMember.emit(memberUserId);
-  }
 
   protected onQuickAction(id: string): void {
     const action = this.quickActions.find((item) => item.id === id);
