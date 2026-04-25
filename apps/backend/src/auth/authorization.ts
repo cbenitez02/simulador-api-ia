@@ -105,6 +105,7 @@ export function resolveWorkspaceAccess(
   return {
     id: resolvedWorkspaceId,
     role: membership.role,
+    isPersonal: actor.personalWorkspaceId === resolvedWorkspaceId,
     capabilities: getWorkspaceCapabilities(membership.role),
   };
 }

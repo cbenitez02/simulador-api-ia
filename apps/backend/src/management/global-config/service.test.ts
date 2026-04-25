@@ -15,6 +15,7 @@ describe('global-config/service', () => {
         workspace: {
           id: 'workspace-1',
           role: 'owner',
+          isPersonal: true,
           capabilities: {
             canEdit: true,
             canManageMembers: true,

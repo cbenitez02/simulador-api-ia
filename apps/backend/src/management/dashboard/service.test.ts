@@ -17,6 +17,7 @@ describe('dashboard/service', () => {
         workspace: {
           id: 'workspace-1',
           role: 'owner',
+          isPersonal: true,
           capabilities: { canEdit: true, canManageMembers: true },
         },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
@@ -176,6 +177,7 @@ describe('dashboard/service', () => {
         workspace: {
           id: 'workspace-1',
           role: 'viewer',
+          isPersonal: false,
           capabilities: { canEdit: false, canManageMembers: false },
         },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),

@@ -23,6 +23,7 @@ export interface WorkspaceCapabilities {
 export interface WorkspaceAccessSummary {
   id: string;
   role: WorkspaceRole;
+  isPersonal: boolean;
   capabilities: WorkspaceCapabilities;
 }
 

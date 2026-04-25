@@ -128,6 +128,12 @@ export async function removeWorkspaceMember(
 ): Promise<void> {
   requireWorkspaceAccess(actor, workspaceId, 'owner');
 
+  if (actor.personalWorkspaceId === workspaceId && actor.userId === memberUserId) {
+    throw new AppError(409, 'Personal workspace owners must keep their own membership', {
+      code: 'PERSONAL_WORKSPACE_OWNER_MEMBERSHIP_REQUIRED',
+    });
+  }
+
   const membership = await prisma.workspaceMembership.findUnique({
     where: {
       workspaceId_userId: {
