@@ -4,6 +4,8 @@ import type { HttpMethod } from '../../../shared/models/endpoint-preview.model';
 export type EndpointScenarioKind = 'success' | 'empty' | 'error' | 'timeout' | 'custom';
 
 export type EndpointDraftSource = 'manual' | 'ai-preview' | 'existing';
+export type EndpointFlowMode = 'ai' | 'manual' | 'edit';
+export type SaveStage = 'endpoint-core' | 'config' | 'scenarios' | 'refresh';
 
 export interface EndpointDraftLocks {
   method: boolean;
@@ -46,6 +48,11 @@ export interface EndpointDraft {
   behavior: EndpointBehaviorConfig;
   locks: EndpointDraftLocks;
   source: EndpointDraftSource;
+  saveState?: {
+    stage: SaveStage;
+    endpointId: string | null;
+    partial: boolean;
+  } | null;
 }
 
 export type CreateEndpointStep = 'prompt' | 'review' | 'editor';
@@ -72,6 +79,59 @@ export function unlockedEndpointDraftLocks(): EndpointDraftLocks {
     method: false,
     path: false,
     scenarioType: false,
+  };
+}
+
+export function endpointDraftLocksForMode(mode: EndpointFlowMode): EndpointDraftLocks {
+  if (mode === 'edit') {
+    return {
+      method: true,
+      path: true,
+      scenarioType: false,
+    };
+  }
+
+  return unlockedEndpointDraftLocks();
+}
+
+function normalizeDraftRoute(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '/resource';
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.replace(/\/+$|\s+$/g, '') || '/';
+}
+
+export function statusCodeForDraftMethod(method: HttpMethod): number {
+  if (method === 'POST') return 201;
+  if (method === 'DELETE') return 204;
+  return 200;
+}
+
+export function createManualEndpointDraft(method: HttpMethod = 'GET', route = '/resource'): EndpointDraft {
+  const normalizedRoute = normalizeDraftRoute(route);
+  const statusCode = statusCodeForDraftMethod(method);
+
+  return {
+    method,
+    route: normalizedRoute,
+    description: '',
+    statusCode,
+    responseBody: {},
+    scenarios: [
+      {
+        id: newScenarioId(),
+        name: 'Success',
+        type: 'success',
+        statusCode,
+        body: {},
+        delayMs: 0,
+        weight: 100,
+      },
+    ],
+    behavior: defaultEndpointBehavior(),
+    locks: endpointDraftLocksForMode('manual'),
+    source: 'manual',
+    saveState: null,
   };
 }
 

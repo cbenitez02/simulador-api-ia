@@ -20,6 +20,7 @@ export interface WorkspaceCapabilitiesDto {
 export interface WorkspaceSummaryDto {
   id: string;
   role: WorkspaceRoleDto;
+  isPersonal?: boolean;
   capabilities: WorkspaceCapabilitiesDto;
 }
 
@@ -132,7 +133,7 @@ export interface AiEndpointDraftLocksDto {
 }
 
 export interface AiEndpointPreviewDto {
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
   path: string;
   description: string;
   statusCode: number;
@@ -142,7 +143,7 @@ export interface AiEndpointPreviewDto {
 }
 
 export interface CreateEndpointDto {
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
   path: string;
   description?: string;
   statusCode: number;

@@ -2,14 +2,16 @@
   <div class="cep-review__card">
     <app-section-heading
       variant="card"
-      title="Review endpoint basics"
-      description="Confirm or edit the inferred method and route"
+      [title]="reviewStepCopy(mode()).title"
+      [description]="reviewStepCopy(mode()).description"
     />
 
     <div class="cep-review__field">
       <div class="cep-review__label-row">
         <label class="cep-review__label" for="cep-review-method-trigger">Method</label>
-        <span class="cep-review__badge">{{ methodLocked() ? 'Locked by AI preview' : 'Inferred' }}</span>
+        <span class="cep-review__badge">
+          {{ methodLocked() ? reviewStepCopy(mode()).lockedBadge : reviewStepCopy(mode()).editableBadge }}
+        </span>
       </div>
       @if (methodLocked()) {
         <div class="cep-review__input cep-review__input--mono">{{ method() }}</div>
@@ -28,7 +30,9 @@
     <div class="cep-review__field">
       <div class="cep-review__label-row">
         <label class="cep-review__label" for="cep-review-route">Route</label>
-        <span class="cep-review__badge">{{ routeLocked() ? 'Locked by AI preview' : 'Inferred' }}</span>
+        <span class="cep-review__badge">
+          {{ routeLocked() ? reviewStepCopy(mode()).lockedBadge : reviewStepCopy(mode()).editableBadge }}
+        </span>
       </div>
       <input
         id="cep-review-route"

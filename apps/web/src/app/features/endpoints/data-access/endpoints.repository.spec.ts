@@ -2,6 +2,7 @@ import { setupAngularVitest } from '../../../testing/angular-vitest';
 import { Injector, runInInjectionContext } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiClient } from '../../../shared/http/api-client';
+import type { EndpointSaveError } from './endpoints.repository';
 import { EndpointsRepository } from './endpoints.repository';
 
 setupAngularVitest();
@@ -311,7 +312,7 @@ describe('EndpointsRepository', () => {
     expect(result.config?.errorRatePct).toBe(0);
   });
 
-  it('surfaces partial failures without refreshing endpoint detail', async () => {
+  it('surfaces config-stage partial failures with persisted endpoint metadata and skips refresh', async () => {
     const api = {
       post: vi.fn(async (path: string) => {
         if (path === '/projects/p1/endpoints') {
@@ -363,10 +364,73 @@ describe('EndpointsRepository', () => {
         locks: { method: false, path: false, scenarioType: false },
         source: 'manual',
       }),
-    ).rejects.toThrow('Config persistence failed');
+    ).rejects.toMatchObject({
+      message: 'Config persistence failed',
+      stage: 'config',
+      endpointId: 'e1',
+      partial: true,
+    } satisfies Partial<EndpointSaveError>);
 
     expect(api.put).toHaveBeenCalledWith('/endpoints/e1/config', expect.any(Object));
     expect(api.get).not.toHaveBeenCalledWith('/projects/p1/endpoints/e1');
+  });
+
+  it('surfaces refresh-stage partial failures after config and scenarios succeed', async () => {
+    const api = {
+      post: vi.fn(async (path: string) => {
+        if (path === '/projects/p1/endpoints') {
+          return {
+            id: 'e1',
+            projectId: 'p1',
+            method: 'POST',
+            path: '/users',
+            description: 'Create user',
+            statusCode: 201,
+            responseBody: { ok: true },
+          };
+        }
+
+        return { id: 'new-scenario' };
+      }),
+      put: vi.fn(async () => ({})),
+      get: vi.fn(async (path: string) => {
+        if (path === '/endpoints/e1/scenarios') return [];
+        throw new Error('Detail refresh failed');
+      }),
+      patch: vi.fn(async () => ({})),
+      delete: vi.fn(async () => undefined),
+    };
+
+    const repository = createRepository(api);
+
+    await expect(
+      repository.saveEndpoint('p1', {
+        method: 'POST',
+        route: '/users',
+        description: 'Create user',
+        statusCode: 201,
+        responseBody: { ok: true },
+        behavior: {
+          latencyMode: 'fixed',
+          fixedDelayMs: 100,
+          minDelayMs: 0,
+          maxDelayMs: 500,
+          errorRate: 0,
+          useScenarioWeights: true,
+        },
+        scenarios: [],
+        locks: { method: false, path: false, scenarioType: false },
+        source: 'manual',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Detail refresh failed',
+      stage: 'refresh',
+      endpointId: 'e1',
+      partial: true,
+    } satisfies Partial<EndpointSaveError>);
+
+    expect(api.put).toHaveBeenCalledWith('/endpoints/e1/config', expect.any(Object));
+    expect(api.get).toHaveBeenCalledWith('/projects/p1/endpoints/e1');
   });
 
   it('hydrates edit drafts with defaults when related config or scenarios are missing', async () => {

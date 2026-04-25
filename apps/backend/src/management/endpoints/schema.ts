@@ -6,7 +6,7 @@ const emptyStringToUndefined = (value: unknown) => {
   return trimmed.length === 0 ? undefined : trimmed;
 };
 
-export const endpointMethodSchema = z.enum([
+export const supportedEndpointMethods = [
   'GET',
   'POST',
   'PUT',
@@ -14,7 +14,9 @@ export const endpointMethodSchema = z.enum([
   'DELETE',
   'HEAD',
   'OPTIONS',
-]);
+] as const;
+
+export const endpointMethodSchema = z.enum(supportedEndpointMethods);
 
 export const projectParamsSchema = z.object({
   projectId: z.string().min(1),

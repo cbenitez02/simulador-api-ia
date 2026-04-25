@@ -16,6 +16,9 @@
           >
             <span class="utility__action-icon" aria-hidden="true">
               @switch (action.icon) {
+                @case ('sparkles') {
+                  <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
+                }
                 @case ('plus') {
                   <svg lucidePlus [size]="18" strokeWidth="1.75"></svg>
                 }

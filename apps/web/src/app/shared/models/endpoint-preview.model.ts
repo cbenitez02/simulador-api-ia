@@ -1,6 +1,6 @@
 import type { EndpointConfig } from './endpoint-config.model';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
 export interface EndpointPreview {
   id: string;

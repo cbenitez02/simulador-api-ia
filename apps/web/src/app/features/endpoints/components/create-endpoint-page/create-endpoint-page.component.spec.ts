@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../../../testing/angular-vitest';
 import { Injector, runInInjectionContext } from '@angular/core';
 import type { EndpointPreview } from '../../../../shared/models/endpoint-preview.model';
-import type { EndpointDraft } from '../../models/endpoint-draft.model';
-import { EndpointsRepository } from '../../data-access/endpoints.repository';
+import type { EndpointDraft, EndpointFlowMode } from '../../models/endpoint-draft.model';
+import { EndpointsRepository, EndpointSaveError } from '../../data-access/endpoints.repository';
 import { EndpointAiGeneratorService } from '../../services/endpoint-ai-generator.service';
 import { CreateEndpointPageComponent } from './create-endpoint-page.component';
 
@@ -16,16 +16,19 @@ type WritableSignalLike<T> = {
 
 type CreateEndpointPageTestApi = {
   saved: { emit(value: EndpointPreview): void };
+  mode: () => EndpointFlowMode;
   projectId: () => string | null;
   promptText: WritableSignalLike<string>;
-  reviewMethod: WritableSignalLike<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'>;
+  reviewMethod: WritableSignalLike<EndpointDraft['method']>;
   reviewRoute: WritableSignalLike<string>;
   step: WritableSignalLike<'prompt' | 'review' | 'editor'>;
   draft: WritableSignalLike<EndpointDraft | null>;
+  editingEndpointId: WritableSignalLike<string | null>;
   loadingError: () => string | null;
   loadingDraft: () => boolean;
   generating: () => boolean;
   saving: () => boolean;
+  saveError: () => string | null;
   sourcePrompt: () => string;
   canSave(): boolean;
   onGenerateRequested(): Promise<void>;
@@ -122,6 +125,22 @@ describe('CreateEndpointPageComponent', () => {
     repository.saveEndpoint.mockReset();
     repository.loadDraft.mockReset();
     aiService.generateFromPrompt.mockReset();
+  });
+
+  it('bootstraps manual mode on the shared review step with a seeded draft', () => {
+    const component = createComponent();
+
+    (component as unknown as { resetCreateFlow(mode: EndpointFlowMode): void }).resetCreateFlow('manual');
+
+    expect(component.step()).toBe('review');
+    expect(component.reviewMethod()).toBe('GET');
+    expect(component.reviewRoute()).toBe('/resource');
+    expect(component.draft()).toMatchObject({
+      source: 'manual',
+      method: 'GET',
+      route: '/resource',
+      locks: { method: false, path: false, scenarioType: false },
+    });
   });
 
   it('prevents duplicate manual saves while the repository request is still pending', async () => {
@@ -234,5 +253,44 @@ describe('CreateEndpointPageComponent', () => {
       statusCode: 201,
       locks: { method: true, path: true, scenarioType: true },
     });
+  });
+
+  it('keeps the wizard recoverable after a partial save and retries against the persisted endpoint id', async () => {
+    repository.saveEndpoint
+      .mockRejectedValueOnce(new EndpointSaveError('Config persistence failed', 'config', 'e1', true))
+      .mockResolvedValueOnce({
+        id: 'e1',
+        method: 'POST',
+        path: '/users',
+        description: 'Create user',
+        latencyMs: 120,
+        statusCode: 201,
+        responseBody: { ok: true },
+      });
+
+    const component = createComponent();
+    component.projectId = () => 'p1';
+    component.step.set('editor');
+    component.draft.set(draftFixture);
+
+    await component.saveEndpoint();
+
+    expect(component.saveError()).toContain('Endpoint basics were saved');
+    expect(component.editingEndpointId()).toBe('e1');
+    expect(component.canSave()).toBe(true);
+
+    await component.saveEndpoint();
+
+    expect(repository.saveEndpoint).toHaveBeenNthCalledWith(
+      2,
+      'p1',
+      expect.objectContaining({
+        method: 'POST',
+        route: '/users',
+        locks: { method: true, path: true, scenarioType: false },
+        saveState: { stage: 'config', endpointId: 'e1', partial: true },
+      }),
+      'e1',
+    );
   });
 });

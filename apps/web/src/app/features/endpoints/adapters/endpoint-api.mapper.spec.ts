@@ -7,11 +7,11 @@ import {
 } from './endpoint-api.mapper';
 
 describe('endpoint-api.mapper', () => {
-  it('maps unsupported methods defensively and zeroes unsupported endpoint error rate', () => {
+  it('preserves backend-supported methods and still falls back for unsupported ones', () => {
     const result = mapEndpointSummaryFromApi({
       id: 'e1',
       projectId: 'p1',
-      method: 'OPTIONS',
+      method: 'HEAD',
       path: '/users',
       description: '',
       statusCode: 200,
@@ -28,9 +28,22 @@ describe('endpoint-api.mapper', () => {
       scenarios: [],
     });
 
-    expect(result.method).toBe('GET');
+    const unsupported = mapEndpointSummaryFromApi({
+      id: 'e2',
+      projectId: 'p1',
+      method: 'TRACE',
+      path: '/users',
+      description: '',
+      statusCode: 200,
+      responseBody: { ok: true },
+      endpointConfig: null,
+      scenarios: [],
+    });
+
+    expect(result.method).toBe('HEAD');
     expect(result.config?.latencyMs).toBe(200);
     expect(result.config?.errorRatePct).toBe(0);
+    expect(unsupported.method).toBe('GET');
   });
 
   it('hydrates edit draft using backend scenarios', () => {
@@ -66,6 +79,7 @@ describe('endpoint-api.mapper', () => {
     });
 
     expect(result.method).toBe('PATCH');
+    expect(result.locks).toEqual({ method: true, path: true, scenarioType: false });
     expect(result.behavior.errorRate).toBe(0);
     expect(result.scenarios[0]?.id).toBe('s1');
   });
@@ -95,7 +109,7 @@ describe('endpoint-api.mapper', () => {
 
   it('maps ai preview dto into a locked MVP draft without contract drift', () => {
     const result = mapAiDraftFromApi({
-      method: 'POST',
+      method: 'OPTIONS',
       path: '/users',
       description: 'Create user',
       statusCode: 201,
@@ -122,7 +136,7 @@ describe('endpoint-api.mapper', () => {
     });
 
     expect(result).toMatchObject({
-      method: 'POST',
+      method: 'OPTIONS',
       route: '/users',
       description: 'Create user',
       statusCode: 201,

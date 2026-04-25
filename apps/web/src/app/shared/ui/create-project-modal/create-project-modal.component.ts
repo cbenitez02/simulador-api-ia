@@ -12,6 +12,7 @@ import { LucideLoader2, LucideSparkles } from '@lucide/angular';
 
 import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
 import { ToggleSwitchComponent } from '../toggle-switch/toggle-switch.component';
+import { projectRecoverySubtitle } from '../../utils/endpoint-flow-ui';
 import type {
   CreateProjectModalPayload,
   CreateProjectPartialSuccessState,
@@ -84,7 +85,7 @@ export class CreateProjectModalComponent {
 
   protected readonly modalSubtitle = computed(() =>
     this.isPartialSuccess()
-      ? 'Your project is ready. Retry generation or continue manually without creating a duplicate project.'
+      ? projectRecoverySubtitle()
       : this.isEditMode()
         ? 'Update the project name and description. The stable mock URL stays exactly the same.'
         : 'Name your project and optionally generate your first mock endpoint with AI.',
@@ -95,7 +96,7 @@ export class CreateProjectModalComponent {
   protected readonly primaryLabel = computed(() => {
     if (this.loading())
       return this.isEditMode() ? 'Saving changes...' : this.aiEnabled() ? 'Generating...' : 'Creating project...';
-    if (this.isPartialSuccess()) return 'Retry generation';
+    if (this.isPartialSuccess()) return 'Continue manually';
     if (this.isEditMode()) return 'Save changes';
     return this.aiEnabled() ? 'Create project & endpoint' : 'Create project';
   });
@@ -159,7 +160,7 @@ export class CreateProjectModalComponent {
   protected onPrimaryClick(): void {
     if (this.primaryDisabled()) return;
     if (this.isPartialSuccess()) {
-      this.retryEndpointGeneration.emit(this.partialSuccessState()!);
+      this.continueManually.emit(this.partialSuccessState()!.createdProjectId);
       return;
     }
     const name = this.projectName().trim();

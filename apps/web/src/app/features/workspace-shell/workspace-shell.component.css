@@ -62,6 +62,8 @@
 .workspace__main--create-wizard {
   background: var(--cep-wizard-bg, #0a0b0d);
   border-right: 1px solid var(--cp-border-muted);
+  --cep-topbar-offset: 56px;
+  --cep-bottombar-offset: 84px;
 }
 
 .workspace__main--welcome {

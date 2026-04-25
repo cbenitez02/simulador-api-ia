@@ -6,6 +6,7 @@ import {
   LucideGitBranch,
   LucidePlay,
   LucidePlus,
+  LucideSparkles,
   LucideSettings,
   LucideUpload,
 } from '@lucide/angular';
@@ -24,10 +25,10 @@ export interface UtilitySidebarRequestItem {
 }
 
 interface UtilityQuickAction {
-  id: 'create' | 'snapshot' | 'test' | 'export' | 'import';
+  id: 'create' | 'create-manual' | 'snapshot' | 'test' | 'export' | 'import';
   title: string;
   subtitle: string;
-  icon: 'plus' | 'play' | 'download' | 'upload';
+  icon: 'plus' | 'play' | 'download' | 'upload' | 'sparkles';
   disabled?: boolean;
 }
 
@@ -43,6 +44,7 @@ interface UtilityQuickAction {
     LucideGitBranch,
     LucidePlay,
     LucidePlus,
+    LucideSparkles,
     LucideSettings,
     LucideUpload,
   ],
@@ -57,6 +59,7 @@ export class MainDashboardUtilitySidebarComponent {
   readonly workspaceMemberMutationPending = input(false);
 
   readonly createEndpoint = output<void>();
+  readonly createManualEndpoint = output<void>();
   readonly createSnapshot = output<void>();
   readonly testAllEndpoints = output<void>();
   readonly exportConfig = output<void>();
@@ -68,8 +71,14 @@ export class MainDashboardUtilitySidebarComponent {
   protected readonly quickActions: UtilityQuickAction[] = [
     {
       id: 'create',
-      title: 'Create endpoint',
+      title: 'Create endpoint with AI',
       subtitle: 'Add a new mock endpoint',
+      icon: 'sparkles' as const,
+    },
+    {
+      id: 'create-manual',
+      title: 'Create endpoint',
+      subtitle: 'Configure and define your endpoint manually',
       icon: 'plus' as const,
     },
     {
@@ -181,6 +190,10 @@ export class MainDashboardUtilitySidebarComponent {
       case 'create':
         if (!this.canMutate()) return;
         this.createEndpoint.emit();
+        break;
+      case 'create-manual':
+        if (!this.canMutate()) return;
+        this.createManualEndpoint.emit();
         break;
       case 'snapshot':
         if (!this.canMutate()) return;

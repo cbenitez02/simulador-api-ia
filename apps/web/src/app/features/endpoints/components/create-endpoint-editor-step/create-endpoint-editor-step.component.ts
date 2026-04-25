@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal, untracked } from '@angular/core';
 import { HTTP_METHOD_SELECT_OPTIONS } from '../../../../shared/constants/http-method-select-options';
 import type { HttpMethod } from '../../../../shared/models/endpoint-preview.model';
+import { editorSourcePrompt, editMethodPathNotice } from '../../../../shared/utils/endpoint-flow-ui';
 import { JsonLineHighlightPipe } from '../../../../shared/pipes/json-line-highlight.pipe';
 import { displayRoute } from '../../../../shared/utils/display-route';
 import { HttpMethodBadgeComponent } from '../../../../shared/ui/http-method-badge/http-method-badge.component';
@@ -13,7 +14,7 @@ import {
   type SegmentedOption,
 } from '../../../../shared/ui/segmented-control/segmented-control.component';
 import { SelectMenuComponent, type SelectMenuOption } from '../../../../shared/ui/select-menu/select-menu.component';
-import type { EndpointDraft, EndpointScenario, LatencyMode } from '../../models/endpoint-draft.model';
+import type { EndpointDraft, EndpointFlowMode, EndpointScenario, LatencyMode } from '../../models/endpoint-draft.model';
 import { newScenarioId } from '../../models/endpoint-draft.model';
 import { statusCodeForMethod } from '../../services/endpoint-draft.mapper';
 
@@ -67,6 +68,7 @@ function bodySignature(body: unknown): string {
 })
 export class CreateEndpointEditorStepComponent {
   readonly draft = input.required<EndpointDraft>();
+  readonly mode = input<EndpointFlowMode>('ai');
   /** Shown on the right of the metadata bar (original NL prompt). */
   readonly sourcePrompt = input('');
   /** Base URL for the Preview tab request line. */
@@ -77,6 +79,7 @@ export class CreateEndpointEditorStepComponent {
   protected readonly methodOptions = HTTP_METHOD_SELECT_OPTIONS;
   protected readonly latencyModeOptions = LATENCY_MODE_OPTIONS;
   protected readonly scenarioTypeOptions = SCENARIO_TYPE_OPTIONS;
+  protected readonly editMethodPathNotice = editMethodPathNotice;
 
   protected readonly editorTabs = computed<IconTabItem[]>(() => {
     const d = this.draft();
@@ -95,6 +98,8 @@ export class CreateEndpointEditorStepComponent {
 
   protected readonly responseJsonError = signal<string | null>(null);
   protected readonly previewLines = signal<string[]>([]);
+  private pendingScenarioScrollId: string | null = null;
+  private pendingScenarioScrollAttempts = 0;
 
   constructor() {
     effect(() => {
@@ -117,6 +122,10 @@ export class CreateEndpointEditorStepComponent {
 
   protected onEditorTabChange(id: string): void {
     this.selectTab(id as EditorPanelTab);
+  }
+
+  protected metadataLabel(): string {
+    return editorSourcePrompt(this.mode(), this.sourcePrompt());
   }
 
   protected mockRequestLine(): string {
@@ -264,6 +273,7 @@ export class CreateEndpointEditorStepComponent {
       weight: 10,
     };
     this.emit({ ...d, scenarios: [...d.scenarios, row] });
+    this.queueScenarioScroll(row.id);
   }
 
   protected addPreset(kind: 'empty' | 'error' | 'timeout' | 'unauthorized'): void {
@@ -316,6 +326,7 @@ export class CreateEndpointEditorStepComponent {
         };
     }
     this.emit({ ...d, scenarios: [...d.scenarios, row] });
+    this.queueScenarioScroll(row.id);
   }
 
   protected removeScenario(i: number): void {
@@ -385,5 +396,36 @@ export class CreateEndpointEditorStepComponent {
 
   protected scenarioTypeLocked(): boolean {
     return this.draft().locks.scenarioType;
+  }
+
+  private queueScenarioScroll(scenarioId: string): void {
+    this.pendingScenarioScrollId = scenarioId;
+    this.pendingScenarioScrollAttempts = 0;
+    this.tryScrollToPendingScenario();
+  }
+
+  private tryScrollToPendingScenario(): void {
+    const scenarioId = this.pendingScenarioScrollId;
+    if (!scenarioId) return;
+    const doc = globalThis.document;
+    if (!doc) {
+      this.pendingScenarioScrollId = null;
+      return;
+    }
+
+    const target = doc.querySelector<HTMLElement>(`[data-scenario-id="${scenarioId}"]`);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+      this.pendingScenarioScrollId = null;
+      return;
+    }
+
+    if (this.pendingScenarioScrollAttempts >= 8) {
+      this.pendingScenarioScrollId = null;
+      return;
+    }
+
+    this.pendingScenarioScrollAttempts += 1;
+    globalThis.setTimeout(() => this.tryScrollToPendingScenario(), 40);
   }
 }

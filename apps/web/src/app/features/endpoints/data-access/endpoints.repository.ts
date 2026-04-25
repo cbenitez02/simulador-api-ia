@@ -9,7 +9,7 @@ import type {
   ScenarioDto,
 } from '../../../shared/http/api.types';
 import type { EndpointPreview } from '../../../shared/models/endpoint-preview.model';
-import type { EndpointDraft } from '../models/endpoint-draft.model';
+import type { EndpointDraft, SaveStage } from '../models/endpoint-draft.model';
 import {
   mapAiDraftFromApi,
   mapEndpointConfigRequestFromDraft,
@@ -30,6 +30,30 @@ export interface EndpointListQuery {
 export interface PagedEndpointsResult {
   items: EndpointPreview[];
   page: PagedResponseDto<EndpointListItemDto>['page'];
+}
+
+export class EndpointSaveError extends Error {
+  public readonly stage: SaveStage;
+  public readonly endpointId: string | null;
+  public readonly partial: boolean;
+
+  public constructor(message: string, stage: SaveStage, endpointId: string | null, partial: boolean) {
+    super(message);
+    this.name = 'EndpointSaveError';
+    this.stage = stage;
+    this.endpointId = endpointId;
+    this.partial = partial;
+  }
+}
+
+function toEndpointSaveError(
+  error: unknown,
+  stage: SaveStage,
+  endpointId: string | null,
+  partial: boolean,
+): EndpointSaveError {
+  const message = error instanceof Error ? error.message : 'Could not save endpoint.';
+  return new EndpointSaveError(message, stage, endpointId, partial);
 }
 
 function buildEndpointListQueryString(query: EndpointListQuery = {}): string {
@@ -99,21 +123,44 @@ export class EndpointsRepository {
   }
 
   async saveEndpoint(projectId: string, draft: EndpointDraft, endpointId?: string | null): Promise<EndpointPreview> {
-    const endpoint = endpointId
-      ? await this.api.patch<EndpointDto, ReturnType<typeof mapEndpointRequestFromDraft>>(
-          `/projects/${projectId}/endpoints/${endpointId}`,
-          mapEndpointRequestFromDraft(draft),
-        )
-      : await this.api.post<EndpointDto, ReturnType<typeof mapEndpointCreateRequestFromDraft>>(
-          `/projects/${projectId}/endpoints`,
-          mapEndpointCreateRequestFromDraft(draft),
-        );
+    let persistedEndpointId = endpointId ?? null;
 
-    await this.api.put(`/endpoints/${endpoint.id}/config`, mapEndpointConfigRequestFromDraft(endpoint.id, draft));
-    await this.reconcileScenarios(endpoint.id, draft);
+    const endpoint = await (async () => {
+      try {
+        return endpointId
+          ? await this.api.patch<EndpointDto, ReturnType<typeof mapEndpointRequestFromDraft>>(
+              `/projects/${projectId}/endpoints/${endpointId}`,
+              mapEndpointRequestFromDraft(draft),
+            )
+          : await this.api.post<EndpointDto, ReturnType<typeof mapEndpointCreateRequestFromDraft>>(
+              `/projects/${projectId}/endpoints`,
+              mapEndpointCreateRequestFromDraft(draft),
+            );
+      } catch (error) {
+        throw toEndpointSaveError(error, 'endpoint-core', persistedEndpointId, false);
+      }
+    })();
 
-    const detail = await this.api.get<EndpointDto>(`/projects/${projectId}/endpoints/${endpoint.id}`);
-    return mapEndpointSummaryFromApi(detail);
+    persistedEndpointId = endpoint.id;
+
+    try {
+      await this.api.put(`/endpoints/${endpoint.id}/config`, mapEndpointConfigRequestFromDraft(endpoint.id, draft));
+    } catch (error) {
+      throw toEndpointSaveError(error, 'config', persistedEndpointId, true);
+    }
+
+    try {
+      await this.reconcileScenarios(endpoint.id, draft);
+    } catch (error) {
+      throw toEndpointSaveError(error, 'scenarios', persistedEndpointId, true);
+    }
+
+    try {
+      const detail = await this.api.get<EndpointDto>(`/projects/${projectId}/endpoints/${endpoint.id}`);
+      return mapEndpointSummaryFromApi(detail);
+    } catch (error) {
+      throw toEndpointSaveError(error, 'refresh', persistedEndpointId, true);
+    }
   }
 
   async deleteEndpoint(projectId: string, endpointId: string): Promise<void> {
