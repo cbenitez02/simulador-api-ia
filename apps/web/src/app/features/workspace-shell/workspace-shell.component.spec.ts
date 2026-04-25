@@ -1,5 +1,7 @@
 import { Injector, runInInjectionContext } from '@angular/core';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BehaviorSubject, map } from 'rxjs';
 import { setupAngularVitest } from '../../testing/angular-vitest';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
@@ -23,6 +25,27 @@ import { signal } from '@angular/core';
 import type { EndpointFlowMode } from '../endpoints/models/endpoint-draft.model';
 
 setupAngularVitest();
+
+function createWorkspaceRouterTestDoubles(initialNavId = 'dashboard') {
+  const navId$ = new BehaviorSubject(initialNavId);
+  const route = {
+    paramMap: navId$.pipe(map((navId) => convertToParamMap({ navId }))),
+    snapshot: {
+      paramMap: {
+        get: (key: string) => (key === 'navId' ? navId$.getValue() : null),
+      },
+    },
+  };
+  const router = {
+    navigateByUrl: vi.fn(async (url: string) => {
+      const navId = url.replace(/^\//, '');
+      navId$.next(navId || 'dashboard');
+      return true;
+    }),
+  };
+
+  return { route, router };
+}
 
 type WritableSignalLike<T> = {
   (): T;
@@ -282,6 +305,7 @@ describe('WorkspaceShellComponent', () => {
   };
 
   function createComponent() {
+    const { route, router } = createWorkspaceRouterTestDoubles();
     const injector = Injector.create({
       providers: [
         { provide: ProjectsRepository, useValue: projectsRepository },
@@ -291,10 +315,17 @@ describe('WorkspaceShellComponent', () => {
         { provide: ProjectContractsRepository, useValue: projectContractsRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
+        { provide: ActivatedRoute, useValue: route },
+        { provide: Router, useValue: router },
       ],
     });
 
-    return runInInjectionContext(injector, () => new WorkspaceShellComponent()) as unknown as WorkspaceShellTestApi;
+    const component = runInInjectionContext(
+      injector,
+      () => new WorkspaceShellComponent(),
+    ) as unknown as WorkspaceShellTestApi;
+    (component as unknown as { ngOnInit(): void }).ngOnInit();
+    return component;
   }
 
   beforeEach(() => {

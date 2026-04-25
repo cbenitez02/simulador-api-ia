@@ -1,5 +1,7 @@
 import { Injector, runInInjectionContext, signal } from '@angular/core';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BehaviorSubject, map } from 'rxjs';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../testing/angular-vitest';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { AuditHistoryComponent } from '../audit-history/audit-history.component';
@@ -13,6 +15,27 @@ import { WorkspaceMembersRepository } from '../workspace-members/data-access/wor
 import { WorkspaceShellComponent } from './workspace-shell.component';
 
 setupAngularVitest();
+
+function createWorkspaceRouterTestDoubles(initialNavId = 'dashboard') {
+  const navId$ = new BehaviorSubject(initialNavId);
+  const route = {
+    paramMap: navId$.pipe(map((navId) => convertToParamMap({ navId }))),
+    snapshot: {
+      paramMap: {
+        get: (key: string) => (key === 'navId' ? navId$.getValue() : null),
+      },
+    },
+  };
+  const router = {
+    navigateByUrl: vi.fn(async (url: string) => {
+      const navId = url.replace(/^\//, '');
+      navId$.next(navId || 'dashboard');
+      return true;
+    }),
+  };
+
+  return { route, router };
+}
 
 type WorkspaceShellHarness = WorkspaceShellComponent & {
   activeNav: {
@@ -152,6 +175,7 @@ describe('WorkspaceShellComponent audit history integration', () => {
   }
 
   function createComponent() {
+    const { route, router } = createWorkspaceRouterTestDoubles();
     const injector = Injector.create({
       providers: [
         ...provideAngularReactiveSchedulers(),
@@ -163,14 +187,19 @@ describe('WorkspaceShellComponent audit history integration', () => {
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
+        { provide: ActivatedRoute, useValue: route },
+        { provide: Router, useValue: router },
       ],
     });
 
+    const component = runInInjectionContext(
+      injector,
+      () => new WorkspaceShellComponent(),
+    ) as unknown as WorkspaceShellHarness & WorkspaceShellComponent;
+    component.ngOnInit();
+
     return {
-      component: runInInjectionContext(
-        injector,
-        () => new WorkspaceShellComponent(),
-      ) as unknown as WorkspaceShellHarness,
+      component,
       injector,
     };
   }

@@ -1,5 +1,7 @@
 import { Injector, runInInjectionContext, signal } from '@angular/core';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BehaviorSubject, map } from 'rxjs';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../testing/angular-vitest';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { ApiClient } from '../../shared/http/api-client';
@@ -16,6 +18,27 @@ import { WorkspaceMembersRepository } from '../workspace-members/data-access/wor
 import { WorkspaceShellComponent } from './workspace-shell.component';
 
 setupAngularVitest();
+
+function createWorkspaceRouterTestDoubles(initialNavId = 'dashboard') {
+  const navId$ = new BehaviorSubject(initialNavId);
+  const route = {
+    paramMap: navId$.pipe(map((navId) => convertToParamMap({ navId }))),
+    snapshot: {
+      paramMap: {
+        get: (key: string) => (key === 'navId' ? navId$.getValue() : null),
+      },
+    },
+  };
+  const router = {
+    navigateByUrl: vi.fn(async (url: string) => {
+      const navId = url.replace(/^\//, '');
+      navId$.next(navId || 'dashboard');
+      return true;
+    }),
+  };
+
+  return { route, router };
+}
 
 type WorkspaceShellHarness = WorkspaceShellComponent & {
   projects: () => Array<{ name: string; description: string; mockUrl: string; endpoints: Array<{ path: string }> }>;
@@ -90,6 +113,7 @@ describe('WorkspaceShellComponent integration', () => {
   };
 
   const endpointsRepository = {
+    listEndpoints: vi.fn(),
     saveEndpoint: vi.fn(),
     generateAiEndpoint: vi.fn(),
     deleteEndpoint: vi.fn(),
@@ -152,8 +176,13 @@ describe('WorkspaceShellComponent integration', () => {
     api.patch.mockReset();
     api.delete.mockReset();
     endpointsRepository.saveEndpoint.mockReset();
+    endpointsRepository.listEndpoints.mockReset();
     endpointsRepository.generateAiEndpoint.mockReset();
     endpointsRepository.deleteEndpoint.mockReset();
+    endpointsRepository.listEndpoints.mockResolvedValue({
+      items: [],
+      page: { limit: 25, offset: 0, total: 0, hasMore: false },
+    });
     globalConfigRepository.getConfig.mockReset();
     globalConfigRepository.saveConfig.mockReset();
     projectSnapshotsRepository.list.mockReset();
@@ -302,6 +331,7 @@ describe('WorkspaceShellComponent integration', () => {
   const projectListPath = '/projects?limit=25&offset=0';
 
   function createComponent() {
+    const { route, router } = createWorkspaceRouterTestDoubles();
     const injector = Injector.create({
       providers: [
         ProjectsRepository,
@@ -313,6 +343,8 @@ describe('WorkspaceShellComponent integration', () => {
         { provide: ProjectContractsRepository, useValue: projectContractsRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
+        { provide: ActivatedRoute, useValue: route },
+        { provide: Router, useValue: router },
       ],
     });
 
@@ -320,6 +352,7 @@ describe('WorkspaceShellComponent integration', () => {
       injector,
       () => new WorkspaceShellComponent(),
     ) as unknown as WorkspaceShellHarness;
+    component.ngOnInit();
     const logsRepository = injector.get(LogsRepository);
     return { component, logsRepository };
   }
@@ -527,6 +560,27 @@ describe('WorkspaceShellComponent integration', () => {
         return createDashboardSummary(endpointCreated ? 1 : 0);
       }
 
+      if (path === '/projects/p1/endpoints?limit=25&offset=0&sort=path-asc') {
+        return {
+          items: endpointCreated
+            ? [
+                {
+                  id: 'e1',
+                  projectId: 'p1',
+                  method: 'POST',
+                  path: '/users',
+                  description: 'Create user',
+                  statusCode: 201,
+                  updatedAt: new Date().toISOString(),
+                  scenarioCount: 1,
+                  latencyMs: 120,
+                },
+              ]
+            : [],
+          page: { limit: 25, offset: 0, total: endpointCreated ? 1 : 0, hasMore: false },
+        };
+      }
+
       throw new Error(`Unexpected GET ${path}`);
     });
     api.post.mockResolvedValueOnce({
@@ -549,6 +603,33 @@ describe('WorkspaceShellComponent integration', () => {
         responseBody: { id: 'u1' },
       };
     });
+    endpointsRepository.listEndpoints.mockImplementation(async () => ({
+      items: endpointCreated
+        ? [
+            {
+              id: 'e1',
+              method: 'POST',
+              path: '/users',
+              description: 'Create user',
+              latencyMs: 120,
+              statusCode: 201,
+              responseBody: null,
+              responseHeaders: {},
+              config: {
+                latencyMs: 120,
+                errorRatePct: 0,
+                scenarios: {
+                  success: true,
+                  empty: false,
+                  error: false,
+                  timeout: false,
+                },
+              },
+            },
+          ]
+        : [],
+      page: { limit: 25, offset: 0, total: endpointCreated ? 1 : 0, hasMore: false },
+    }));
 
     const { component } = createComponent();
     await flushAsyncWork();
@@ -589,6 +670,27 @@ describe('WorkspaceShellComponent integration', () => {
         return createDashboardSummary(endpointCreated ? 1 : 0);
       }
 
+      if (path === '/projects/p1/endpoints?limit=25&offset=0&sort=path-asc') {
+        return {
+          items: endpointCreated
+            ? [
+                {
+                  id: 'e1',
+                  projectId: 'p1',
+                  method: 'POST',
+                  path: '/users',
+                  description: 'Create user',
+                  statusCode: 201,
+                  updatedAt: new Date().toISOString(),
+                  scenarioCount: 1,
+                  latencyMs: 120,
+                },
+              ]
+            : [],
+          page: { limit: 25, offset: 0, total: endpointCreated ? 1 : 0, hasMore: false },
+        };
+      }
+
       throw new Error(`Unexpected GET ${path}`);
     });
     api.post.mockResolvedValueOnce({
@@ -613,6 +715,33 @@ describe('WorkspaceShellComponent integration', () => {
           responseBody: { id: 'u1' },
         };
       });
+    endpointsRepository.listEndpoints.mockImplementation(async () => ({
+      items: endpointCreated
+        ? [
+            {
+              id: 'e1',
+              method: 'POST',
+              path: '/users',
+              description: 'Create user',
+              latencyMs: 120,
+              statusCode: 201,
+              responseBody: null,
+              responseHeaders: {},
+              config: {
+                latencyMs: 120,
+                errorRatePct: 0,
+                scenarios: {
+                  success: true,
+                  empty: false,
+                  error: false,
+                  timeout: false,
+                },
+              },
+            },
+          ]
+        : [],
+      page: { limit: 25, offset: 0, total: endpointCreated ? 1 : 0, hasMore: false },
+    }));
 
     const { component } = createComponent();
     await flushAsyncWork();
