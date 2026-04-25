@@ -119,6 +119,15 @@
         <svg lucideHistory [size]="18" strokeWidth="1.75"></svg>
         <span>History</span>
       </button>
+      <button
+        type="button"
+        class="sidebar__nav-item"
+        [class.sidebar__nav-item--active]="activeNav() === 'workspace'"
+        (click)="selectNav('workspace')"
+      >
+        <svg lucideUsers [size]="18" strokeWidth="1.75"></svg>
+        <span>Workspace</span>
+      </button>
     </nav>
   </div>
 
@@ -134,5 +143,28 @@
       </div>
       <p class="sidebar__meta">{{ ap.endpointCount }} endpoints</p>
     </section>
+  }
+
+  @if (normalizedUserDisplayName(); as userDisplayName) {
+    <section class="sidebar__user-card" aria-label="Signed-in user">
+      @if (normalizedUserAvatarUrl(); as avatarUrl) {
+        <img class="sidebar__user-avatar" [src]="avatarUrl" [alt]="'Avatar of ' + userDisplayName" />
+      } @else {
+        <span class="sidebar__user-avatar sidebar__user-avatar--fallback" aria-hidden="true">{{ userInitials() }}</span>
+      }
+      <div class="sidebar__user-details">
+        <p class="sidebar__label sidebar__label--card">Signed in as</p>
+        <p class="sidebar__user-name">{{ userDisplayName }}</p>
+      </div>
+    </section>
+  }
+
+  @if (showSignOut()) {
+    <div class="sidebar__footer-actions">
+      <button type="button" class="sidebar__sign-out-btn" (click)="signOut()">
+        <svg lucideLogOut [size]="18" strokeWidth="1.75" aria-hidden="true"></svg>
+        <span>Sign out</span>
+      </button>
+    </div>
   }
 </aside>

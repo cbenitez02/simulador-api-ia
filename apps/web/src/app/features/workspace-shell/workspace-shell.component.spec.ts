@@ -40,7 +40,7 @@ type WorkspaceShellTestApi = {
   selectedProjectId: WritableSignalLike<string>;
   selectedEndpointId: WritableSignalLike<string | null>;
   selectedLog: WritableSignalLike<ApiLogEntry | null>;
-  activeNav: WritableSignalLike<'dashboard' | 'logs' | 'endpoints'>;
+  activeNav: WritableSignalLike<'dashboard' | 'logs' | 'endpoints' | 'history' | 'workspace'>;
   globalConfig: WritableSignalLike<GlobalConfig>;
   globalConfigDrawerOpen: WritableSignalLike<boolean>;
   globalConfigError: () => string | null;
@@ -62,6 +62,14 @@ type WorkspaceShellTestApi = {
   retryLoadProjects(): void;
   loadMoreProjects(): void;
   selectProject(id: string): void;
+  selectNav(id: 'dashboard' | 'logs' | 'endpoints' | 'history' | 'workspace'): void;
+  activeWorkspaceSummary: () => {
+    id: string;
+    name: string;
+    role: 'owner' | 'editor' | 'viewer';
+    isPersonal?: boolean;
+    capabilities: { canEdit: boolean; canManageMembers: boolean };
+  } | null;
   editGlobalConfig(): void;
   openEditProjectModal(): void;
   onEditProjectModalSave(payload: EditProjectModalPayload): void;
@@ -377,6 +385,17 @@ describe('WorkspaceShellComponent', () => {
     expect(component.selectedProjectId()).toBe('');
   });
 
+  it('delegates sign out requests to the frontend auth session service', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+
+    const component = createComponent() as WorkspaceShellTestApi & { signOut(): void };
+    await flushAsyncWork();
+
+    component.signOut();
+
+    expect(authSession.signOut).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks viewer-only mutations from the current workspace slice', async () => {
     projectsRepository.listProjects.mockResolvedValue(
       pagedProjectsResult([
@@ -457,6 +476,37 @@ describe('WorkspaceShellComponent', () => {
 
     expect(workspaceMembersRepository.addMember).toHaveBeenCalledTimes(1);
     expect(workspaceMembersRepository.removeMember).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads workspace members and exposes a workspace summary when the user navigates to the workspace section', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectsRepository.getProject.mockResolvedValue(projectFixture);
+    workspaceMembersRepository.listMembers.mockResolvedValue([
+      {
+        userId: 'user-1',
+        email: 'owner@example.com',
+        displayName: 'Owner User',
+        role: 'owner',
+        createdAt: '2026-04-08T10:00:00.000Z',
+      },
+    ]);
+
+    const component = createComponent();
+    await flushAsyncWork();
+    workspaceMembersRepository.listMembers.mockClear();
+
+    component.selectNav('workspace');
+    await flushAsyncWork();
+
+    expect(component.activeNav()).toBe('workspace');
+    expect(workspaceMembersRepository.listMembers).toHaveBeenCalledWith('workspace-1');
+    expect(component.activeWorkspaceSummary()).toEqual({
+      id: 'workspace-1',
+      name: 'Workspace project',
+      role: 'owner',
+      isPersonal: undefined,
+      capabilities: { canEdit: true, canManageMembers: true },
+    });
   });
 
   it('hydrates the initially selected project with the real dashboard summary after loading the sidebar list', async () => {
@@ -775,7 +825,7 @@ describe('WorkspaceShellComponent', () => {
     expect(component.createProjectModalLoading()).toBe(false);
   });
 
-  it('allows continuing manually after partial success without clearing the created project', async () => {
+  it('routes partial project success into the shared manual endpoint flow', async () => {
     projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
 
     const component = createComponent();

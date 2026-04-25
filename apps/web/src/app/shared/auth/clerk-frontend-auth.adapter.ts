@@ -20,6 +20,7 @@ export class ClerkFrontendAuthAdapter implements FrontendAuthAdapter {
         state: 'misconfigured',
         userId: null,
         displayName: null,
+        avatarUrl: null,
         email: null,
         emailVerified: false,
         headers: null,
@@ -44,6 +45,7 @@ export class ClerkFrontendAuthAdapter implements FrontendAuthAdapter {
         state: 'error',
         userId: null,
         displayName: null,
+        avatarUrl: null,
         email: null,
         emailVerified: false,
         headers: null,
@@ -89,12 +91,14 @@ export class ClerkFrontendAuthAdapter implements FrontendAuthAdapter {
     const email = primaryEmail?.emailAddress ?? null;
     const emailVerified = primaryEmail?.verification.status === 'verified';
     const displayName = user?.fullName ?? email ?? user?.id ?? null;
+    const avatarUrl = user?.imageUrl ?? null;
 
     if (!clerk.isSignedIn || !user) {
       return {
         state: 'unauthenticated',
         userId: null,
         displayName: null,
+        avatarUrl: null,
         email: null,
         emailVerified: false,
         headers: null,
@@ -106,6 +110,7 @@ export class ClerkFrontendAuthAdapter implements FrontendAuthAdapter {
       state: 'authenticated',
       userId: user.id,
       displayName,
+      avatarUrl,
       email,
       emailVerified,
       headers: {

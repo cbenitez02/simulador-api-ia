@@ -12,6 +12,7 @@ export interface FrontendAuthSnapshot {
   state: FrontendAuthState;
   userId: string | null;
   displayName: string | null;
+  avatarUrl: string | null;
   email: string | null;
   emailVerified: boolean;
   headers: FrontendSessionHeaders | null;
@@ -24,6 +25,7 @@ export const loadingFrontendAuthSnapshot: FrontendAuthSnapshot = {
   state: 'loading',
   userId: null,
   displayName: null,
+  avatarUrl: null,
   email: null,
   emailVerified: false,
   headers: null,

@@ -7,14 +7,6 @@ import { MainDashboardUtilitySidebarComponent } from './main-dashboard-utility-s
 setupAngularVitest();
 
 type MainDashboardUtilityHarness = MainDashboardUtilitySidebarComponent & {
-  recentRequests: () => Array<{
-    id: string;
-    requestLabel: string;
-    statusCode: number;
-    latencyMs: number;
-    scenarioType: string;
-    timeLabel: string;
-  }>;
   globalConfigRows: () => Array<{ label: string; badge: string; tone: 'neutral' | 'success' }>;
   quickActions: Array<{ id: string; title: string; subtitle: string }>;
   onQuickAction(id: string): void;
@@ -82,7 +74,7 @@ const projectFixture: DashboardProject = {
 };
 
 describe('MainDashboardUtilitySidebarComponent', () => {
-  it('derives recent request traffic and persisted config badges instead of seeded placeholder activity', () => {
+  it('derives persisted config badges for the global config section', () => {
     const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
     const component = runInInjectionContext(
       injector,
@@ -91,34 +83,12 @@ describe('MainDashboardUtilitySidebarComponent', () => {
 
     bindProjectInput(component, projectFixture);
 
-    expect(component.recentRequests()).toEqual([
-      {
-        id: 'log-1',
-        requestLabel: 'POST /users',
-        statusCode: 500,
-        latencyMs: 140,
-        scenarioType: 'error',
-        timeLabel: 'just now',
-      },
-    ]);
     expect(component.globalConfigRows()).toEqual([
       { label: 'Default latency', badge: '50–250ms', tone: 'neutral' },
       { label: 'Error simulation', badge: '15% · 400, 500', tone: 'success' },
       { label: 'Rate limiting', badge: '90 req/min', tone: 'neutral' },
       { label: 'Logging', badge: 'Full', tone: 'neutral' },
     ]);
-  });
-
-  it('keeps recent request traffic empty when the summary has no traffic yet', () => {
-    const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
-    const component = runInInjectionContext(
-      injector,
-      () => new MainDashboardUtilitySidebarComponent(),
-    ) as unknown as MainDashboardUtilityHarness & { project: () => DashboardProject };
-
-    bindProjectInput(component, { ...projectFixture, recentRequests: [] });
-
-    expect(component.recentRequests()).toEqual([]);
   });
 
   it('adds a create snapshot quick action gated through the mutation affordance', () => {

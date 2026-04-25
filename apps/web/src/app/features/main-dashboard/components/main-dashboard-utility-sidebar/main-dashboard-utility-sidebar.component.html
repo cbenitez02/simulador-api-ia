@@ -1,12 +1,13 @@
 <aside class="utility" aria-label="Acciones y configuración">
   <section class="utility__section" aria-labelledby="utility-quick-heading">
     <h2 id="utility-quick-heading" class="utility__label">Quick actions</h2>
-    <ul class="utility__actions" role="list">
+    <ul class="utility__actions">
       @for (action of quickActions; track action.id) {
         <li>
           <button
             type="button"
             class="utility__action"
+            [class.utility__action--featured]="action.featured"
             [disabled]="action.disabled === true || (!canMutate() && action.id !== 'test' && action.id !== 'export')"
             [attr.aria-disabled]="
               action.disabled === true || (!canMutate() && action.id !== 'test' && action.id !== 'export')
@@ -15,23 +16,36 @@
             (click)="onQuickAction(action.id)"
           >
             <span class="utility__action-icon" aria-hidden="true">
-              @switch (action.icon) {
-                @case ('sparkles') {
-                  <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
-                }
-                @case ('plus') {
-                  <svg lucidePlus [size]="18" strokeWidth="1.75"></svg>
-                }
-                @case ('play') {
-                  <svg lucidePlay [size]="18" strokeWidth="1.75"></svg>
-                }
-                @case ('download') {
-                  <svg lucideDownload [size]="18" strokeWidth="1.75"></svg>
-                }
-                @case ('upload') {
-                  <svg lucideUpload [size]="18" strokeWidth="1.75"></svg>
-                }
-              }
+              <svg
+                lucideSparkles
+                [size]="18"
+                strokeWidth="1.75"
+                [style.display]="action.icon === 'sparkles' ? null : 'none'"
+              ></svg>
+              <svg
+                lucidePlus
+                [size]="18"
+                strokeWidth="1.75"
+                [style.display]="action.icon === 'plus' ? null : 'none'"
+              ></svg>
+              <svg
+                lucidePlay
+                [size]="18"
+                strokeWidth="1.75"
+                [style.display]="action.icon === 'play' ? null : 'none'"
+              ></svg>
+              <svg
+                lucideDownload
+                [size]="18"
+                strokeWidth="1.75"
+                [style.display]="action.icon === 'download' ? null : 'none'"
+              ></svg>
+              <svg
+                lucideUpload
+                [size]="18"
+                strokeWidth="1.75"
+                [style.display]="action.icon === 'upload' ? null : 'none'"
+              ></svg>
             </span>
             <span class="utility__action-text">
               <span class="utility__action-title">{{ action.title }}</span>
@@ -43,116 +57,10 @@
     </ul>
   </section>
 
-  <section class="utility__section utility__section--activity" aria-labelledby="utility-activity-heading">
-    <h2 id="utility-activity-heading" class="utility__label">Recent requests</h2>
-    <div class="utility__activity-card">
-      @if (recentRequests().length > 0) {
-        <ul class="utility__activity-list cp-scrollbar" role="list">
-          @for (item of recentRequests(); track item.id) {
-            <li class="utility__activity-row">
-              <span class="utility__activity-icon" aria-hidden="true">
-                <svg lucideGitBranch [size]="16" strokeWidth="1.75"></svg>
-              </span>
-              <div class="utility__activity-body">
-                <p class="utility__activity-primary">
-                  <strong class="utility__activity-target">{{ item.requestLabel }}</strong>
-                </p>
-                <p class="utility__activity-meta">
-                  <svg
-                    lucideClock
-                    [size]="12"
-                    strokeWidth="1.75"
-                    class="utility__activity-meta-icon"
-                    aria-hidden="true"
-                  ></svg>
-                  <span class="utility__activity-time">{{ item.timeLabel }}</span>
-                  <span>{{ item.statusCode }}</span>
-                  <span>{{ item.latencyMs }}ms</span>
-                  <span>{{ item.scenarioType }}</span>
-                </p>
-              </div>
-            </li>
-          }
-        </ul>
-      } @else {
-        <p class="utility__activity-empty">No recent requests yet.</p>
-      }
-    </div>
-  </section>
-
-  <section class="utility__section" aria-labelledby="utility-members-heading">
-    <h2 id="utility-members-heading" class="utility__label">Workspace members</h2>
-    <div class="utility__config-card utility__members-card">
-      <div class="utility__members-header">
-        <span class="utility__members-role">Your role: {{ workspaceRoleLabel() }}</span>
-      </div>
-
-      @if (workspaceMembersError()) {
-        <p class="utility__members-error">{{ workspaceMembersError() }}</p>
-      }
-
-      @if (workspaceMembersLoading()) {
-        <p class="utility__activity-empty">Loading members…</p>
-      } @else if (workspaceMembers().length > 0) {
-        <ul class="utility__members-list" role="list">
-          @for (member of workspaceMembers(); track member.userId) {
-            <li class="utility__members-row">
-              <div class="utility__members-meta">
-                <strong>{{ member.displayName || member.email || member.userId }}</strong>
-                <span>{{ member.email || 'No email' }} · {{ member.role }}</span>
-              </div>
-              @if (canManageMembers()) {
-                <button
-                  type="button"
-                  class="utility__members-remove"
-                  [disabled]="workspaceMemberMutationPending()"
-                  (click)="onRemoveMember(member.userId)"
-                >
-                  Remove
-                </button>
-              }
-            </li>
-          }
-        </ul>
-      } @else {
-        <p class="utility__activity-empty">No workspace members yet.</p>
-      }
-
-      @if (canManageMembers()) {
-        <form
-          class="utility__members-form"
-          #memberForm="ngForm"
-          (ngSubmit)="addMember(memberEmail.value, memberRole.value); memberForm.resetForm({ role: 'viewer' })"
-        >
-          <input
-            #memberEmail
-            type="email"
-            name="email"
-            required
-            placeholder="colleague@example.com"
-            class="utility__members-input"
-          />
-          <select #memberRole name="role" class="utility__members-select">
-            <option value="viewer">Viewer</option>
-            <option value="editor">Editor</option>
-            <option value="owner">Owner</option>
-          </select>
-          <button
-            type="submit"
-            class="utility__config-btn"
-            [disabled]="workspaceMemberMutationPending() || !memberForm.form.valid"
-          >
-            Add member
-          </button>
-        </form>
-      }
-    </div>
-  </section>
-
   <section class="utility__section utility__section--footer" aria-labelledby="utility-global-heading">
     <h2 id="utility-global-heading" class="utility__label">Global config</h2>
     <div class="utility__config-card">
-      <ul class="utility__config-rows" role="list">
+      <ul class="utility__config-rows">
         @for (row of globalConfigRows(); track row.label) {
           <li class="utility__config-row">
             <span class="utility__config-key">{{ row.label }}</span>
