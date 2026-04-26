@@ -61,42 +61,30 @@
           aria-label="Search logs by endpoint or status"
         />
       </label>
-      <select
-        class="logs__select"
+      <app-select-menu
+        class="logs__filter-menu"
+        [options]="methodFilterOptions"
         [value]="methodFilter()"
-        (change)="onMethodChange($event)"
-        aria-label="Filter by HTTP method"
-      >
-        <option value="all">All Methods</option>
-        <option value="GET">GET</option>
-        <option value="POST">POST</option>
-        <option value="PUT">PUT</option>
-        <option value="PATCH">PATCH</option>
-        <option value="DELETE">DELETE</option>
-      </select>
-      <select
-        class="logs__select"
+        (valueChange)="onMethodChange($event)"
+        triggerId="logs-method-filter-trigger"
+        listboxId="logs-method-filter-listbox"
+      />
+      <app-select-menu
+        class="logs__filter-menu"
+        [options]="statusFilterOptions"
         [value]="statusFilter()"
-        (change)="onStatusChange($event)"
-        aria-label="Filter by status code range"
-      >
-        <option value="all">All Status</option>
-        <option value="2xx">2xx</option>
-        <option value="3xx">3xx</option>
-        <option value="4xx">4xx</option>
-        <option value="5xx">5xx</option>
-      </select>
-      <select
-        class="logs__select"
+        (valueChange)="onStatusChange($event)"
+        triggerId="logs-status-filter-trigger"
+        listboxId="logs-status-filter-listbox"
+      />
+      <app-select-menu
+        class="logs__filter-menu logs__filter-menu--endpoint"
+        [options]="endpointFilterOptions()"
         [value]="endpointFilter()"
-        (change)="onEndpointChange($event)"
-        aria-label="Filter by endpoint path"
-      >
-        <option value="all">All Endpoints</option>
-        @for (path of endpointOptions(); track path) {
-          <option [value]="path">{{ path }}</option>
-        }
-      </select>
+        (valueChange)="onEndpointChange($event)"
+        triggerId="logs-endpoint-filter-trigger"
+        listboxId="logs-endpoint-filter-listbox"
+      />
     </div>
 
     <div class="logs__list-wrap">

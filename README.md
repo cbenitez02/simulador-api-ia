@@ -53,6 +53,8 @@ Para una auditoría puntual del estado actual de las validaciones backend en CI,
 
 Para las reglas mínimas de merge y release-readiness del backend, ver `docs/backend-merge-gates.md`.
 
+Para el plan de resolución del bug de audit history que registra updates falsos al editar scenarios, ver `docs/audit-history-false-positive-fix-plan.md`.
+
 ### Backend
 
 El backend carga variables desde `apps/backend/.env`.

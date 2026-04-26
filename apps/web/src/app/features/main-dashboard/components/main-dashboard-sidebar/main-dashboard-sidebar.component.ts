@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal, type OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  LucideArrowLeft,
   LucideArrowRightLeft,
+  LucideCheck,
   LucideCopy,
   LucideFileText,
   LucideHandMetal,
@@ -9,6 +11,7 @@ import {
   LucideLayoutGrid,
   LucideLogOut,
   LucidePlus,
+  LucideSettings,
   LucideUsers,
 } from '@lucide/angular';
 
@@ -18,6 +21,15 @@ import type {
   WorkspaceNavId,
 } from '../../../workspace-shell/models/workspace-shell.model';
 
+const ACCOUNT_NAV_ROUTES = new Set<WorkspaceNavId>([
+  'account-profile-settings',
+  'account-api-keys',
+  'account-notifications',
+  'account-security',
+  'account-usage',
+  'account-plan-billing',
+]);
+
 @Component({
   selector: 'app-main-dashboard-sidebar',
   templateUrl: './main-dashboard-sidebar.component.html',
@@ -25,7 +37,9 @@ import type {
   standalone: true,
   imports: [
     RouterLink,
+    LucideArrowLeft,
     LucideArrowRightLeft,
+    LucideCheck,
     LucideHandMetal,
     LucideHistory,
     LucideCopy,
@@ -33,11 +47,12 @@ import type {
     LucideLayoutGrid,
     LucideLogOut,
     LucidePlus,
+    LucideSettings,
     LucideUsers,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MainDashboardSidebarComponent {
+export class MainDashboardSidebarComponent implements OnDestroy {
   readonly projects = input.required<SidebarProjectRow[]>();
   readonly selectedProjectId = input.required<string>();
   readonly activeNav = input.required<WorkspaceNavId>();
@@ -60,6 +75,9 @@ export class MainDashboardSidebarComponent {
   readonly retryRequested = output<void>();
   readonly loadMoreRequested = output<void>();
   readonly signOutRequested = output<void>();
+  protected readonly copiedMockUrl = signal(false);
+  private copyFeedbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  protected readonly isAccountNav = computed(() => ACCOUNT_NAV_ROUTES.has(this.activeNav()));
 
   protected readonly activeProject = computed((): SidebarProjectRow | null => {
     const list = this.projects();
@@ -125,13 +143,32 @@ export class MainDashboardSidebarComponent {
     this.loadMoreRequested.emit();
   }
 
-  protected copyMockUrl(): void {
+  protected async copyMockUrl(): Promise<void> {
     const ap = this.activeProject();
     if (!ap) return;
-    void navigator.clipboard.writeText(ap.mockUrl);
+    try {
+      await navigator.clipboard.writeText(ap.mockUrl);
+      this.copiedMockUrl.set(true);
+      if (this.copyFeedbackTimeoutId) {
+        clearTimeout(this.copyFeedbackTimeoutId);
+      }
+      this.copyFeedbackTimeoutId = setTimeout(() => {
+        this.copiedMockUrl.set(false);
+        this.copyFeedbackTimeoutId = null;
+      }, 1500);
+    } catch {
+      this.copiedMockUrl.set(false);
+    }
   }
 
   protected signOut(): void {
     this.signOutRequested.emit();
+  }
+
+  ngOnDestroy(): void {
+    if (this.copyFeedbackTimeoutId) {
+      clearTimeout(this.copyFeedbackTimeoutId);
+      this.copyFeedbackTimeoutId = null;
+    }
   }
 }

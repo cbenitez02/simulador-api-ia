@@ -65,6 +65,8 @@ export interface EndpointListItemDto {
   path: string;
   description: string;
   statusCode: number;
+  responseBody: unknown;
+  responseHeaders: Record<string, string>;
   updatedAt: string;
   scenarioCount: number;
   latencyMs: number;

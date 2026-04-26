@@ -15,6 +15,7 @@ import type {
   ProjectModalInitialValues,
   ProjectModalMode,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
+import { AccountSectionPageComponent } from '../account/account-section-page.component';
 import { AuditHistoryComponent } from '../audit-history/audit-history.component';
 import { CreateEndpointPageComponent } from '../endpoints/components/create-endpoint-page/create-endpoint-page.component';
 import { EndpointDetailPanelComponent } from '../endpoints/components/endpoint-detail-panel/endpoint-detail-panel.component';
@@ -61,10 +62,22 @@ interface ContractImportReviewState {
   analysis: OpenApiContractAnalyzeDto;
 }
 
-const WORKSPACE_NAV_ROUTES: readonly WorkspaceNavId[] = ['dashboard', 'endpoints', 'logs', 'history', 'workspace'];
+const WORKSPACE_NAV_ROUTES = new Set<WorkspaceNavId>([
+  'dashboard',
+  'endpoints',
+  'logs',
+  'history',
+  'workspace',
+  'account-profile-settings',
+  'account-api-keys',
+  'account-notifications',
+  'account-security',
+  'account-usage',
+  'account-plan-billing',
+]);
 
 const isWorkspaceNavId = (value: string | null): value is WorkspaceNavId =>
-  typeof value === 'string' && WORKSPACE_NAV_ROUTES.includes(value as WorkspaceNavId);
+  typeof value === 'string' && WORKSPACE_NAV_ROUTES.has(value as WorkspaceNavId);
 
 @Component({
   selector: 'app-workspace-shell',
@@ -85,6 +98,7 @@ const isWorkspaceNavId = (value: string | null): value is WorkspaceNavId =>
     CreateProjectModalComponent,
     ConfirmDialogComponent,
     WorkspaceMembersPageComponent,
+    AccountSectionPageComponent,
   ],
   templateUrl: './workspace-shell.component.html',
   styleUrls: ['./workspace-shell.component.css'],
@@ -105,6 +119,14 @@ export class WorkspaceShellComponent implements OnInit {
   private readonly projectSnapshotsRepository = inject(ProjectSnapshotsRepository);
   private readonly projectContractsRepository = inject(ProjectContractsRepository);
   private readonly workspaceMembersRepository = inject(WorkspaceMembersRepository);
+  private readonly accountNavRoutes = new Set<WorkspaceNavId>([
+    'account-profile-settings',
+    'account-api-keys',
+    'account-notifications',
+    'account-security',
+    'account-usage',
+    'account-plan-billing',
+  ]);
 
   protected readonly projects = signal<DashboardProject[]>([]);
   protected readonly projectsPage = signal<PaginationState>({ limit: 25, offset: 0, total: 0, hasMore: false });
@@ -136,6 +158,7 @@ export class WorkspaceShellComponent implements OnInit {
   );
 
   protected readonly hasProjects = computed(() => this.projects().length > 0);
+  protected readonly isAccountNav = computed(() => this.accountNavRoutes.has(this.activeNav()));
   protected readonly showProtectedApiBoundary = computed(
     () => this.protectedApiAccessState() !== 'ready' || this.authSnapshot().state !== 'authenticated',
   );

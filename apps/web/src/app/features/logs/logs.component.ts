@@ -14,6 +14,7 @@ import { LogsListComponent } from './components/logs-list/logs-list.component';
 import type { ApiLogCursor, ApiLogEntry, ListLogsQuery } from './models/api-log.model';
 import type { HttpMethod } from '../../shared/models/endpoint-preview.model';
 import { LogsRepository } from './data-access/logs.repository';
+import { SelectMenuComponent, type SelectMenuOption } from '../../shared/ui/select-menu/select-menu.component';
 
 type MethodFilter = 'all' | HttpMethod;
 type StatusBand = 'all' | '2xx' | '3xx' | '4xx' | '5xx';
@@ -58,7 +59,16 @@ function reconcileSelection(selected: ApiLogEntry | null, entries: ApiLogEntry[]
   templateUrl: './logs.component.html',
   styleUrls: ['./logs.component.css'],
   standalone: true,
-  imports: [LogsListComponent, LucidePause, LucidePlay, LucideRadio, LucideRefreshCw, LucideSearch, LucideTrash2],
+  imports: [
+    LogsListComponent,
+    SelectMenuComponent,
+    LucidePause,
+    LucidePlay,
+    LucideRadio,
+    LucideRefreshCw,
+    LucideSearch,
+    LucideTrash2,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LogsComponent {
@@ -103,6 +113,25 @@ export class LogsComponent {
     const paths = new Set(this.entries().map((entry) => entry.path));
     return [...paths].sort((left, right) => left.localeCompare(right));
   });
+  protected readonly methodFilterOptions: readonly SelectMenuOption[] = [
+    { value: 'all', label: 'All Methods' },
+    { value: 'GET', label: 'GET' },
+    { value: 'POST', label: 'POST' },
+    { value: 'PUT', label: 'PUT' },
+    { value: 'PATCH', label: 'PATCH' },
+    { value: 'DELETE', label: 'DELETE' },
+  ];
+  protected readonly statusFilterOptions: readonly SelectMenuOption[] = [
+    { value: 'all', label: 'All Status' },
+    { value: '2xx', label: '2xx' },
+    { value: '3xx', label: '3xx' },
+    { value: '4xx', label: '4xx' },
+    { value: '5xx', label: '5xx' },
+  ];
+  protected readonly endpointFilterOptions = computed<readonly SelectMenuOption[]>(() => [
+    { value: 'all', label: 'All Endpoints' },
+    ...this.endpointOptions().map((path) => ({ value: path, label: path })),
+  ]);
 
   protected readonly filteredEntries = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
@@ -153,21 +182,21 @@ export class LogsComponent {
     this.searchQuery.set(value);
   }
 
-  protected onMethodChange(ev: Event): void {
-    const value = (ev.target as HTMLSelectElement).value as MethodFilter;
-    this.methodFilter.set(value);
+  protected onMethodChange(value: string): void {
+    const nextValue = value as MethodFilter;
+    this.methodFilter.set(nextValue);
     void this.reloadForServerFilters();
   }
 
-  protected onStatusChange(ev: Event): void {
-    const value = (ev.target as HTMLSelectElement).value as StatusBand;
-    this.statusFilter.set(value);
+  protected onStatusChange(value: string): void {
+    const nextValue = value as StatusBand;
+    this.statusFilter.set(nextValue);
     void this.reloadForServerFilters();
   }
 
-  protected onEndpointChange(ev: Event): void {
-    const value = (ev.target as HTMLSelectElement).value;
-    this.endpointFilter.set(value);
+  protected onEndpointChange(value: string): void {
+    const nextValue = value;
+    this.endpointFilter.set(nextValue);
     void this.reloadForServerFilters();
   }
 

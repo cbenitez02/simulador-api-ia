@@ -235,8 +235,8 @@
   gap: 0.5rem;
 }
 
-.workspace-members-page__input,
-.workspace-members-page__select {
+.workspace-members-page__input {
+  flex: 1 1 220px;
   min-height: 2.25rem;
   padding: 0.5rem 0.625rem;
   border-radius: 8px;
@@ -245,14 +245,25 @@
   color: var(--cp-text-primary);
   font: inherit;
   font-size: 0.8125rem;
+  line-height: 1.2;
 }
 
-.workspace-members-page__input {
-  flex: 1 1 220px;
+.workspace-members-page__input:focus {
+  outline: none;
 }
 
-.workspace-members-page__select {
+.workspace-members-page__input:focus-visible {
+  border-color: var(--cp-accent-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cp-accent-primary) 32%, transparent);
+}
+
+.workspace-members-page__role-menu {
   flex: 0 0 auto;
+}
+
+.workspace-members-page__role-menu::ng-deep .select-menu__trigger {
+  min-height: 2.25rem;
+  min-width: 8.5rem;
 }
 
 .workspace-members-page__submit {

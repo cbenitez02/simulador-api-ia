@@ -2,6 +2,7 @@ import { authorizeProjectAccess } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
+import { areJsonValuesEqual } from '../../lib/stable-json.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { writeAuditEvent } from '../audit-events/service.js';
 import type {
@@ -27,6 +28,8 @@ type EndpointListItem = {
   path: string;
   description: string;
   statusCode: number;
+  responseBody: unknown;
+  responseHeaders: Record<string, string>;
   updatedAt: Date;
   scenarioCount: number;
   latencyMs: number;
@@ -56,6 +59,25 @@ function resolveEndpointOrderBy(query: ListEndpointsQueryInput) {
     default:
       return [{ path: 'asc' as const }, { id: 'asc' as const }];
   }
+}
+
+function hasEndpointChanges(
+  current: {
+    description: string;
+    statusCode: number;
+    responseBody: unknown;
+  },
+  next: {
+    description: string;
+    statusCode: number;
+    responseBody: unknown;
+  }
+) {
+  return (
+    current.description !== next.description ||
+    current.statusCode !== next.statusCode ||
+    !areJsonValuesEqual(current.responseBody, next.responseBody)
+  );
 }
 
 export async function listEndpoints(
@@ -91,6 +113,7 @@ export async function listEndpoints(
         path: true,
         description: true,
         statusCode: true,
+        responseBody: true,
         updatedAt: true,
         endpointConfig: {
           select: {
@@ -116,6 +139,8 @@ export async function listEndpoints(
       path: item.path,
       description: item.description,
       statusCode: item.statusCode,
+      responseBody: item.responseBody,
+      responseHeaders: { 'content-type': 'application/json' },
       updatedAt: item.updatedAt,
       scenarioCount: item._count.scenarios,
       latencyMs: resolveLatencyMs(item.endpointConfig),
@@ -228,7 +253,12 @@ export async function updateEndpoint(
 
   const endpoint = await prisma.endpoint.findFirst({
     where: { id: endpointId, projectId },
-    select: { id: true },
+    select: {
+      id: true,
+      description: true,
+      statusCode: true,
+      responseBody: true,
+    },
   });
 
   if (!endpoint) {
@@ -253,6 +283,16 @@ export async function updateEndpoint(
         },
       },
     });
+
+    if (
+      !hasEndpointChanges(endpoint, {
+        description: updated.description,
+        statusCode: updated.statusCode,
+        responseBody: updated.responseBody,
+      })
+    ) {
+      return updated;
+    }
 
     await writeAuditEvent(tx, {
       actor,
