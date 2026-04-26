@@ -45,7 +45,6 @@
 .sidebar__brand-title {
   font-size: 0.9375rem;
   font-weight: 500;
-  letter-spacing: -0.01em;
   color: var(--cp-text-primary);
 }
 
@@ -207,7 +206,6 @@
 
 .sidebar__project--active:hover {
   background: var(--cp-surface-muted);
-  color: var(--cp-text-primary);
 }
 
 .sidebar__project-dot {
@@ -268,7 +266,6 @@
 
 .sidebar__nav-item--active:hover {
   background: var(--cp-surface-interactive-active);
-  color: var(--cp-text-primary);
 }
 
 .sidebar__nav-item--back {
@@ -306,7 +303,6 @@
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--cp-text-primary);
-  letter-spacing: -0.02em;
 }
 
 .sidebar__url-row {
@@ -417,7 +413,6 @@
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid var(--cp-border-default);
-  flex-shrink: 0;
 }
 
 .sidebar__user-avatar--fallback {
@@ -478,7 +473,6 @@
 .sidebar__user-account-btn--active {
   border-color: var(--cp-border-default);
   background: var(--cp-surface-interactive-hover);
-  color: var(--cp-text-primary);
 }
 
 .sidebar__footer-actions {
