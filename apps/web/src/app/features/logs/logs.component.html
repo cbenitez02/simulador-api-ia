@@ -66,24 +66,24 @@
         [options]="methodFilterOptions"
         [value]="methodFilter()"
         (valueChange)="onMethodChange($event)"
-        triggerId="logs-method-filter-trigger"
-        listboxId="logs-method-filter-listbox"
+        [triggerId]="'logs-method-filter-trigger'"
+        [listboxId]="'logs-method-filter-listbox'"
       />
       <app-select-menu
         class="logs__filter-menu"
         [options]="statusFilterOptions"
         [value]="statusFilter()"
         (valueChange)="onStatusChange($event)"
-        triggerId="logs-status-filter-trigger"
-        listboxId="logs-status-filter-listbox"
+        [triggerId]="'logs-status-filter-trigger'"
+        [listboxId]="'logs-status-filter-listbox'"
       />
       <app-select-menu
         class="logs__filter-menu logs__filter-menu--endpoint"
         [options]="endpointFilterOptions()"
         [value]="endpointFilter()"
         (valueChange)="onEndpointChange($event)"
-        triggerId="logs-endpoint-filter-trigger"
-        listboxId="logs-endpoint-filter-listbox"
+        [triggerId]="'logs-endpoint-filter-trigger'"
+        [listboxId]="'logs-endpoint-filter-listbox'"
       />
     </div>
 

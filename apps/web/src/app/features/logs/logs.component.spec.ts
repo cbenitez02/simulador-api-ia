@@ -26,9 +26,9 @@ type LogsComponentHarness = {
   lastSuccessfulUpdate: () => string | null;
   refreshLogs(): void;
   loadOlderLogs(): void;
-  onMethodChange(event: Event): void;
-  onStatusChange(event: Event): void;
-  onEndpointChange(event: Event): void;
+  onMethodChange(value: string): void;
+  onStatusChange(value: string): void;
+  onEndpointChange(value: string): void;
 };
 
 const newestLogFixture: ApiLogEntry = {
@@ -147,13 +147,13 @@ describe('LogsComponent', () => {
 
     await component.loadProject('p1');
 
-    component.onMethodChange({ target: { value: 'POST' } } as never);
+    component.onMethodChange('POST');
     await flushAsyncWork();
 
-    component.onStatusChange({ target: { value: '3xx' } } as never);
+    component.onStatusChange('3xx');
     await flushAsyncWork();
 
-    component.onEndpointChange({ target: { value: '/users' } } as never);
+    component.onEndpointChange('/users');
     await flushAsyncWork();
 
     expect(listLogs).toHaveBeenNthCalledWith(2, 'p1', { method: 'POST' });

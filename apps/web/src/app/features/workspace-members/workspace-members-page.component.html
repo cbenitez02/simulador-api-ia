@@ -84,8 +84,8 @@
               [options]="roleOptions"
               [value]="selectedRole()"
               (valueChange)="onRoleChange($event)"
-              triggerId="workspace-members-role-trigger"
-              listboxId="workspace-members-role-listbox"
+              [triggerId]="'workspace-members-role-trigger'"
+              [listboxId]="'workspace-members-role-listbox'"
             />
           </div>
           <button

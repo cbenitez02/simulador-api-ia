@@ -5,9 +5,23 @@ import { areJsonValuesEqual } from '../../lib/stable-json.js';
 import { writeAuditEvent } from '../audit-events/service.js';
 import type { UpsertEndpointConfigInput } from './schema.js';
 
-function canonicalizeEndpointConfig(input: UpsertEndpointConfigInput): UpsertEndpointConfigInput {
+type EndpointConfigComparableInput = {
+  latencyMode: string;
+  fixedDelayMs: number;
+  minDelayMs: number;
+  maxDelayMs: number;
+  useScenarioWeights: boolean;
+};
+
+function toLatencyMode(value: string): UpsertEndpointConfigInput['latencyMode'] {
+  return value === 'range' ? 'range' : 'fixed';
+}
+
+function canonicalizeEndpointConfig(
+  input: EndpointConfigComparableInput
+): UpsertEndpointConfigInput {
   return {
-    latencyMode: input.latencyMode,
+    latencyMode: toLatencyMode(input.latencyMode),
     fixedDelayMs: input.fixedDelayMs,
     minDelayMs: input.minDelayMs,
     maxDelayMs: input.maxDelayMs,

@@ -3,10 +3,10 @@ import {
   Component,
   ElementRef,
   HostListener,
-  computed,
+  EventEmitter,
+  Input,
   inject,
-  input,
-  output,
+  Output,
   signal,
 } from '@angular/core';
 
@@ -25,18 +25,17 @@ export interface SelectMenuOption {
 export class SelectMenuComponent {
   private readonly host = inject(ElementRef<HTMLElement>);
 
-  readonly options = input.required<readonly SelectMenuOption[]>();
-  readonly value = input.required<string>();
-  readonly valueChange = output<string>();
-  readonly triggerId = input.required<string>();
-  readonly listboxId = input.required<string>();
+  @Input({ required: true }) options: readonly SelectMenuOption[] = [];
+  @Input({ required: true }) value = '';
+  @Output() readonly valueChange = new EventEmitter<string>();
+  @Input({ required: true }) triggerId = '';
+  @Input({ required: true }) listboxId = '';
 
   protected readonly open = signal(false);
 
-  protected readonly currentLabel = computed(() => {
-    const v = this.value();
-    return this.options().find((o) => o.value === v)?.label ?? '';
-  });
+  protected get currentLabel(): string {
+    return this.options.find((option) => option.value === this.value)?.label ?? '';
+  }
 
   protected toggle(): void {
     this.open.update((o) => !o);
