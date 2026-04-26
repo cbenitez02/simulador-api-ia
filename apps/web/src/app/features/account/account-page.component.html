@@ -1,0 +1,135 @@
+<main class="account-page cp-scrollbar" aria-label="Account">
+  <header class="account-page__head">
+    <h1 class="account-page__title">Account Settings</h1>
+    <p class="account-page__sub">Manage your account and preferences</p>
+  </header>
+
+  <section class="account-page__panel account-page__panel--profile" aria-label="Profile summary">
+    <div class="account-page__profile-main">
+      <div class="account-page__avatar" aria-hidden="true">
+        <span>AC</span>
+      </div>
+      <div class="account-page__profile-meta">
+        <p class="account-page__name">{{ profile.fullName }}</p>
+        <p class="account-page__email">{{ profile.email }}</p>
+        <p class="account-page__company">{{ profile.company }}</p>
+      </div>
+    </div>
+    <button type="button" class="account-page__edit-btn">
+      <svg lucidePencilLine [size]="14" strokeWidth="1.9" aria-hidden="true"></svg>
+      <span>Edit</span>
+    </button>
+  </section>
+
+  <section id="account-profile-settings" class="account-page__panel" aria-label="Profile settings">
+    <h2 class="account-page__section-title">Profile Settings</h2>
+    <div class="account-page__info-list">
+      @for (field of accountFields; track field.label) {
+        <article class="account-page__info-row">
+          <span class="account-page__info-icon" aria-hidden="true">
+            @if (field.icon === 'copy') {
+              <svg lucideCopy [size]="16" strokeWidth="1.75"></svg>
+            } @else if (field.icon === 'history') {
+              <svg lucideHistory [size]="16" strokeWidth="1.75"></svg>
+            } @else if (field.icon === 'file') {
+              <svg lucideFileText [size]="16" strokeWidth="1.75"></svg>
+            } @else {
+              <svg lucideUsers [size]="16" strokeWidth="1.75"></svg>
+            }
+          </span>
+          <div class="account-page__info-copy">
+            <span class="account-page__info-label">{{ field.label }}</span>
+            <strong class="account-page__info-value">{{ field.value }}</strong>
+          </div>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section id="account-api-keys" class="account-page__panel" aria-label="API keys">
+    <h2 class="account-page__section-title">API Keys</h2>
+    <p class="account-page__section-sub">Manage your active keys for integrations and automation.</p>
+    <article class="account-page__subcard">
+      <p class="account-page__subcard-title">Primary key</p>
+      <p class="account-page__subcard-value">mk_live_2f4c7f9a•••••••••••</p>
+      <button type="button" class="account-page__subcard-btn">Regenerate key</button>
+    </article>
+  </section>
+
+  <section id="account-notifications" class="account-page__panel" aria-label="Notifications">
+    <h2 class="account-page__section-title">Notifications</h2>
+    <p class="account-page__section-sub">Control email and product alerts for workspace activity.</p>
+    <article class="account-page__subcard">
+      <p class="account-page__subcard-title">Current preferences</p>
+      <ul class="account-page__subcard-list">
+        <li>Build alerts: enabled</li>
+        <li>Quota warnings: enabled</li>
+        <li>Marketing emails: disabled</li>
+      </ul>
+    </article>
+  </section>
+
+  <section id="account-security" class="account-page__panel" aria-label="Security">
+    <h2 class="account-page__section-title">Security</h2>
+    <p class="account-page__section-sub">Review sign-in protection and account access settings.</p>
+    <article class="account-page__subcard">
+      <p class="account-page__subcard-title">Security status</p>
+      <ul class="account-page__subcard-list">
+        <li>2FA: enabled</li>
+        <li>Password last changed: 22 days ago</li>
+        <li>Active sessions: 2 devices</li>
+      </ul>
+    </article>
+  </section>
+
+  <section id="account-usage" class="account-page__panel" aria-label="Usage">
+    <div class="account-page__panel-head">
+      <div>
+        <h2 class="account-page__section-title">Usage</h2>
+        <p class="account-page__section-sub">Monitor your key product metrics for this billing period.</p>
+      </div>
+      <button type="button" class="account-page__icon-btn" title="Copy usage summary" aria-label="Copy usage summary">
+        <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+      </button>
+    </div>
+
+    <article class="account-page__usage-card">
+      <p class="account-page__usage-title">Usage this month</p>
+      <ul class="account-page__usage-list">
+        @for (usage of usageHighlights; track usage) {
+          <li>{{ usage }}</li>
+        }
+      </ul>
+    </article>
+  </section>
+
+  <section id="account-plan-billing" class="account-page__panel" aria-label="Plan and billing">
+    <div class="account-page__panel-head">
+      <div>
+        <h2 class="account-page__section-title">Plan / Billing</h2>
+        <p class="account-page__section-sub">Track limits and unlock higher usage for production workloads.</p>
+      </div>
+      <button
+        type="button"
+        class="account-page__icon-btn"
+        title="Copy billing summary"
+        aria-label="Copy billing summary"
+      >
+        <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+      </button>
+    </div>
+
+    <article class="account-page__billing-card">
+      <p class="account-page__billing-plan">
+        Current Plan:
+        <span class="account-page__billing-plan-pill">Free</span>
+      </p>
+      <ul class="account-page__billing-list">
+        @for (highlight of billingHighlights; track highlight) {
+          <li>{{ highlight }}</li>
+        }
+      </ul>
+      <button type="button" class="account-page__upgrade-btn">Upgrade to Pro</button>
+    </article>
+  </section>
+</main>

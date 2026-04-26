@@ -124,6 +124,8 @@ describe('EndpointsRepository', () => {
                 path: '/users',
                 description: 'List users',
                 statusCode: 200,
+                responseBody: { data: [{ id: 'u1' }] },
+                responseHeaders: { 'content-type': 'application/json' },
                 updatedAt: new Date().toISOString(),
                 scenarioCount: 2,
                 latencyMs: 120,
@@ -159,6 +161,8 @@ describe('EndpointsRepository', () => {
         path: '/users',
         latencyMs: 120,
         statusCode: 200,
+        responseBody: { data: [{ id: 'u1' }] },
+        responseHeaders: { 'content-type': 'application/json' },
       }),
     ]);
   });
@@ -302,14 +306,125 @@ describe('EndpointsRepository', () => {
 
     expect(api.patch).toHaveBeenCalledWith('/projects/p1/endpoints/e1', expect.any(Object));
     expect(api.put).toHaveBeenCalledWith('/endpoints/e1/config', expect.objectContaining({ errorRate: 0 }));
-    expect(api.patch).toHaveBeenCalledWith(
-      '/endpoints/e1/scenarios/s1',
-      expect.objectContaining({ name: 'Existing success' }),
-    );
     expect(api.post).toHaveBeenCalledWith('/endpoints/e1/scenarios', expect.objectContaining({ name: 'Timeout' }));
     expect(api.delete).toHaveBeenCalledWith('/endpoints/e1/scenarios/s-obsolete');
+    expect(api.patch).not.toHaveBeenCalledWith('/endpoints/e1/scenarios/s1', expect.anything());
     expect(result.id).toBe('e1');
     expect(result.config?.errorRatePct).toBe(0);
+  });
+
+  it('patches existing scenarios only when their persisted payload actually changed', async () => {
+    const api = {
+      post: vi.fn(async () => ({ id: 'created-scenario' })),
+      put: vi.fn(async () => ({})),
+      get: vi.fn(async (path: string) => {
+        if (path === '/endpoints/e1/scenarios') {
+          return [
+            {
+              id: 's1',
+              endpointId: 'e1',
+              name: 'Existing success',
+              type: 'success',
+              statusCode: 200,
+              body: { ok: true },
+              delayMs: 50,
+              weight: 70,
+            },
+          ];
+        }
+
+        if (path === '/projects/p1/endpoints/e1') {
+          return {
+            id: 'e1',
+            projectId: 'p1',
+            method: 'PATCH',
+            path: '/users/:id',
+            description: 'Update user',
+            statusCode: 200,
+            responseBody: { ok: true },
+            endpointConfig: {
+              endpointId: 'e1',
+              latencyMode: 'range',
+              fixedDelayMs: 0,
+              minDelayMs: 50,
+              maxDelayMs: 250,
+              errorRate: 0,
+              useScenarioWeights: false,
+            },
+            scenarios: [
+              {
+                id: 's1',
+                endpointId: 'e1',
+                name: 'Existing success renamed',
+                type: 'success',
+                statusCode: 200,
+                body: { ok: true },
+                delayMs: 50,
+                weight: 70,
+              },
+            ],
+          };
+        }
+
+        throw new Error(`Unexpected path: ${path}`);
+      }),
+      patch: vi.fn(async (path: string) => {
+        if (path === '/projects/p1/endpoints/e1') {
+          return {
+            id: 'e1',
+            projectId: 'p1',
+            method: 'PATCH',
+            path: '/users/:id',
+            description: 'Update user',
+            statusCode: 200,
+            responseBody: { ok: true },
+          };
+        }
+
+        return {};
+      }),
+      delete: vi.fn(async () => undefined),
+    };
+
+    const repository = createRepository(api);
+
+    await repository.saveEndpoint(
+      'p1',
+      {
+        method: 'PATCH',
+        route: '/users/:id',
+        description: 'Update user',
+        statusCode: 200,
+        responseBody: { ok: true },
+        behavior: {
+          latencyMode: 'range',
+          fixedDelayMs: 0,
+          minDelayMs: 50,
+          maxDelayMs: 250,
+          errorRate: 15,
+          useScenarioWeights: false,
+        },
+        scenarios: [
+          {
+            id: 's1',
+            name: 'Existing success renamed',
+            type: 'success',
+            statusCode: 200,
+            body: { ok: true },
+            delayMs: 50,
+            weight: 70,
+          },
+        ],
+        locks: { method: false, path: false, scenarioType: false },
+        source: 'existing',
+      },
+      'e1',
+    );
+
+    expect(api.patch).toHaveBeenCalledWith(
+      '/endpoints/e1/scenarios/s1',
+      expect.objectContaining({ name: 'Existing success renamed' }),
+    );
   });
 
   it('surfaces config-stage partial failures with persisted endpoint metadata and skips refresh', async () => {

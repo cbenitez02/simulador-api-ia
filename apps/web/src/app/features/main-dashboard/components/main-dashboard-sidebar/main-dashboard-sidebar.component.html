@@ -3,146 +3,232 @@
     <div class="sidebar__brand-icon" aria-hidden="true">
       <svg lucideHandMetal [size]="18" class="sidebar__brand-leaf"></svg>
     </div>
-    <span class="sidebar__brand-title">AI API Simulator</span>
+    <span class="sidebar__brand-title">Mocklify</span>
   </div>
 
   <div class="sidebar__scroll">
-    <section class="sidebar__section" aria-labelledby="projects-heading">
-      <div class="sidebar__section-head">
-        <h2 id="projects-heading" class="sidebar__label">Projects</h2>
-        <button type="button" class="sidebar__icon-btn" (click)="addProject()" aria-label="Añadir proyecto">
-          <svg lucidePlus [size]="16"></svg>
-        </button>
-      </div>
-      @if (loading()) {
-        <div class="sidebar__projects-empty">
-          <p class="sidebar__projects-empty-text">Loading projects...</p>
-        </div>
-      } @else if (errorMessage(); as errorMessage) {
-        <div class="sidebar__projects-empty">
-          <p class="sidebar__projects-empty-text">{{ errorMessage }}</p>
-          <button type="button" class="sidebar__create-project-btn" (click)="retry()">Retry</button>
-        </div>
-      } @else if (projects().length === 0) {
-        <div class="sidebar__projects-empty">
-          <p class="sidebar__projects-empty-text">No projects yet.</p>
-          <button type="button" class="sidebar__create-project-btn" (click)="addProject()">
-            <svg lucidePlus [size]="18" strokeWidth="2.25" aria-hidden="true"></svg>
-            Create Project
+    @if (!isAccountNav()) {
+      <section class="sidebar__section" aria-labelledby="projects-heading">
+        <div class="sidebar__section-head">
+          <h2 id="projects-heading" class="sidebar__label">Projects</h2>
+          <button type="button" class="sidebar__icon-btn" (click)="addProject()" aria-label="Añadir proyecto">
+            <svg lucidePlus [size]="16"></svg>
           </button>
         </div>
-      } @else {
-        <ul class="sidebar__projects">
-          @for (p of projects(); track p.id) {
-            <li>
-              <button
-                type="button"
-                class="sidebar__project"
-                [class.sidebar__project--active]="selectedProjectId() === p.id"
-                (click)="selectProject(p.id)"
-              >
-                <span
-                  class="sidebar__project-dot"
-                  [class.sidebar__project-dot--active]="selectedProjectId() === p.id"
-                  aria-hidden="true"
-                ></span>
-                <span class="sidebar__project-name">{{ p.name }}</span>
-              </button>
-            </li>
-          }
-        </ul>
-
-        @if (pagination().total > projects().length || pagination().errorMessage) {
-          <div class="sidebar__projects-footer">
-            @if (pagination().total > 0) {
-              <p class="sidebar__projects-meta">
-                Showing {{ pagination().loaded }} of {{ pagination().total }} projects
-              </p>
-            }
-
-            @if (pagination().errorMessage; as paginationError) {
-              <p class="sidebar__projects-error">{{ paginationError }}</p>
-            }
-
-            @if (pagination().hasMore) {
-              <button
-                type="button"
-                class="sidebar__load-more-btn"
-                (click)="loadMore()"
-                [disabled]="pagination().loadingMore"
-              >
-                {{ pagination().loadingMore ? 'Loading more…' : 'Load more projects' }}
-              </button>
-            }
+        @if (loading()) {
+          <div class="sidebar__projects-empty">
+            <p class="sidebar__projects-empty-text">Loading projects...</p>
           </div>
+        } @else if (errorMessage(); as errorMessage) {
+          <div class="sidebar__projects-empty">
+            <p class="sidebar__projects-empty-text">{{ errorMessage }}</p>
+            <button type="button" class="sidebar__create-project-btn" (click)="retry()">Retry</button>
+          </div>
+        } @else if (projects().length === 0) {
+          <div class="sidebar__projects-empty">
+            <p class="sidebar__projects-empty-text">No projects yet.</p>
+            <button type="button" class="sidebar__create-project-btn" (click)="addProject()">
+              <svg lucidePlus [size]="18" strokeWidth="2.25" aria-hidden="true"></svg>
+              Create Project
+            </button>
+          </div>
+        } @else {
+          <ul class="sidebar__projects">
+            @for (p of projects(); track p.id) {
+              <li>
+                <button
+                  type="button"
+                  class="sidebar__project"
+                  [class.sidebar__project--active]="selectedProjectId() === p.id"
+                  (click)="selectProject(p.id)"
+                >
+                  <span
+                    class="sidebar__project-dot"
+                    [class.sidebar__project-dot--active]="selectedProjectId() === p.id"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="sidebar__project-name">{{ p.name }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+
+          @if (pagination().total > projects().length || pagination().errorMessage) {
+            <div class="sidebar__projects-footer">
+              @if (pagination().total > 0) {
+                <p class="sidebar__projects-meta">
+                  Showing {{ pagination().loaded }} of {{ pagination().total }} projects
+                </p>
+              }
+
+              @if (pagination().errorMessage; as paginationError) {
+                <p class="sidebar__projects-error">{{ paginationError }}</p>
+              }
+
+              @if (pagination().hasMore) {
+                <button
+                  type="button"
+                  class="sidebar__load-more-btn"
+                  (click)="loadMore()"
+                  [disabled]="pagination().loadingMore"
+                >
+                  {{ pagination().loadingMore ? 'Loading more…' : 'Load more projects' }}
+                </button>
+              }
+            </div>
+          }
         }
-      }
-    </section>
+      </section>
 
-    <div class="sidebar__divider" role="separator"></div>
+      <div class="sidebar__divider" role="separator"></div>
+    }
 
-    <nav class="sidebar__nav" aria-label="Aplicación">
-      <button
-        type="button"
-        class="sidebar__nav-item"
-        [class.sidebar__nav-item--active]="activeNav() === 'dashboard'"
-        routerLink="/dashboard"
-        [attr.aria-current]="activeNav() === 'dashboard' ? 'page' : null"
-      >
-        <svg lucideLayoutGrid [size]="18" strokeWidth="1.75"></svg>
-        <span>Dashboard</span>
-      </button>
-      <button
-        type="button"
-        class="sidebar__nav-item"
-        [class.sidebar__nav-item--active]="activeNav() === 'endpoints'"
-        routerLink="/endpoints"
-        [attr.aria-current]="activeNav() === 'endpoints' ? 'page' : null"
-      >
-        <svg lucideArrowRightLeft [size]="18" strokeWidth="1.75"></svg>
-        <span>Endpoints</span>
-      </button>
-      <button
-        type="button"
-        class="sidebar__nav-item"
-        [class.sidebar__nav-item--active]="activeNav() === 'logs'"
-        routerLink="/logs"
-        [attr.aria-current]="activeNav() === 'logs' ? 'page' : null"
-      >
-        <svg lucideFileText [size]="18" strokeWidth="1.75"></svg>
-        <span>Logs</span>
-      </button>
-      <button
-        type="button"
-        class="sidebar__nav-item"
-        [class.sidebar__nav-item--active]="activeNav() === 'history'"
-        routerLink="/history"
-        [attr.aria-current]="activeNav() === 'history' ? 'page' : null"
-      >
-        <svg lucideHistory [size]="18" strokeWidth="1.75"></svg>
-        <span>History</span>
-      </button>
-      <button
-        type="button"
-        class="sidebar__nav-item"
-        [class.sidebar__nav-item--active]="activeNav() === 'workspace'"
-        routerLink="/workspace"
-        [attr.aria-current]="activeNav() === 'workspace' ? 'page' : null"
-      >
-        <svg lucideUsers [size]="18" strokeWidth="1.75"></svg>
-        <span>Workspace</span>
-      </button>
-    </nav>
+    @if (isAccountNav()) {
+      <nav class="sidebar__nav" aria-label="Account sections">
+        <button type="button" class="sidebar__nav-item sidebar__nav-item--back" routerLink="/dashboard">
+          <svg lucideArrowLeft [size]="18" strokeWidth="1.75"></svg>
+          <span>Back to Dashboard</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'account-profile-settings'"
+          routerLink="/account-profile-settings"
+        >
+          <svg lucideSettings [size]="18" strokeWidth="1.75"></svg>
+          <span>Profile Settings</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'account-api-keys'"
+          routerLink="/account-api-keys"
+        >
+          <svg lucideArrowRightLeft [size]="18" strokeWidth="1.75"></svg>
+          <span>API Keys</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'account-notifications'"
+          routerLink="/account-notifications"
+        >
+          <svg lucideFileText [size]="18" strokeWidth="1.75"></svg>
+          <span>Notifications</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'account-security'"
+          routerLink="/account-security"
+        >
+          <svg lucideUsers [size]="18" strokeWidth="1.75"></svg>
+          <span>Security</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'account-usage'"
+          routerLink="/account-usage"
+        >
+          <svg lucideLayoutGrid [size]="18" strokeWidth="1.75"></svg>
+          <span>Usage</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'account-plan-billing'"
+          routerLink="/account-plan-billing"
+        >
+          <svg lucideHistory [size]="18" strokeWidth="1.75"></svg>
+          <span>Plan / Billing</span>
+        </button>
+      </nav>
+    } @else {
+      <nav class="sidebar__nav" aria-label="Aplicación">
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'dashboard'"
+          routerLink="/dashboard"
+          [attr.aria-current]="activeNav() === 'dashboard' ? 'page' : null"
+        >
+          <svg lucideLayoutGrid [size]="18" strokeWidth="1.75"></svg>
+          <span>Dashboard</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'endpoints'"
+          routerLink="/endpoints"
+          [attr.aria-current]="activeNav() === 'endpoints' ? 'page' : null"
+        >
+          <svg lucideArrowRightLeft [size]="18" strokeWidth="1.75"></svg>
+          <span>Endpoints</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'logs'"
+          routerLink="/logs"
+          [attr.aria-current]="activeNav() === 'logs' ? 'page' : null"
+        >
+          <svg lucideFileText [size]="18" strokeWidth="1.75"></svg>
+          <span>Logs</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'history'"
+          routerLink="/history"
+          [attr.aria-current]="activeNav() === 'history' ? 'page' : null"
+        >
+          <svg lucideHistory [size]="18" strokeWidth="1.75"></svg>
+          <span>History</span>
+        </button>
+        <button
+          type="button"
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav() === 'workspace'"
+          routerLink="/workspace"
+          [attr.aria-current]="activeNav() === 'workspace' ? 'page' : null"
+        >
+          <svg lucideUsers [size]="18" strokeWidth="1.75"></svg>
+          <span>Workspace</span>
+        </button>
+      </nav>
+    }
   </div>
 
-  @if (activeProject(); as ap) {
+  @if (!isAccountNav() && activeProject(); as ap) {
     <section class="sidebar__active-card" aria-label="Proyecto activo">
       <p class="sidebar__label sidebar__label--card">Active project</p>
       <p class="sidebar__active-name">{{ ap.name }}</p>
       <div class="sidebar__url-row">
         <span class="sidebar__url-text" [title]="ap.mockUrl">{{ displayMockUrl() }}</span>
-        <button type="button" class="sidebar__copy-btn" (click)="copyMockUrl()" aria-label="Copiar URL del mock">
-          <svg lucideCopy [size]="16" strokeWidth="1.75"></svg>
+        <button
+          type="button"
+          class="sidebar__copy-btn"
+          [class.sidebar__copy-btn--copied]="copiedMockUrl()"
+          (click)="copyMockUrl()"
+          [attr.aria-label]="copiedMockUrl() ? 'URL copiada' : 'Copiar URL del mock'"
+        >
+          <span class="sidebar__copy-icon-wrap" aria-hidden="true">
+            <svg
+              lucideCopy
+              [size]="16"
+              strokeWidth="1.75"
+              class="sidebar__copy-icon sidebar__copy-icon--copy"
+              [class.sidebar__copy-icon--hidden]="copiedMockUrl()"
+            ></svg>
+            <svg
+              lucideCheck
+              [size]="16"
+              strokeWidth="2"
+              class="sidebar__copy-icon sidebar__copy-icon--check"
+              [class.sidebar__copy-icon--visible]="copiedMockUrl()"
+            ></svg>
+          </span>
         </button>
       </div>
       <p class="sidebar__meta">{{ ap.endpointCount }} endpoints</p>
@@ -162,6 +248,16 @@
           <p class="sidebar__user-username">{{ userHandle }}</p>
         }
       </div>
+      <button
+        type="button"
+        class="sidebar__user-account-btn"
+        [class.sidebar__user-account-btn--active]="isAccountNav()"
+        routerLink="/account-profile-settings"
+        title="Account settings"
+        aria-label="Open account settings"
+      >
+        <svg lucideSettings [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
+      </button>
     </section>
   }
 

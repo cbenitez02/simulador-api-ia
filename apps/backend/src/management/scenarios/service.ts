@@ -2,9 +2,38 @@ import { authorizeEndpointAccess } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
+import { areJsonValuesEqual } from '../../lib/stable-json.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { writeAuditEvent } from '../audit-events/service.js';
 import type { CreateScenarioInput, UpdateScenarioInput } from './schema.js';
+
+function hasScenarioChanges(
+  current: {
+    name: string;
+    type: string;
+    statusCode: number;
+    body: unknown;
+    delayMs: number;
+    weight: number;
+  },
+  next: {
+    name: string;
+    type: string;
+    statusCode: number;
+    body: unknown;
+    delayMs: number;
+    weight: number;
+  }
+) {
+  return (
+    current.name !== next.name ||
+    current.type !== next.type ||
+    current.statusCode !== next.statusCode ||
+    !areJsonValuesEqual(current.body, next.body) ||
+    current.delayMs !== next.delayMs ||
+    current.weight !== next.weight
+  );
+}
 
 export async function listScenarios(actor: AuthenticatedActor, endpointId: string) {
   await authorizeEndpointAccess(actor, endpointId);
@@ -76,7 +105,15 @@ export async function updateScenario(
 
   const scenario = await prisma.scenario.findFirst({
     where: { id: scenarioId, endpointId },
-    select: { id: true },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      statusCode: true,
+      body: true,
+      delayMs: true,
+      weight: true,
+    },
   });
 
   if (!scenario) {
@@ -95,6 +132,19 @@ export async function updateScenario(
         ...(input.weight !== undefined ? { weight: input.weight } : {}),
       },
     });
+
+    if (
+      !hasScenarioChanges(scenario, {
+        name: updated.name,
+        type: updated.type,
+        statusCode: updated.statusCode,
+        body: updated.body,
+        delayMs: updated.delayMs,
+        weight: updated.weight,
+      })
+    ) {
+      return updated;
+    }
 
     const endpoint = await tx.endpoint.findUniqueOrThrow({
       where: { id: endpointId },

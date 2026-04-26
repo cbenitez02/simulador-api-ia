@@ -81,7 +81,7 @@
       </div>
     </div>
   </main>
-} @else if (!hasProjects()) {
+} @else if (!hasProjects() && !isAccountNav()) {
   @if (activeNav() === 'dashboard') {
     <div class="workspace__main workspace__main--welcome">
       <app-dashboard-empty-state
@@ -184,53 +184,87 @@
       (removeMember)="removeWorkspaceMember($event)"
     />
   </main>
+} @else if (activeNav() === 'account-profile-settings') {
+  <main class="workspace__main" aria-label="Profile settings">
+    <app-account-section-page section="account-profile-settings"></app-account-section-page>
+  </main>
+} @else if (activeNav() === 'account-api-keys') {
+  <main class="workspace__main" aria-label="API keys">
+    <app-account-section-page section="account-api-keys"></app-account-section-page>
+  </main>
+} @else if (activeNav() === 'account-notifications') {
+  <main class="workspace__main" aria-label="Notifications">
+    <app-account-section-page section="account-notifications"></app-account-section-page>
+  </main>
+} @else if (activeNav() === 'account-security') {
+  <main class="workspace__main" aria-label="Security">
+    <app-account-section-page section="account-security"></app-account-section-page>
+  </main>
+} @else if (activeNav() === 'account-usage') {
+  <main class="workspace__main" aria-label="Usage">
+    <app-account-section-page section="account-usage"></app-account-section-page>
+  </main>
+} @else if (activeNav() === 'account-plan-billing') {
+  <main class="workspace__main" aria-label="Plan and billing">
+    <app-account-section-page section="account-plan-billing"></app-account-section-page>
+  </main>
 }
 
 @if (contractImportReview(); as review) {
-  <section class="workspace__contract-review" aria-label="OpenAPI contract review">
-    <h2>Review OpenAPI import</h2>
-    <p>
-      {{ review.file.name }} · {{ review.analysis.summary.create }} create · {{ review.analysis.summary.update }} update
-      · {{ review.analysis.summary.delete }} delete
-    </p>
-    @if (review.analysis.warnings.length > 0) {
-      <ul>
-        @for (warning of review.analysis.warnings; track warning.code + warning.message + (warning.path ?? '')) {
-          <li>
-            {{ warning.message }}
-            @if (warning.path) {
-              — {{ warning.path }}
+  <div class="workspace__contract-review-backdrop" (click)="cancelContractImportReview()">
+    <section
+      class="workspace__contract-review"
+      aria-label="OpenAPI contract review"
+      role="dialog"
+      aria-modal="true"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="workspace__contract-review-title">Review OpenAPI import</h2>
+      <p class="workspace__contract-review-summary">
+        {{ review.file.name }} · {{ review.analysis.summary.create }} create ·
+        {{ review.analysis.summary.update }} update · {{ review.analysis.summary.delete }} delete
+      </p>
+      <div class="workspace__contract-review-body cp-scrollbar">
+        @if (review.analysis.warnings.length > 0) {
+          <ul class="workspace__contract-review-list">
+            @for (warning of review.analysis.warnings; track warning.code + warning.message + (warning.path ?? '')) {
+              <li>
+                {{ warning.message }}
+                @if (warning.path) {
+                  — {{ warning.path }}
+                }
+              </li>
             }
-          </li>
+          </ul>
         }
-      </ul>
-    }
-    @if (review.analysis.operations.length > 0) {
-      <ul>
-        @for (operation of review.analysis.operations; track operation.method + operation.path) {
-          <li>{{ operation.action | titlecase }} · {{ operation.method }} {{ operation.path }}</li>
+        @if (review.analysis.operations.length > 0) {
+          <ul class="workspace__contract-review-list">
+            @for (operation of review.analysis.operations; track operation.method + operation.path) {
+              <li>{{ operation.action | titlecase }} · {{ operation.method }} {{ operation.path }}</li>
+            }
+          </ul>
         }
-      </ul>
-    }
-    <div class="workspace__needs-project-actions">
-      <button
-        type="button"
-        class="workspace__needs-project-btn workspace__needs-project-btn--primary"
-        [disabled]="!canMutateActiveWorkspace() || endpointMutationPending()"
-        (click)="confirmContractImport()"
-      >
-        Confirm import
-      </button>
-      <button
-        type="button"
-        class="workspace__needs-project-btn"
-        [disabled]="endpointMutationPending()"
-        (click)="cancelContractImportReview()"
-      >
-        Cancel
-      </button>
-    </div>
-  </section>
+      </div>
+      <div class="workspace__needs-project-actions workspace__contract-review-actions">
+        <button
+          type="button"
+          class="workspace__needs-project-btn workspace__needs-project-btn--primary"
+          [disabled]="!canMutateActiveWorkspace() || endpointMutationPending()"
+          (click)="confirmContractImport()"
+        >
+          Confirm import
+        </button>
+        <button
+          type="button"
+          class="workspace__needs-project-btn"
+          [disabled]="endpointMutationPending()"
+          (click)="cancelContractImportReview()"
+        >
+          Cancel
+        </button>
+      </div>
+    </section>
+  </div>
 }
 
 @if (activeNav() === 'dashboard' && hasProjects()) {

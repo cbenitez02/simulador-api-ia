@@ -19,6 +19,11 @@ import {
   mapEndpointSummaryFromApi,
 } from '../adapters/endpoint-api.mapper';
 
+type ComparableScenarioPayload = Pick<
+  CreateScenarioDto,
+  'name' | 'type' | 'statusCode' | 'body' | 'delayMs' | 'weight'
+>;
+
 export interface EndpointListQuery {
   limit?: number;
   offset?: number;
@@ -74,14 +79,56 @@ function mapEndpointListItemFromApi(endpoint: EndpointListItemDto): EndpointPrev
     id: endpoint.id,
     method: mapEndpointSummaryFromApi({
       ...endpoint,
-      responseBody: null,
     } as EndpointDto).method,
     path: endpoint.path,
     description: endpoint.description || 'No description',
     latencyMs: endpoint.latencyMs,
     statusCode: endpoint.statusCode,
-    responseBody: null,
+    responseBody: endpoint.responseBody,
+    responseHeaders: endpoint.responseHeaders,
   };
+}
+
+function sortComparableValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortComparableValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((result, key) => {
+        result[key] = sortComparableValue((value as Record<string, unknown>)[key]);
+        return result;
+      }, {});
+  }
+
+  return value;
+}
+
+function buildScenarioPayload(
+  scenario: Pick<ScenarioDto, 'name' | 'type' | 'statusCode' | 'body' | 'delayMs' | 'weight'>,
+): ComparableScenarioPayload;
+function buildScenarioPayload(
+  scenario: Pick<EndpointDraft['scenarios'][number], 'name' | 'type' | 'statusCode' | 'body' | 'delayMs' | 'weight'>,
+): ComparableScenarioPayload;
+function buildScenarioPayload(
+  scenario:
+    | Pick<ScenarioDto, 'name' | 'type' | 'statusCode' | 'body' | 'delayMs' | 'weight'>
+    | Pick<EndpointDraft['scenarios'][number], 'name' | 'type' | 'statusCode' | 'body' | 'delayMs' | 'weight'>,
+): ComparableScenarioPayload {
+  return {
+    name: scenario.name.trim() || 'Scenario',
+    type: scenario.type === 'custom' ? 'success' : scenario.type,
+    statusCode: scenario.statusCode,
+    body: scenario.body,
+    delayMs: scenario.delayMs,
+    weight: Math.max(1, scenario.weight),
+  };
+}
+
+function haveSameScenarioPayload(left: ComparableScenarioPayload, right: ComparableScenarioPayload): boolean {
+  return JSON.stringify(sortComparableValue(left)) === JSON.stringify(sortComparableValue(right));
 }
 
 @Injectable({ providedIn: 'root' })
@@ -174,17 +221,14 @@ export class EndpointsRepository {
 
     await Promise.all(
       draft.scenarios.map(async (scenario) => {
-        const payload: CreateScenarioDto = {
-          name: scenario.name.trim() || 'Scenario',
-          type: scenario.type === 'custom' ? 'success' : scenario.type,
-          statusCode: scenario.statusCode,
-          body: scenario.body,
-          delayMs: scenario.delayMs,
-          weight: Math.max(1, scenario.weight),
-        };
+        const payload = buildScenarioPayload(scenario);
 
         if (existingById.has(scenario.id)) {
           seen.add(scenario.id);
+          if (haveSameScenarioPayload(payload, buildScenarioPayload(existingById.get(scenario.id)!))) {
+            return;
+          }
+
           await this.api.patch(`/endpoints/${endpointId}/scenarios/${scenario.id}`, payload);
           return;
         }

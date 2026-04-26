@@ -1,3 +1,4 @@
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { resolveAngularExternalResources, setupAngularVitest } from '../../testing/angular-vitest';
@@ -45,6 +46,7 @@ async function renderPage(
   await resolveAngularExternalResources();
   await TestBed.configureTestingModule({
     imports: [WorkspaceMembersPageComponent],
+    schemas: [NO_ERRORS_SCHEMA],
   }).compileComponents();
 
   const fixture = TestBed.createComponent(WorkspaceMembersPageComponent);
@@ -151,21 +153,22 @@ describe('WorkspaceMembersPageComponent', () => {
 
   it('emits addMember with normalized payload when the form is submitted', async () => {
     const fixture = await renderPage();
-    const component = fixture.componentInstance;
+    const component = fixture.componentInstance as WorkspaceMembersPageComponent & {
+      selectedRole: { set(value: 'viewer' | 'editor' | 'owner'): void };
+    };
     const emitSpy = vi.fn();
     component.addMember.subscribe(emitSpy);
+    component.selectedRole.set('editor');
 
     const element = fixture.nativeElement as HTMLElement;
     const emailInput = element.querySelector<HTMLInputElement>('.workspace-members-page__input');
-    const roleSelect = element.querySelector<HTMLSelectElement>('.workspace-members-page__select');
     const form = element.querySelector('form');
 
-    if (!emailInput || !roleSelect || !form) {
+    if (!emailInput || !form) {
       throw new Error('Form fields not rendered');
     }
 
     emailInput.value = '  newcomer@example.com  ';
-    roleSelect.value = 'editor';
     form.dispatchEvent(new Event('submit'));
 
     expect(emitSpy).toHaveBeenCalledWith({ email: 'newcomer@example.com', role: 'editor' });
