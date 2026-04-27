@@ -85,7 +85,7 @@ const previewFixture: EndpointPreview = {
   config: {
     latencyMs: 150,
     errorRatePct: 0,
-    scenarios: { success: true, empty: false, error: false, timeout: false },
+    scenarios: { success: true, empty: false, error: false, timeout: false, unauthorized: false },
   },
 };
 

@@ -26,11 +26,13 @@ export interface AuditHistoryEntry {
   workspaceId: string;
   projectId: string;
   resourceType: AuditResourceType;
+  resourceTypeLabel?: string;
   resourceId: string;
   resourceLabel: string;
   action: AuditAction;
   actionLabel: string;
   summary: string;
+  detailsLabel?: string | null;
   metadata: unknown;
   createdAt: string;
   timeLabel: string;

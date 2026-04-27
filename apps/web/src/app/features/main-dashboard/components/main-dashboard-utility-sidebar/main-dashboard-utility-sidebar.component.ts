@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { LucideDownload, LucidePlay, LucidePlus, LucideSparkles, LucideSettings, LucideUpload } from '@lucide/angular';
+import { LucideDownload, LucidePlus, LucideSparkles, LucideSettings, LucideUpload } from '@lucide/angular';
 
 import type { DashboardProject } from '../../models/dashboard-project.model';
 
 interface UtilityQuickAction {
-  id: 'create' | 'create-manual' | 'snapshot' | 'test' | 'export' | 'import';
+  id: 'create' | 'create-manual' | 'snapshot' | 'export' | 'import';
   title: string;
   subtitle: string;
   icon: 'plus' | 'play' | 'download' | 'upload' | 'sparkles';
@@ -17,12 +17,15 @@ interface UtilityQuickAction {
   templateUrl: './main-dashboard-utility-sidebar.component.html',
   styleUrls: ['./main-dashboard-utility-sidebar.component.css'],
   standalone: true,
-  imports: [LucideDownload, LucidePlay, LucidePlus, LucideSparkles, LucideSettings, LucideUpload],
+  imports: [LucideDownload, LucidePlus, LucideSparkles, LucideSettings, LucideUpload],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainDashboardUtilitySidebarComponent {
   readonly project = input.required<DashboardProject>();
   readonly canMutate = input(true);
+
+  protected readonly canCreateSnapshot = computed(() => this.project().workspace.capabilities.canRestoreSnapshots);
+  protected readonly canImportContracts = computed(() => this.project().workspace.capabilities.canImportContracts);
 
   readonly createEndpoint = output<void>();
   readonly createManualEndpoint = output<void>();
@@ -51,13 +54,6 @@ export class MainDashboardUtilitySidebarComponent {
       title: 'Create snapshot',
       subtitle: 'Save the current project state',
       icon: 'download' as const,
-    },
-    {
-      id: 'test',
-      title: 'Test all endpoints',
-      subtitle: 'Coming soon — bulk testing is not available yet',
-      icon: 'play' as const,
-      disabled: true,
     },
     {
       id: 'export',
@@ -131,17 +127,14 @@ export class MainDashboardUtilitySidebarComponent {
         this.createManualEndpoint.emit();
         break;
       case 'snapshot':
-        if (!this.canMutate()) return;
+        if (!this.canCreateSnapshot()) return;
         this.createSnapshot.emit();
-        break;
-      case 'test':
-        this.testAllEndpoints.emit();
         break;
       case 'export':
         this.exportConfig.emit();
         break;
       case 'import':
-        if (!this.canMutate()) return;
+        if (!this.canImportContracts()) return;
         this.importEndpoints.emit();
         break;
       default:

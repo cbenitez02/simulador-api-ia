@@ -204,9 +204,11 @@ describe('AuditHistoryComponent', () => {
       resourceId: 'snapshot-1',
       resourceLabel: 'Before imports',
       action: 'created',
-      actionLabel: 'saved snapshot',
-      summary: 'Created snapshot Before imports',
-      metadata: { snapshotName: 'Before imports' },
+      actionLabel: 'saved revision',
+      summary: 'Created revision Before imports',
+      detailsLabel: '2 endpoints · 3 scenarios · scope unset',
+      resourceTypeLabel: 'revision',
+      metadata: { snapshotName: 'Before imports', endpointCount: 2, scenarioCount: 3, scope: 'unset' },
       createdAt: '2026-04-14T12:00:00.000Z',
       timeLabel: '12:00:00',
     };
@@ -219,9 +221,10 @@ describe('AuditHistoryComponent', () => {
       canRestoreSnapshots: false,
     });
 
-    expect(element.textContent).toContain('Created snapshot Before imports');
+    expect(element.textContent).toContain('Created revision Before imports');
+    expect(element.textContent).toContain('2 endpoints · 3 scenarios · scope unset');
     expect(
-      Array.from(element.querySelectorAll('button')).some((button) => button.textContent?.includes('Restore snapshot')),
+      Array.from(element.querySelectorAll('button')).some((button) => button.textContent?.includes('Restore revision')),
     ).toBe(false);
   });
 });

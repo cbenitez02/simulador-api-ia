@@ -111,4 +111,23 @@ describe('CreateEndpointEditorStepComponent', () => {
       }),
     );
   });
+
+  it('adds an unauthorized preset with 401 defaults', () => {
+    const component = createComponent();
+
+    component.addPreset('unauthorized');
+
+    expect(component.draftChange.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarios: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Unauthorized',
+            type: 'unauthorized',
+            statusCode: 401,
+            body: { error: 'Unauthorized', message: 'Invalid or missing token' },
+          }),
+        ]),
+      }),
+    );
+  });
 });

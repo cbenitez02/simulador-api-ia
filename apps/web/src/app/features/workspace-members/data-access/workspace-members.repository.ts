@@ -1,6 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { ApiClient } from '../../../shared/http/api-client';
-import type { WorkspaceMemberDto, WorkspaceMembersListDto, WorkspaceRoleDto } from '../../../shared/http/api.types';
+import type {
+  UpdateWorkspaceMemberRoleDto,
+  WorkspaceMemberDto,
+  WorkspaceMembersListDto,
+  WorkspaceRoleDto,
+} from '../../../shared/http/api.types';
 import type { WorkspaceMember } from '../models/workspace-member.model';
 
 function mapWorkspaceMemberFromApi(member: WorkspaceMemberDto): WorkspaceMember {
@@ -25,6 +30,19 @@ export class WorkspaceMembersRepository {
   async addMember(workspaceId: string, input: { email: string; role: WorkspaceRoleDto }): Promise<WorkspaceMember> {
     const member = await this.api.post<WorkspaceMemberDto, { email: string; role: WorkspaceRoleDto }>(
       `/workspaces/${workspaceId}/members`,
+      input,
+    );
+
+    return mapWorkspaceMemberFromApi(member);
+  }
+
+  async updateMemberRole(
+    workspaceId: string,
+    memberUserId: string,
+    input: UpdateWorkspaceMemberRoleDto,
+  ): Promise<WorkspaceMember> {
+    const member = await this.api.patch<WorkspaceMemberDto, UpdateWorkspaceMemberRoleDto>(
+      `/workspaces/${workspaceId}/members/${memberUserId}`,
       input,
     );
 

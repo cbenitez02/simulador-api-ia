@@ -11,17 +11,27 @@ export interface ApiErrorDto {
 }
 
 export type WorkspaceRoleDto = 'owner' | 'editor' | 'viewer';
+export type InvitableWorkspaceRoleDto = Exclude<WorkspaceRoleDto, 'owner'>;
+export type WorkspaceKindDto = 'personal' | 'team';
 
 export interface WorkspaceCapabilitiesDto {
   canEdit: boolean;
   canManageMembers: boolean;
+  canRestoreSnapshots: boolean;
+  canImportContracts: boolean;
 }
 
 export interface WorkspaceSummaryDto {
   id: string;
+  name: string;
+  kind: WorkspaceKindDto;
   role: WorkspaceRoleDto;
   isPersonal?: boolean;
   capabilities: WorkspaceCapabilitiesDto;
+}
+
+export interface WorkspaceListDto {
+  items: WorkspaceSummaryDto[];
 }
 
 export interface WorkspaceMemberDto {
@@ -34,6 +44,26 @@ export interface WorkspaceMemberDto {
 
 export interface WorkspaceMembersListDto {
   items: WorkspaceMemberDto[];
+}
+
+export type WorkspaceInvitationStatusDto = 'pending' | 'accepted' | 'revoked';
+
+export interface WorkspaceInvitationDto {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  email: string;
+  role: WorkspaceRoleDto;
+  status: WorkspaceInvitationStatusDto;
+  createdAt: string;
+}
+
+export interface WorkspaceInvitationsListDto {
+  items: WorkspaceInvitationDto[];
+}
+
+export interface UpdateWorkspaceMemberRoleDto {
+  role: WorkspaceRoleDto;
 }
 
 export interface ProjectDto {
@@ -75,11 +105,14 @@ export interface EndpointListItemDto {
 export interface CreateProjectDto {
   name: string;
   description?: string;
+  workspaceId?: string;
 }
 
 export interface UpdateProjectDto {
   name?: string;
   description?: string;
+  slug?: string;
+  workspaceId?: string;
 }
 
 export interface EndpointConfigDto {
@@ -96,7 +129,7 @@ export interface ScenarioDto {
   id: string;
   endpointId: string;
   name: string;
-  type: 'success' | 'error' | 'timeout' | 'empty';
+  type: 'success' | 'error' | 'timeout' | 'empty' | 'unauthorized';
   statusCode: number;
   body: unknown;
   delayMs: number;
@@ -117,7 +150,7 @@ export interface EndpointDto {
   _count?: { scenarios: number };
 }
 
-export type AiScenarioTypeDto = 'success' | 'error' | 'timeout' | 'empty';
+export type AiScenarioTypeDto = 'success' | 'error' | 'timeout' | 'empty' | 'unauthorized';
 
 export interface AiEndpointScenarioDto {
   name: string;
@@ -160,7 +193,7 @@ export interface UpdateEndpointDto {
 
 export interface CreateScenarioDto {
   name: string;
-  type: 'success' | 'error' | 'timeout' | 'empty';
+  type: 'success' | 'error' | 'timeout' | 'empty' | 'unauthorized';
   statusCode: number;
   body: unknown;
   delayMs: number;
@@ -203,7 +236,7 @@ export interface ProjectSnapshotPayloadEndpointConfigDto {
 
 export interface ProjectSnapshotPayloadScenarioDto {
   name: string;
-  type: 'success' | 'error' | 'timeout' | 'empty';
+  type: 'success' | 'error' | 'timeout' | 'empty' | 'unauthorized';
   statusCode: number;
   body: unknown;
   delayMs: number;
@@ -237,6 +270,14 @@ export interface ProjectSnapshotDto {
   name: string;
   description: string;
   createdAt: string;
+  revision?: {
+    endpointCount: number;
+    scenarioCount: number;
+    globalScope: 'all' | 'unset' | null;
+    projectSlug: string | null;
+    projectName: string | null;
+    isLegacySnapshot: boolean;
+  };
   createdBy: ProjectSnapshotActorDto;
 }
 
@@ -257,6 +298,58 @@ export interface RestoreProjectSnapshotResponseDto {
   restoredSnapshotId: string;
 }
 
+export interface ProjectSnapshotRestorePreviewValueDto<T> {
+  current: T;
+  snapshot: T;
+  changed: boolean;
+}
+
+export interface ProjectSnapshotRestorePreviewConfigChangeDto {
+  field: keyof Omit<GlobalConfigDto, 'projectId'>;
+  current: unknown;
+  snapshot: unknown;
+}
+
+export interface ProjectSnapshotRestorePreviewEndpointDto {
+  key: string;
+  method: string;
+  path: string;
+}
+
+export interface ProjectSnapshotRestorePreviewDto {
+  snapshotId: string;
+  snapshotName: string;
+  revision?: {
+    endpointCount: number;
+    scenarioCount: number;
+    globalScope: 'all' | 'unset' | null;
+    projectSlug: string | null;
+    projectName: string | null;
+    isLegacySnapshot: boolean;
+  };
+  project: {
+    name: ProjectSnapshotRestorePreviewValueDto<string>;
+    description: ProjectSnapshotRestorePreviewValueDto<string>;
+  };
+  globalConfig: {
+    changed: boolean;
+    changes: ProjectSnapshotRestorePreviewConfigChangeDto[];
+  };
+  endpoints: {
+    create: ProjectSnapshotRestorePreviewEndpointDto[];
+    update: ProjectSnapshotRestorePreviewEndpointDto[];
+    delete: ProjectSnapshotRestorePreviewEndpointDto[];
+    keep: ProjectSnapshotRestorePreviewEndpointDto[];
+  };
+  counts: {
+    create: number;
+    update: number;
+    delete: number;
+    keep: number;
+    totalAfterRestore: number;
+  };
+}
+
 export interface ApiLogDto {
   id: string;
   projectId: string;
@@ -266,7 +359,15 @@ export interface ApiLogDto {
   origin: 'mock' | 'forced-error';
   statusCode: number;
   latencyMs: number;
-  scenarioType: 'success' | 'error' | 'timeout' | 'empty' | 'forced-error' | 'default' | 'rate-limit-block';
+  scenarioType:
+    | 'success'
+    | 'error'
+    | 'timeout'
+    | 'empty'
+    | 'unauthorized'
+    | 'forced-error'
+    | 'default'
+    | 'rate-limit-block';
   scenarioSelectionSource: 'weighted-random' | 'uniform-random' | 'direct-endpoint' | 'forced-error' | 'rate-limit';
   scenarioName: string | null;
   hasScenario: boolean;

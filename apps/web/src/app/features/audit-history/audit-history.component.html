@@ -55,7 +55,7 @@
                             {{ entry.actionLabel }}
                           </span>
                           <span class="audit-history__resource-type" [attr.data-resource]="entry.resourceType">
-                            {{ entry.resourceType }}
+                            {{ entry.resourceTypeLabel ?? entry.resourceType }}
                           </span>
                         </div>
                         <div class="audit-history__resource-block">
@@ -68,13 +68,16 @@
                         </div>
                       </div>
                       <p class="audit-history__summary">{{ entry.summary }}</p>
+                      @if (entry.detailsLabel) {
+                        <p class="audit-history__summary audit-history__summary--meta">{{ entry.detailsLabel }}</p>
+                      }
                       <div class="audit-history__row-foot">
                         <span class="audit-history__actor"
                           >By <strong>{{ entry.actorLabel }}</strong></span
                         >
                         @if (canRestoreEntry(entry)) {
                           <button type="button" class="audit-history__restore" (click)="requestRestore(entry)">
-                            Restore snapshot
+                            Restore revision
                           </button>
                         }
                       </div>

@@ -38,9 +38,41 @@ function resolveResourceLabel(event: ApiAuditEventDto): string {
   }
 }
 
+function resolveResourceTypeLabel(resourceType: ApiAuditEventDto['resourceType']): string {
+  return resourceType === 'snapshot' ? 'revision' : resourceType;
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function resolveSnapshotDetails(event: ApiAuditEventDto): string | null {
+  if (event.resourceType !== 'snapshot') return null;
+
+  const metadata = (event.metadata ?? {}) as Record<string, unknown>;
+  const endpointCount =
+    typeof metadata['restoredEndpointCount'] === 'number'
+      ? metadata['restoredEndpointCount']
+      : typeof metadata['endpointCount'] === 'number'
+        ? metadata['endpointCount']
+        : null;
+  const scenarioCount = typeof metadata['scenarioCount'] === 'number' ? metadata['scenarioCount'] : null;
+  const deletedCount = typeof metadata['deletedEndpointCount'] === 'number' ? metadata['deletedEndpointCount'] : null;
+  const scope = metadata['scope'] === 'all' || metadata['scope'] === 'unset' ? metadata['scope'] : null;
+
+  const parts = [
+    endpointCount === null ? null : pluralize(endpointCount, 'endpoint'),
+    scenarioCount === null ? null : pluralize(scenarioCount, 'scenario'),
+    deletedCount && deletedCount > 0 ? pluralize(deletedCount, 'deleted', 'deleted') : null,
+    scope ? `scope ${scope}` : null,
+  ].filter((value): value is string => Boolean(value));
+
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 function resolveActionLabel(event: ApiAuditEventDto): string {
-  if (event.resourceType === 'snapshot' && event.action === 'created') return 'saved snapshot';
-  if (event.resourceType === 'snapshot' && event.action === 'restored') return 'restored snapshot';
+  if (event.resourceType === 'snapshot' && event.action === 'created') return 'saved revision';
+  if (event.resourceType === 'snapshot' && event.action === 'restored') return 'restored revision';
   if (event.resourceType === 'contract' && event.action === 'analyzed') return 'analyzed contract';
   if (event.resourceType === 'contract' && event.action === 'exported') return 'exported contract';
   if (event.resourceType === 'contract' && event.action === 'imported') return 'imported contract';
@@ -55,11 +87,13 @@ export function mapAuditEventFromApi(event: ApiAuditEventDto): AuditHistoryEntry
     workspaceId: event.workspaceId,
     projectId: event.projectId,
     resourceType: event.resourceType,
+    resourceTypeLabel: resolveResourceTypeLabel(event.resourceType),
     resourceId: event.resourceId,
     resourceLabel: resolveResourceLabel(event),
     action: event.action,
     actionLabel: resolveActionLabel(event),
     summary: event.summary,
+    detailsLabel: resolveSnapshotDetails(event),
     metadata: event.metadata,
     createdAt: event.createdAt,
     timeLabel: timeLabel(event.createdAt),

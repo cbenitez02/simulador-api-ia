@@ -4,6 +4,7 @@ import {
   LucideAlertTriangle,
   LucideCircle,
   LucideCircleCheck,
+  LucideCheck,
   LucideClock,
   LucideCopy,
   LucideFileText,
@@ -11,6 +12,7 @@ import {
   LucideTrash2,
 } from '@lucide/angular';
 import { HttpMethodBadgeComponent } from '../../../../shared/ui/http-method-badge/http-method-badge.component';
+import { ToastService } from '../../../../shared/ui/toast/toast.service';
 import { copyTextToClipboard } from '../../../../shared/utils/copy-text-to-clipboard';
 import type { DashboardProject } from '../../models/dashboard-project.model';
 
@@ -25,6 +27,7 @@ import type { DashboardProject } from '../../models/dashboard-project.model';
     LucideAlertTriangle,
     LucideCircle,
     LucideCircleCheck,
+    LucideCheck,
     LucideClock,
     LucideCopy,
     LucideFileText,
@@ -35,6 +38,7 @@ import type { DashboardProject } from '../../models/dashboard-project.model';
 })
 export class MainDashboardDataComponent {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   readonly project = input.required<DashboardProject>();
   readonly canMutate = input(true);
@@ -81,11 +85,17 @@ export class MainDashboardDataComponent {
     }
 
     const ok = await copyTextToClipboard(url);
-    this.copyBaseUrlState.set(ok ? 'copied' : 'error');
+    this.copyBaseUrlState.set(ok ? 'copied' : 'idle');
+
+    if (ok) {
+      this.toast.success('Ruta del mock copiada', { description: url });
+    } else {
+      this.toast.error('No se pudo copiar la ruta');
+    }
 
     this.copyBaseUrlResetHandle = setTimeout(() => {
       this.copyBaseUrlState.set('idle');
       this.copyBaseUrlResetHandle = null;
-    }, 2000);
+    }, 1500);
   }
 }

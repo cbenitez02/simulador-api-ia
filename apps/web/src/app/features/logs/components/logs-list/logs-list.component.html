@@ -56,6 +56,15 @@
                       aria-hidden="true"
                     ></svg>
                   }
+                  @case ('unauthorized') {
+                    <svg
+                      lucideAlertTriangle
+                      class="logs-table__scenario-icon"
+                      [size]="14"
+                      strokeWidth="2.25"
+                      aria-hidden="true"
+                    ></svg>
+                  }
                   @default {
                     <svg
                       lucideMinus

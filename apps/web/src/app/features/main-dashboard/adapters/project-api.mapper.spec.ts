@@ -29,8 +29,15 @@ describe('project-api.mapper', () => {
         mockUrl: 'https://mock.example.com/users-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Equipo',
+          kind: 'team',
           role: 'editor',
-          capabilities: { canEdit: true, canManageMembers: false },
+          capabilities: {
+            canEdit: true,
+            canManageMembers: false,
+            canRestoreSnapshots: false,
+            canImportContracts: false,
+          },
         },
         updatedAt: new Date().toISOString(),
         status: 'attention',
@@ -84,6 +91,8 @@ describe('project-api.mapper', () => {
     expect(result.status).toBe('attention');
     expect(result.workspace.role).toBe('editor');
     expect(result.workspace.capabilities.canManageMembers).toBe(false);
+    expect(result.workspace.capabilities.canRestoreSnapshots).toBe(false);
+    expect(result.workspace.capabilities.canImportContracts).toBe(false);
     expect(result.mockUrl).toBe('https://mock.example.com/users-api');
     expect(result.description).toBe('Your mock API workspace.');
     expect(result.metrics.totalScenarios).toBe(3);
@@ -108,8 +117,15 @@ describe('project-api.mapper', () => {
         mockUrl: 'https://mock.example.com/empty-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Equipo',
+          kind: 'team',
           role: 'viewer',
-          capabilities: { canEdit: false, canManageMembers: false },
+          capabilities: {
+            canEdit: false,
+            canManageMembers: false,
+            canRestoreSnapshots: false,
+            canImportContracts: false,
+          },
         },
         updatedAt: new Date().toISOString(),
         status: 'empty',
@@ -158,8 +174,15 @@ describe('project-api.mapper', () => {
       updatedAt: new Date().toISOString(),
       workspace: {
         id: 'workspace-1',
+        name: 'Personal',
+        kind: 'personal',
         role: 'owner',
-        capabilities: { canEdit: true, canManageMembers: true },
+        capabilities: {
+          canEdit: true,
+          canManageMembers: true,
+          canRestoreSnapshots: true,
+          canImportContracts: true,
+        },
       },
       _count: { endpoints: 0 },
     });
@@ -176,8 +199,15 @@ describe('project-api.mapper', () => {
       updatedAt: new Date().toISOString(),
       workspace: {
         id: 'workspace-1',
+        name: 'Personal',
+        kind: 'personal',
         role: 'owner',
-        capabilities: { canEdit: true, canManageMembers: true },
+        capabilities: {
+          canEdit: true,
+          canManageMembers: true,
+          canRestoreSnapshots: true,
+          canImportContracts: true,
+        },
       },
       _count: { endpoints: 2 },
     });

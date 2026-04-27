@@ -109,6 +109,7 @@ export class LogsDetailSidebarComponent {
       case 'success':
         return 'detail__scenario-hero--success';
       case 'error':
+      case 'unauthorized':
       case 'forced-error':
       case 'rate-limit-block':
       case 'timeout':

@@ -11,6 +11,7 @@ type MainDashboardUtilityHarness = MainDashboardUtilitySidebarComponent & {
   quickActions: Array<{ id: string; title: string; subtitle: string }>;
   onQuickAction(id: string): void;
   createSnapshot: { emit: () => void };
+  importEndpoints: { emit: () => void };
   exportConfig: { emit: () => void };
 };
 
@@ -24,8 +25,15 @@ const projectFixture: DashboardProject = {
   slug: 'users-api',
   workspace: {
     id: 'workspace-1',
+    name: 'Personal',
+    kind: 'personal',
     role: 'owner',
-    capabilities: { canEdit: true, canManageMembers: true },
+    capabilities: {
+      canEdit: true,
+      canManageMembers: true,
+      canRestoreSnapshots: true,
+      canImportContracts: true,
+    },
   },
   status: 'running',
   mockUrl: 'https://mock.example.com/users-api',
@@ -91,7 +99,7 @@ describe('MainDashboardUtilitySidebarComponent', () => {
     ]);
   });
 
-  it('adds a create snapshot quick action gated through the mutation affordance', () => {
+  it('adds a create snapshot quick action gated through snapshot capability', () => {
     const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
     const component = runInInjectionContext(
       injector,
@@ -109,7 +117,7 @@ describe('MainDashboardUtilitySidebarComponent', () => {
     expect(emitSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps snapshot quick actions read-only when the workspace cannot mutate', () => {
+  it('keeps snapshot quick actions read-only when the workspace cannot restore snapshots', () => {
     const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
     const component = runInInjectionContext(
       injector,
@@ -121,16 +129,49 @@ describe('MainDashboardUtilitySidebarComponent', () => {
       workspace: {
         ...projectFixture.workspace,
         role: 'viewer',
-        capabilities: { canEdit: false, canManageMembers: false },
+        capabilities: {
+          canEdit: true,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
       },
     });
-    component.canMutate = (() => false) as typeof component.canMutate;
+    component.canMutate = (() => true) as typeof component.canMutate;
     const emitSpy = vi.spyOn(component.createSnapshot, 'emit');
 
     component.onQuickAction('snapshot');
 
     expect(component.quickActions.map((action) => action.id)).toContain('snapshot');
     expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it('blocks contract import when the workspace lacks the explicit import capability', () => {
+    const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
+    const component = runInInjectionContext(
+      injector,
+      () => new MainDashboardUtilitySidebarComponent(),
+    ) as unknown as MainDashboardUtilityHarness & { project: () => DashboardProject; canMutate: () => boolean };
+
+    bindProjectInput(component, {
+      ...projectFixture,
+      workspace: {
+        ...projectFixture.workspace,
+        role: 'editor',
+        capabilities: {
+          canEdit: true,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
+      },
+    });
+    component.canMutate = (() => true) as typeof component.canMutate;
+    const importSpy = vi.spyOn(component.importEndpoints, 'emit');
+
+    component.onQuickAction('import');
+
+    expect(importSpy).not.toHaveBeenCalled();
   });
 
   it('labels import/export actions as contract flows and still allows export for viewers', () => {

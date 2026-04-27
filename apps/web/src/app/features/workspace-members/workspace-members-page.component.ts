@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideUsers } from '@lucide/angular';
 import { SelectMenuComponent, type SelectMenuOption } from '../../shared/ui/select-menu/select-menu.component';
 
-import type { WorkspaceRoleDto } from '../../shared/http/api.types';
+import type { InvitableWorkspaceRoleDto, WorkspaceInvitationDto, WorkspaceRoleDto } from '../../shared/http/api.types';
 import type { WorkspaceMember } from './models/workspace-member.model';
 
 export interface WorkspacePageWorkspaceSummary {
@@ -26,23 +26,34 @@ export interface WorkspacePageWorkspaceSummary {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkspaceMembersPageComponent {
+  private static readonly DEFAULT_INVITE_ROLE = 'viewer' as const;
+
   readonly workspace = input<WorkspacePageWorkspaceSummary | null>(null);
   readonly currentUserId = input<string | null>(null);
   readonly currentUserEmail = input<string | null>(null);
   readonly members = input<WorkspaceMember[]>([]);
+  readonly invitations = input<WorkspaceInvitationDto[]>([]);
   readonly loading = input(false);
   readonly errorMessage = input<string | null>(null);
   readonly mutationPending = input(false);
 
-  readonly addMember = output<{ email: string; role: WorkspaceRoleDto }>();
+  readonly addMember = output<{ email: string; role: InvitableWorkspaceRoleDto }>();
+  readonly revokeInvitation = output<string>();
+  readonly updateMemberRole = output<{ memberUserId: string; role: WorkspaceRoleDto }>();
   readonly removeMember = output<string>();
 
-  protected readonly roleOptions: readonly SelectMenuOption[] = [
+  protected readonly memberRoleOptions: readonly SelectMenuOption[] = [
     { value: 'viewer', label: 'Viewer' },
     { value: 'editor', label: 'Editor' },
     { value: 'owner', label: 'Owner' },
   ];
-  protected readonly selectedRole = signal<WorkspaceRoleDto>('viewer');
+  protected readonly inviteRoleOptions: readonly SelectMenuOption[] = [
+    { value: 'viewer', label: 'Viewer' },
+    { value: 'editor', label: 'Editor' },
+  ];
+  protected readonly selectedRole = signal<InvitableWorkspaceRoleDto>(
+    WorkspaceMembersPageComponent.DEFAULT_INVITE_ROLE,
+  );
 
   protected readonly canManageMembers = computed(() => this.workspace()?.capabilities.canManageMembers ?? false);
 
@@ -84,24 +95,42 @@ export class WorkspaceMembersPageComponent {
       return false;
     }
 
-    const isOwnerSelfRemoval = this.isCurrentUser(member) && member.role === 'owner';
+    const isOwnerSelfRemovalInPersonalWorkspace =
+      this.workspace()?.isPersonal === true && this.isCurrentUser(member) && member.role === 'owner';
 
-    return !isOwnerSelfRemoval;
+    return !isOwnerSelfRemovalInPersonalWorkspace;
   }
 
-  protected onAddMember(email: string, role: WorkspaceRoleDto): void {
+  protected canEditMemberRole(member: WorkspaceMember): boolean {
+    if (!this.canManageMembers() || this.mutationPending()) {
+      return false;
+    }
+
+    return !this.isCurrentUser(member);
+  }
+
+  protected onAddMember(email: string, role: InvitableWorkspaceRoleDto): void {
     if (!this.canManageMembers() || this.mutationPending()) return;
 
     const normalizedEmail = email.trim();
     if (!normalizedEmail) return;
 
-    const nextRole: WorkspaceRoleDto = role === 'owner' || role === 'editor' ? role : 'viewer';
+    const nextRole: InvitableWorkspaceRoleDto = role === 'editor' ? 'editor' : 'viewer';
     this.addMember.emit({ email: normalizedEmail, role: nextRole });
   }
 
   protected onRoleChange(value: string): void {
-    const nextRole: WorkspaceRoleDto = value === 'owner' || value === 'editor' ? value : 'viewer';
+    const nextRole: InvitableWorkspaceRoleDto = value === 'editor' ? 'editor' : 'viewer';
     this.selectedRole.set(nextRole);
+  }
+
+  protected onMemberRoleChange(member: WorkspaceMember, value: string): void {
+    if (!this.canEditMemberRole(member)) return;
+
+    const nextRole: WorkspaceRoleDto = value === 'owner' || value === 'editor' ? value : 'viewer';
+    if (member.role === nextRole) return;
+
+    this.updateMemberRole.emit({ memberUserId: member.userId, role: nextRole });
   }
 
   protected onRemoveMember(memberUserId: string): void {
@@ -113,5 +142,10 @@ export class WorkspaceMembersPageComponent {
     if (!confirmed) return;
 
     this.removeMember.emit(memberUserId);
+  }
+
+  protected onRevokeInvitation(invitationId: string): void {
+    if (!this.canManageMembers() || this.mutationPending()) return;
+    this.revokeInvitation.emit(invitationId);
   }
 }

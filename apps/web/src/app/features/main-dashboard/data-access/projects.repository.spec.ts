@@ -12,6 +12,8 @@ const projectDto = {
   updatedAt: new Date().toISOString(),
   workspace: {
     id: 'workspace-1',
+    name: 'Personal workspace',
+    kind: 'personal' as const,
     role: 'owner' as const,
     capabilities: { canEdit: true, canManageMembers: true },
   },
@@ -27,6 +29,8 @@ const dashboardSummaryDto = {
     mockUrl: 'https://mock.example.com/users',
     workspace: {
       id: 'workspace-1',
+      name: 'Personal workspace',
+      kind: 'personal' as const,
       role: 'owner' as const,
       capabilities: { canEdit: true, canManageMembers: true },
     },
@@ -124,23 +128,83 @@ describe('ProjectsRepository', () => {
     const api = {
       get: vi.fn(async () => ({
         ...dashboardSummaryDto,
-        project: { ...dashboardSummaryDto.project, name: 'Users v2', description: 'Updated description' },
+        project: {
+          ...dashboardSummaryDto.project,
+          name: 'Users v2',
+          slug: 'users-v2',
+          mockUrl: 'https://mock.example.com/users-v2',
+          description: 'Updated description',
+        },
       })),
       patch: vi.fn(async () => ({
         ...projectDto,
         name: 'Users v2',
+        slug: 'users-v2',
         description: 'Updated description',
       })),
     };
 
     const repository = createRepository(api);
-    const result = await repository.updateProject('p1', { name: 'Users v2' });
+    const result = await repository.updateProject('p1', { name: 'Users v2', slug: 'users-v2' });
 
-    expect(api.patch).toHaveBeenCalledWith('/projects/p1', { name: 'Users v2' });
+    expect(api.patch).toHaveBeenCalledWith('/projects/p1', { name: 'Users v2', slug: 'users-v2' });
     expect(api.get).toHaveBeenCalledWith('/projects/p1/dashboard-summary');
     expect(result.name).toBe('Users v2');
     expect(result.metrics.totalScenarios).toBe(2);
-    expect(result.mockUrl).toBe('https://mock.example.com/users');
+    expect(result.mockUrl).toBe('https://mock.example.com/users-v2');
+  });
+
+  it('sends workspaceId when transferring a project during update', async () => {
+    const api = {
+      get: vi.fn(async () => ({
+        ...dashboardSummaryDto,
+        project: {
+          ...dashboardSummaryDto.project,
+          workspace: {
+            id: 'workspace-2',
+            name: 'Equipo Plataforma',
+            kind: 'team' as const,
+            role: 'editor' as const,
+            capabilities: { canEdit: true, canManageMembers: false },
+          },
+        },
+      })),
+      patch: vi.fn(async () => ({
+        ...projectDto,
+        workspace: {
+          id: 'workspace-2',
+          name: 'Equipo Plataforma',
+          kind: 'team' as const,
+          role: 'editor' as const,
+          capabilities: { canEdit: true, canManageMembers: false },
+        },
+      })),
+    };
+
+    const repository = createRepository(api);
+    await repository.updateProject('p1', { workspaceId: 'workspace-2' });
+
+    expect(api.patch).toHaveBeenCalledWith('/projects/p1', { workspaceId: 'workspace-2' });
+  });
+
+  it('sends workspaceId when creating a project for a selected workspace', async () => {
+    const api = {
+      post: vi.fn(async () => projectDto),
+      get: vi.fn(async () => dashboardSummaryDto),
+    };
+
+    const repository = createRepository(api);
+    await repository.createProject({
+      name: 'Users',
+      description: 'Workspace scoped project',
+      workspaceId: 'workspace-2',
+    });
+
+    expect(api.post).toHaveBeenCalledWith('/projects', {
+      name: 'Users',
+      description: 'Workspace scoped project',
+      workspaceId: 'workspace-2',
+    });
   });
 
   it('loads dashboard detail from the summary endpoint without endpoint fan-out', async () => {

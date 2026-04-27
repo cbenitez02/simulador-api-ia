@@ -33,7 +33,7 @@ function configToUi(config?: EndpointConfigDto | null): EndpointConfig {
         ? Math.round((resolved.minDelayMs + resolved.maxDelayMs) / 2)
         : resolved.fixedDelayMs,
     errorRatePct: 0,
-    scenarios: { success: true, empty: false, error: false, timeout: false },
+    scenarios: { success: true, empty: false, error: false, timeout: false, unauthorized: false },
   };
 }
 
@@ -43,6 +43,7 @@ function scenariosToFlags(scenarios: EndpointScenario[]): EndpointConfig['scenar
     empty: scenarios.some((scenario) => scenario.type === 'empty'),
     error: scenarios.some((scenario) => scenario.type === 'error'),
     timeout: scenarios.some((scenario) => scenario.type === 'timeout'),
+    unauthorized: scenarios.some((scenario) => scenario.type === 'unauthorized'),
   };
 }
 
@@ -122,7 +123,7 @@ export function mapAiDraftFromApi(draft: AiEndpointPreviewDto): EndpointDraft {
 function mapScenarioFromApi(scenario: {
   id: string;
   name: string;
-  type: 'success' | 'error' | 'timeout' | 'empty';
+  type: 'success' | 'error' | 'timeout' | 'empty' | 'unauthorized';
   statusCode: number;
   body: unknown;
   delayMs: number;

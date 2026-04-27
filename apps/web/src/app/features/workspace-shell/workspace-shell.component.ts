@@ -4,9 +4,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 import { ApiError } from '../../shared/http/api-error.mapper';
-import type { OpenApiContractAnalyzeDto } from '../../shared/http/api.types';
+import type {
+  InvitableWorkspaceRoleDto,
+  OpenApiContractAnalyzeDto,
+  OpenApiContractOperationDto,
+  WorkspaceInvitationDto,
+  WorkspaceSummaryDto,
+} from '../../shared/http/api.types';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { ConfirmDialogComponent } from '../../shared/ui/confirm-dialog/confirm-dialog.component';
+import { ToastService } from '../../shared/ui/toast/toast.service';
 import { CreateProjectModalComponent } from '../../shared/ui/create-project-modal/create-project-modal.component';
 import type {
   CreateProjectModalPayload,
@@ -39,9 +46,14 @@ import { MainDashboardUtilitySidebarComponent } from '../main-dashboard/componen
 import { ProjectsRepository } from '../main-dashboard/data-access/projects.repository';
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
-import type { ProjectSnapshot } from '../project-snapshots/models/project-snapshot.model';
+import type {
+  ProjectSnapshot,
+  ProjectSnapshotRestorePreview,
+} from '../project-snapshots/models/project-snapshot.model';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
 import type { WorkspaceMember } from '../workspace-members/models/workspace-member.model';
+import { WorkspaceInvitationsRepository } from '../workspace-invitations/data-access/workspace-invitations.repository';
+import { WorkspacesRepository } from '../workspaces/data-access/workspaces.repository';
 import {
   WorkspaceMembersPageComponent,
   type WorkspacePageWorkspaceSummary,
@@ -61,6 +73,14 @@ interface ContractImportReviewState {
   file: File;
   analysis: OpenApiContractAnalyzeDto;
 }
+
+interface RestorePreviewDialogState {
+  snapshotId: string;
+  snapshotName: string;
+  preview: ProjectSnapshotRestorePreview;
+}
+
+type ContractReviewAction = 'create' | 'update' | 'delete';
 
 const WORKSPACE_NAV_ROUTES = new Set<WorkspaceNavId>([
   'dashboard',
@@ -119,6 +139,9 @@ export class WorkspaceShellComponent implements OnInit {
   private readonly projectSnapshotsRepository = inject(ProjectSnapshotsRepository);
   private readonly projectContractsRepository = inject(ProjectContractsRepository);
   private readonly workspaceMembersRepository = inject(WorkspaceMembersRepository);
+  private readonly workspaceInvitationsRepository = inject(WorkspaceInvitationsRepository);
+  private readonly workspacesRepository = inject(WorkspacesRepository);
+  private readonly toast = inject(ToastService);
   private readonly accountNavRoutes = new Set<WorkspaceNavId>([
     'account-profile-settings',
     'account-api-keys',
@@ -201,8 +224,16 @@ export class WorkspaceShellComponent implements OnInit {
   protected readonly canManageActiveWorkspaceMembers = computed(
     () => this.activeProject()?.workspace.capabilities.canManageMembers ?? false,
   );
+  protected readonly canRestoreActiveWorkspaceSnapshots = computed(
+    () => this.activeProject()?.workspace.capabilities.canRestoreSnapshots ?? false,
+  );
+  protected readonly canImportActiveWorkspaceContracts = computed(
+    () => this.activeProject()?.workspace.capabilities.canImportContracts ?? false,
+  );
 
   protected readonly workspaceMembers = signal<WorkspaceMember[]>([]);
+  protected readonly workspaceInvitations = signal<WorkspaceInvitationDto[]>([]);
+  protected readonly pendingWorkspaceInvitations = signal<WorkspaceInvitationDto[]>([]);
   protected readonly workspaceMembersLoading = signal(false);
   protected readonly workspaceMembersError = signal<string | null>(null);
   protected readonly workspaceMemberMutationPending = signal(false);
@@ -212,7 +243,7 @@ export class WorkspaceShellComponent implements OnInit {
     if (!project) return null;
     return {
       id: project.workspace.id,
-      name: project.name,
+      name: project.workspace.name,
       role: project.workspace.role,
       isPersonal: project.workspace.isPersonal,
       capabilities: project.workspace.capabilities,
@@ -255,6 +286,7 @@ export class WorkspaceShellComponent implements OnInit {
   protected readonly createProjectModalLoading = signal(false);
   protected readonly createProjectError = signal<string | null>(null);
   protected readonly createProjectPartialState = signal<CreateProjectAiFlowState | null>(null);
+  protected readonly availableWorkspaces = signal<WorkspaceSummaryDto[]>([]);
 
   protected readonly editProjectModalOpen = signal(false);
   protected readonly editProjectModalLoading = signal(false);
@@ -267,6 +299,8 @@ export class WorkspaceShellComponent implements OnInit {
   protected readonly deleteProjectError = signal<string | null>(null);
   protected readonly deleteProjectTargetId = signal<string | null>(null);
   protected readonly deleteProjectTargetName = signal('');
+  protected readonly restorePreviewState = signal<RestorePreviewDialogState | null>(null);
+  protected readonly restorePreviewPending = signal(false);
 
   protected readonly createEndpointFlowOpen = signal(false);
   protected readonly endpointWizardMode = signal<EndpointFlowMode>('ai');
@@ -299,6 +333,9 @@ export class WorkspaceShellComponent implements OnInit {
 
     return `Delete “${projectName}” permanently? This removes its endpoints, scenarios, config, and logs. This action cannot be undone.`;
   });
+  protected readonly contractReviewActions: ContractReviewAction[] = ['create', 'update', 'delete'];
+  protected readonly restorePreviewDialogOpen = computed(() => this.restorePreviewState() !== null);
+  protected readonly restorePreviewActions = ['create', 'update', 'delete', 'keep'] as const;
 
   constructor() {
     queueMicrotask(() => this.initializeWorkspace());
@@ -315,6 +352,7 @@ export class WorkspaceShellComponent implements OnInit {
     if (this.initialized) return;
     this.initialized = true;
     void this.authSession.bootstrap();
+    void this.reloadPendingWorkspaceInvitations();
     void this.reloadProjects();
   }
 
@@ -331,6 +369,7 @@ export class WorkspaceShellComponent implements OnInit {
     this.createProjectError.set(null);
     this.createProjectPartialState.set(null);
     this.createProjectModalOpen.set(true);
+    void this.loadCreateProjectWorkspaces();
   }
 
   protected openEditProjectModal(): void {
@@ -342,9 +381,12 @@ export class WorkspaceShellComponent implements OnInit {
     this.editProjectInitialValues.set({
       name: project.name,
       description: project.description,
+      slug: project.slug,
+      workspaceId: project.workspace.id,
     });
     this.editProjectError.set(null);
     this.editProjectModalOpen.set(true);
+    void this.loadCreateProjectWorkspaces();
   }
 
   protected onProjectModalDismiss(): void {
@@ -372,7 +414,14 @@ export class WorkspaceShellComponent implements OnInit {
   protected onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void {
     if (!this.canMutateActiveWorkspace() && this.hasProjects()) return;
     this.createProjectModalOpen.set(true);
-    void this.createProject({ name: payload.name, description: payload.description }, payload.endpointPrompt);
+    void this.createProject(
+      {
+        name: payload.name,
+        description: payload.description,
+        workspaceId: payload.workspaceId,
+      },
+      payload.endpointPrompt,
+    );
   }
 
   protected retryCreateProjectEndpointGeneration(): void {
@@ -597,7 +646,7 @@ export class WorkspaceShellComponent implements OnInit {
   }
 
   protected importEndpoints(): void {
-    if (!this.canMutateActiveWorkspace()) return;
+    if (!this.canImportActiveWorkspaceContracts()) return;
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     if (!projectId || this.endpointMutationPending()) return;
 
@@ -618,11 +667,29 @@ export class WorkspaceShellComponent implements OnInit {
   }
 
   protected confirmContractImport(): void {
-    if (!this.canMutateActiveWorkspace()) return;
+    if (!this.canImportActiveWorkspaceContracts()) return;
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
     const review = this.contractImportReview();
     if (!projectId || !review || this.endpointMutationPending()) return;
     void this.commitProjectContractImport(projectId, review.file);
+  }
+
+  protected contractReviewActionLabel(action: ContractReviewAction): string {
+    switch (action) {
+      case 'create':
+        return 'Create';
+      case 'update':
+        return 'Update';
+      case 'delete':
+        return 'Delete';
+    }
+  }
+
+  protected contractReviewOperationsForAction(
+    operations: OpenApiContractOperationDto[],
+    action: ContractReviewAction,
+  ): OpenApiContractOperationDto[] {
+    return operations.filter((operation) => operation.action === action);
   }
 
   protected editGlobalConfig(): void {
@@ -649,10 +716,36 @@ export class WorkspaceShellComponent implements OnInit {
     void this.saveGlobalConfig(projectId, cfg);
   }
 
-  protected addWorkspaceMember(input: { email: string; role: 'owner' | 'editor' | 'viewer' }): void {
+  protected addWorkspaceMember(input: { email: string; role: InvitableWorkspaceRoleDto }): void {
     const workspaceId = this.activeProject()?.workspace.id;
     if (!workspaceId || !this.canManageActiveWorkspaceMembers() || this.workspaceMemberMutationPending()) return;
     void this.addWorkspaceMemberRemote(workspaceId, input);
+  }
+
+  protected acceptWorkspaceInvitation(invitationId: string): void {
+    if (this.workspaceMemberMutationPending()) return;
+    void this.acceptWorkspaceInvitationRemote(invitationId);
+  }
+
+  protected revokeWorkspaceInvitation(invitationId: string): void {
+    const workspaceId = this.activeProject()?.workspace.id;
+    if (!workspaceId || !this.canManageActiveWorkspaceMembers() || this.workspaceMemberMutationPending()) return;
+    void this.revokeWorkspaceInvitationRemote(workspaceId, invitationId);
+  }
+
+  protected updateWorkspaceMemberRole(input: { memberUserId: string; role: 'owner' | 'editor' | 'viewer' }): void {
+    const activeProject = this.activeProject();
+    const workspaceId = activeProject?.workspace.id;
+    if (
+      !workspaceId ||
+      !activeProject ||
+      !this.canManageActiveWorkspaceMembers() ||
+      this.workspaceMemberMutationPending()
+    ) {
+      return;
+    }
+
+    void this.updateWorkspaceMemberRoleRemote(activeProject.id, workspaceId, input);
   }
 
   protected removeWorkspaceMember(memberUserId: string): void {
@@ -683,6 +776,7 @@ export class WorkspaceShellComponent implements OnInit {
       this.projectsPage.set(projects.page);
       this.authSession.markProtectedApiReady();
       this.projects.set(projectItems);
+      await this.reloadPendingWorkspaceInvitations();
 
       if (append) {
         return;
@@ -742,6 +836,7 @@ export class WorkspaceShellComponent implements OnInit {
 
     if (!nextSelected) {
       this.workspaceMembers.set([]);
+      this.workspaceInvitations.set([]);
       this.workspaceMembersError.set(null);
     }
 
@@ -786,6 +881,8 @@ export class WorkspaceShellComponent implements OnInit {
     this.projectsPage.set({ limit: WorkspaceShellComponent.PROJECT_PAGE_LIMIT, offset: 0, total: 0, hasMore: false });
     this.endpointList.set([]);
     this.workspaceMembers.set([]);
+    this.workspaceInvitations.set([]);
+    this.pendingWorkspaceInvitations.set([]);
     this.workspaceMembersError.set(null);
     this.contractImportReview.set(null);
     this.selectedProjectId.set('');
@@ -797,6 +894,7 @@ export class WorkspaceShellComponent implements OnInit {
       const refreshed = await this.projectsRepository.getProject(projectId);
       this.projects.update((projects) => projects.map((project) => (project.id === projectId ? refreshed : project)));
       await this.reloadWorkspaceMembers(refreshed.workspace.id);
+      await this.reloadPendingWorkspaceInvitations();
       if (this.activeNav() === 'history') {
         await this.loadSnapshotHistory(projectId, true);
       }
@@ -937,9 +1035,10 @@ export class WorkspaceShellComponent implements OnInit {
     try {
       const endpoint = await this.endpointsRepository.generateAiEndpoint(projectId, endpointPrompt);
       await this.reloadProjects(projectId);
+      await this.reloadEndpointList(projectId);
       this.selectedProjectId.set(projectId);
+      await this.navigateToNav('endpoints');
       this.selectedEndpointId.set(endpoint.id);
-      void this.navigateToNav('endpoints');
       this.createProjectModalOpen.set(false);
       this.createProjectPartialState.set(null);
       this.selectedLog.set(null);
@@ -947,18 +1046,43 @@ export class WorkspaceShellComponent implements OnInit {
     } catch (error) {
       this.selectedProjectId.set(projectId);
       await this.reloadProjects(projectId);
+      const errorMessage = this.mapCreateProjectGenerationError(error);
       this.createProjectPartialState.set({
         createdProjectId: projectId,
         projectName,
         endpointPrompt,
-        message: this.mapCreateProjectGenerationError(error),
+        message: errorMessage,
         retryable: true,
       });
       this.createProjectModalOpen.set(true);
-      void this.navigateToNav('dashboard');
-      this.createProjectError.set(this.mapCreateProjectGenerationError(error));
+      this.createProjectError.set(errorMessage);
+      await this.navigateToNav('dashboard');
     } finally {
       this.createProjectModalLoading.set(false);
+    }
+  }
+
+  private async loadCreateProjectWorkspaces(): Promise<void> {
+    try {
+      const workspaces = await this.workspacesRepository.listWorkspaces();
+      const activeWorkspaceId = this.activeProject()?.workspace.id;
+      const preferredWorkspace =
+        workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
+        workspaces.find((workspace) => workspace.isPersonal) ??
+        workspaces[0];
+
+      if (!preferredWorkspace) {
+        this.availableWorkspaces.set([]);
+        return;
+      }
+
+      this.availableWorkspaces.set([
+        preferredWorkspace,
+        ...workspaces.filter((workspace) => workspace.id !== preferredWorkspace.id),
+      ]);
+    } catch (error) {
+      this.availableWorkspaces.set([]);
+      this.createProjectError.set(error instanceof Error ? error.message : 'Could not load workspaces.');
     }
   }
 
@@ -982,6 +1106,7 @@ export class WorkspaceShellComponent implements OnInit {
   private async updateProject(projectId: string, payload: EditProjectModalPayload): Promise<void> {
     this.editProjectModalLoading.set(true);
     this.editProjectError.set(null);
+    const previousProject = this.projects().find((project) => project.id === projectId) ?? null;
 
     try {
       const updatedProject = await this.projectsRepository.updateProject(projectId, payload);
@@ -989,14 +1114,36 @@ export class WorkspaceShellComponent implements OnInit {
         projects.map((project) => (project.id === projectId ? updatedProject : project)),
       );
       this.selectedProjectId.set(projectId);
+
+      if (previousProject && previousProject.workspace.id !== updatedProject.workspace.id) {
+        this.workspaceMembers.set([]);
+        this.workspaceMembersError.set(null);
+
+        if (this.activeNav() === 'workspace') {
+          await this.reloadWorkspaceMembers(updatedProject.workspace.id);
+        }
+      }
+
       this.editProjectModalOpen.set(false);
       this.editProjectTargetId.set(null);
       this.editProjectInitialValues.set(null);
     } catch (error) {
-      this.editProjectError.set(error instanceof Error ? error.message : 'Could not update project.');
+      this.editProjectError.set(this.mapEditProjectError(error));
     } finally {
       this.editProjectModalLoading.set(false);
     }
+  }
+
+  private mapEditProjectError(error: unknown): string {
+    if (error instanceof ApiError && error.code === 'PROJECT_SLUG_DUPLICATE') {
+      return 'This mock route slug is already in use. Try a different slug.';
+    }
+
+    if (error instanceof ApiError && error.code === 'PROJECT_SLUG_RESERVED') {
+      return 'This slug is reserved by the platform. Choose another one.';
+    }
+
+    return error instanceof Error ? error.message : 'Could not update project.';
   }
 
   private upsertProject(project: DashboardProject): void {
@@ -1148,26 +1295,109 @@ export class WorkspaceShellComponent implements OnInit {
     try {
       const members = await this.workspaceMembersRepository.listMembers(workspaceId);
       this.workspaceMembers.set(members);
+      await this.reloadWorkspaceInvitations(workspaceId);
     } catch (error) {
       this.workspaceMembers.set([]);
+      this.workspaceInvitations.set([]);
       this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not load workspace members.');
     } finally {
       this.workspaceMembersLoading.set(false);
     }
   }
 
+  private async reloadWorkspaceInvitations(workspaceId: string): Promise<void> {
+    if (!this.canManageActiveWorkspaceMembers()) {
+      this.workspaceInvitations.set([]);
+      return;
+    }
+
+    try {
+      const invitations = await this.workspaceInvitationsRepository.listWorkspaceInvitations(workspaceId);
+      this.workspaceInvitations.set(invitations.filter((invitation) => invitation.status === 'pending'));
+    } catch (error) {
+      this.workspaceInvitations.set([]);
+      this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not load workspace invitations.');
+    }
+  }
+
+  private async reloadPendingWorkspaceInvitations(): Promise<void> {
+    try {
+      const invitations = await this.workspaceInvitationsRepository.listPendingInvitations();
+      this.pendingWorkspaceInvitations.set(invitations);
+    } catch (error) {
+      this.pendingWorkspaceInvitations.set([]);
+      if (this.authSession.handleProtectedApiError(error)) {
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : 'Could not load pending workspace invitations.';
+      this.toast.error(message);
+    }
+  }
+
   private async addWorkspaceMemberRemote(
     workspaceId: string,
-    input: { email: string; role: 'owner' | 'editor' | 'viewer' },
+    input: { email: string; role: InvitableWorkspaceRoleDto },
   ): Promise<void> {
     this.workspaceMemberMutationPending.set(true);
     this.workspaceMembersError.set(null);
 
     try {
-      await this.workspaceMembersRepository.addMember(workspaceId, input);
-      await this.reloadWorkspaceMembers(workspaceId);
+      await this.workspaceInvitationsRepository.createInvitation(workspaceId, input);
+      await this.reloadWorkspaceInvitations(workspaceId);
+      await this.reloadPendingWorkspaceInvitations();
     } catch (error) {
-      this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not add workspace member.');
+      this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not send workspace invitation.');
+    } finally {
+      this.workspaceMemberMutationPending.set(false);
+    }
+  }
+
+  private async revokeWorkspaceInvitationRemote(workspaceId: string, invitationId: string): Promise<void> {
+    this.workspaceMemberMutationPending.set(true);
+    this.workspaceMembersError.set(null);
+
+    try {
+      await this.workspaceInvitationsRepository.revokeInvitation(workspaceId, invitationId);
+      await this.reloadWorkspaceInvitations(workspaceId);
+      await this.reloadPendingWorkspaceInvitations();
+    } catch (error) {
+      this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not revoke workspace invitation.');
+    } finally {
+      this.workspaceMemberMutationPending.set(false);
+    }
+  }
+
+  private async acceptWorkspaceInvitationRemote(invitationId: string): Promise<void> {
+    this.workspaceMemberMutationPending.set(true);
+
+    try {
+      await this.workspaceInvitationsRepository.acceptInvitation(invitationId);
+      await this.reloadPendingWorkspaceInvitations();
+      await this.reloadProjects();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not accept workspace invitation.';
+      this.toast.error(message);
+    } finally {
+      this.workspaceMemberMutationPending.set(false);
+    }
+  }
+
+  private async updateWorkspaceMemberRoleRemote(
+    projectId: string,
+    workspaceId: string,
+    input: { memberUserId: string; role: 'owner' | 'editor' | 'viewer' },
+  ): Promise<void> {
+    this.workspaceMemberMutationPending.set(true);
+    this.workspaceMembersError.set(null);
+
+    try {
+      await this.workspaceMembersRepository.updateMemberRole(workspaceId, input.memberUserId, { role: input.role });
+      await this.reloadProjects(projectId);
+    } catch (error) {
+      this.workspaceMembersError.set(
+        error instanceof Error ? error.message : 'Could not update workspace member role.',
+      );
     } finally {
       this.workspaceMemberMutationPending.set(false);
     }
@@ -1187,28 +1417,55 @@ export class WorkspaceShellComponent implements OnInit {
     }
   }
 
-  protected async restoreSnapshot(snapshotId: string): Promise<void> {
-    if (!this.canMutateActiveWorkspace()) return;
+  protected restorePreviewEntries(action: (typeof this.restorePreviewActions)[number]) {
+    return this.restorePreviewState()?.preview.endpoints[action] ?? [];
+  }
+
+  protected closeRestorePreview(): void {
+    if (this.endpointMutationPending()) return;
+    this.restorePreviewState.set(null);
+  }
+
+  protected async confirmRestoreSnapshot(): Promise<void> {
+    if (!this.canRestoreActiveWorkspaceSnapshots()) return;
     const projectId = this.selectedProjectId() || this.activeProject()?.id;
-    if (!projectId || this.endpointMutationPending()) return;
+    const previewState = this.restorePreviewState();
+    if (!projectId || !previewState || this.endpointMutationPending()) return;
 
     this.endpointMutationPending.set(true);
     this.endpointMutationError.set(null);
 
     try {
-      const snapshot = await this.projectSnapshotsRepository.get(projectId, snapshotId);
-      const confirmed = globalThis.confirm(
-        `Restore snapshot “${snapshot.name}”? Live endpoints/config will be replaced.`,
-      );
-      if (!confirmed) return;
-
-      await this.projectSnapshotsRepository.restore(projectId, snapshotId);
+      await this.projectSnapshotsRepository.restore(projectId, previewState.snapshotId);
       await this.refreshProject(projectId);
       await this.loadSnapshotHistory(projectId, true);
+      this.restorePreviewState.set(null);
     } catch (error) {
       this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not restore snapshot.');
     } finally {
       this.endpointMutationPending.set(false);
+    }
+  }
+
+  protected async restoreSnapshot(snapshotId: string): Promise<void> {
+    if (!this.canRestoreActiveWorkspaceSnapshots()) return;
+    const projectId = this.selectedProjectId() || this.activeProject()?.id;
+    if (!projectId || this.endpointMutationPending() || this.restorePreviewPending()) return;
+
+    this.restorePreviewPending.set(true);
+    this.endpointMutationError.set(null);
+
+    try {
+      const preview = await this.projectSnapshotsRepository.previewRestore(projectId, snapshotId);
+      this.restorePreviewState.set({
+        snapshotId,
+        snapshotName: preview.snapshotName,
+        preview,
+      });
+    } catch (error) {
+      this.endpointMutationError.set(error instanceof Error ? error.message : 'Could not restore snapshot.');
+    } finally {
+      this.restorePreviewPending.set(false);
     }
   }
 

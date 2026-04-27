@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, map } from 'rxjs';
 import { setupAngularVitest } from '../../testing/angular-vitest';
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
+import { ApiError } from '../../shared/http/api-error.mapper';
+import type { WorkspaceSummaryDto } from '../../shared/http/api.types';
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import type { GlobalConfig } from '../global-config/models/global-config.model';
@@ -13,13 +15,19 @@ import { ProjectContractsRepository } from './data-access/project-contracts.repo
 import type { DashboardProject } from '../main-dashboard/models/dashboard-project.model';
 import type { EndpointPreview } from '../../shared/models/endpoint-preview.model';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
+import { WorkspacesRepository } from '../workspaces/data-access/workspaces.repository';
 import type { WorkspaceMember } from '../workspace-members/models/workspace-member.model';
+import { ToastService } from '../../shared/ui/toast/toast.service';
+import { WorkspaceInvitationsRepository } from '../workspace-invitations/data-access/workspace-invitations.repository';
 import type {
+  CreateProjectModalPayload,
   CreateProjectWithEndpointPayload,
   EditProjectModalPayload,
+  ProjectModalInitialValues,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
 import type { ApiLogEntry } from '../logs/models/api-log.model';
 import type { CreateProjectAiFlowState } from './models/workspace-shell.model';
+import type { ProjectSnapshotRestorePreview } from '../project-snapshots/models/project-snapshot.model';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 import { signal } from '@angular/core';
 import type { EndpointFlowMode } from '../endpoints/models/endpoint-draft.model';
@@ -79,9 +87,18 @@ type WorkspaceShellTestApi = {
   editProjectModalOpen: WritableSignalLike<boolean>;
   editProjectModalLoading: () => boolean;
   editProjectError: () => string | null;
+  availableWorkspaces: WritableSignalLike<WorkspaceSummaryDto[]>;
+  editProjectInitialValues: WritableSignalLike<(ProjectModalInitialValues & { workspaceId?: string }) | null>;
   deleteProjectDialogOpen: WritableSignalLike<boolean>;
   deleteProjectPending: () => boolean;
   deleteProjectError: () => string | null;
+  restorePreviewDialogOpen: () => boolean;
+  restorePreviewPending: () => boolean;
+  restorePreviewState: () => {
+    snapshotId: string;
+    snapshotName: string;
+    preview: ProjectSnapshotRestorePreview;
+  } | null;
   retryLoadProjects(): void;
   loadMoreProjects(): void;
   selectProject(id: string): void;
@@ -91,9 +108,26 @@ type WorkspaceShellTestApi = {
     name: string;
     role: 'owner' | 'editor' | 'viewer';
     isPersonal?: boolean;
-    capabilities: { canEdit: boolean; canManageMembers: boolean };
+    capabilities: {
+      canEdit: boolean;
+      canManageMembers: boolean;
+      canRestoreSnapshots: boolean;
+      canImportContracts: boolean;
+    };
   } | null;
+  workspaceMembers: WritableSignalLike<WorkspaceMember[]>;
+  pendingWorkspaceInvitations: () => Array<{
+    id: string;
+    workspaceId: string;
+    workspaceName: string;
+    email: string;
+    role: 'owner' | 'editor' | 'viewer';
+    status: 'pending' | 'accepted' | 'revoked';
+    createdAt: string;
+  }>;
   editGlobalConfig(): void;
+  openCreateProjectModal(): void;
+  onCreateProjectModalProjectOnly(payload: CreateProjectModalPayload): void;
   openEditProjectModal(): void;
   onEditProjectModalSave(payload: EditProjectModalPayload): void;
   openDeleteProjectDialog(): void;
@@ -103,10 +137,16 @@ type WorkspaceShellTestApi = {
   editEndpoint(ep: EndpointPreview): void;
   onGlobalConfigSaved(config: GlobalConfig): void;
   addWorkspaceMember(input: { email: string; role: 'owner' | 'editor' | 'viewer' }): void;
+  acceptWorkspaceInvitation(invitationId: string): void;
+  revokeWorkspaceInvitation(invitationId: string): void;
+  updateWorkspaceMemberRole(input: { memberUserId: string; role: 'owner' | 'editor' | 'viewer' }): void;
   removeWorkspaceMember(memberUserId: string): void;
   onCreateProjectModalWithEndpoint(payload: CreateProjectWithEndpointPayload): void;
   retryCreateProjectEndpointGeneration(): void;
   continueCreateProjectManually(): void;
+  restoreSnapshot(snapshotId: string): Promise<void>;
+  confirmRestoreSnapshot(): Promise<void>;
+  closeRestorePreview(): void;
   confirmContractImport(): void;
   cancelContractImportReview(): void;
 };
@@ -135,6 +175,7 @@ const endpointFixture: EndpointPreview = {
       empty: false,
       error: false,
       timeout: false,
+      unauthorized: false,
     },
   },
 };
@@ -176,8 +217,15 @@ const projectFixture: DashboardProject = {
   slug: 'project-1',
   workspace: {
     id: 'workspace-1',
+    name: 'Personal workspace',
+    kind: 'personal',
     role: 'owner',
-    capabilities: { canEdit: true, canManageMembers: true },
+    capabilities: {
+      canEdit: true,
+      canManageMembers: true,
+      canRestoreSnapshots: true,
+      canImportContracts: true,
+    },
   },
   status: 'running',
   mockUrl: 'https://mock.example.com/project-1',
@@ -193,8 +241,15 @@ const secondProjectFixture: DashboardProject = {
   slug: 'project-2',
   workspace: {
     id: 'workspace-2',
+    name: 'Equipo Plataforma',
+    kind: 'team',
     role: 'editor',
-    capabilities: { canEdit: true, canManageMembers: false },
+    capabilities: {
+      canEdit: true,
+      canManageMembers: false,
+      canRestoreSnapshots: false,
+      canImportContracts: false,
+    },
   },
   status: 'empty',
   mockUrl: 'https://mock.example.com/project-2',
@@ -262,12 +317,26 @@ describe('WorkspaceShellComponent', () => {
   const workspaceMembersRepository = {
     listMembers: vi.fn(),
     addMember: vi.fn(),
+    updateMemberRole: vi.fn(),
     removeMember: vi.fn(),
+  };
+
+  const workspacesRepository = {
+    listWorkspaces: vi.fn(),
+  };
+
+  const workspaceInvitationsRepository = {
+    listWorkspaceInvitations: vi.fn(),
+    createInvitation: vi.fn(),
+    revokeInvitation: vi.fn(),
+    listPendingInvitations: vi.fn(),
+    acceptInvitation: vi.fn(),
   };
 
   const projectSnapshotsRepository = {
     list: vi.fn(),
     get: vi.fn(),
+    previewRestore: vi.fn(),
     create: vi.fn(),
     restore: vi.fn(),
   };
@@ -314,9 +383,12 @@ describe('WorkspaceShellComponent', () => {
         { provide: ProjectSnapshotsRepository, useValue: projectSnapshotsRepository },
         { provide: ProjectContractsRepository, useValue: projectContractsRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
+        { provide: WorkspacesRepository, useValue: workspacesRepository },
+        { provide: WorkspaceInvitationsRepository, useValue: workspaceInvitationsRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
         { provide: ActivatedRoute, useValue: route },
         { provide: Router, useValue: router },
+        ToastService,
       ],
     });
 
@@ -341,14 +413,22 @@ describe('WorkspaceShellComponent', () => {
     globalConfigRepository.saveConfig.mockReset();
     projectSnapshotsRepository.list.mockReset();
     projectSnapshotsRepository.get.mockReset();
+    projectSnapshotsRepository.previewRestore.mockReset();
     projectSnapshotsRepository.create.mockReset();
     projectSnapshotsRepository.restore.mockReset();
     projectContractsRepository.exportContract.mockReset();
     projectContractsRepository.analyzeContract.mockReset();
     projectContractsRepository.importContract.mockReset();
     workspaceMembersRepository.listMembers.mockReset();
+    workspacesRepository.listWorkspaces.mockReset();
     workspaceMembersRepository.addMember.mockReset();
+    workspaceMembersRepository.updateMemberRole.mockReset();
     workspaceMembersRepository.removeMember.mockReset();
+    workspaceInvitationsRepository.listWorkspaceInvitations.mockReset();
+    workspaceInvitationsRepository.createInvitation.mockReset();
+    workspaceInvitationsRepository.revokeInvitation.mockReset();
+    workspaceInvitationsRepository.listPendingInvitations.mockReset();
+    workspaceInvitationsRepository.acceptInvitation.mockReset();
     authSession.bootstrap.mockReset();
     authSession.openSignIn.mockReset();
     authSession.signOut.mockReset();
@@ -359,6 +439,7 @@ describe('WorkspaceShellComponent', () => {
     authSession.canAccessProtectedRoutes.mockReturnValue(true);
     projectSnapshotsRepository.list.mockResolvedValue({ items: [] });
     projectSnapshotsRepository.get.mockResolvedValue(null);
+    projectSnapshotsRepository.previewRestore.mockResolvedValue(null);
     projectSnapshotsRepository.create.mockResolvedValue(null);
     projectSnapshotsRepository.restore.mockResolvedValue(undefined);
     projectContractsRepository.exportContract.mockResolvedValue({
@@ -400,6 +481,36 @@ describe('WorkspaceShellComponent', () => {
     });
     authSession.accessState.set('ready');
     workspaceMembersRepository.listMembers.mockResolvedValue([] as WorkspaceMember[]);
+    workspaceInvitationsRepository.listWorkspaceInvitations.mockResolvedValue([]);
+    workspaceInvitationsRepository.listPendingInvitations.mockResolvedValue([]);
+    workspacesRepository.listWorkspaces.mockResolvedValue([
+      {
+        id: 'workspace-1',
+        name: 'Personal workspace',
+        kind: 'personal',
+        role: 'owner',
+        isPersonal: true,
+        capabilities: {
+          canEdit: true,
+          canManageMembers: true,
+          canRestoreSnapshots: true,
+          canImportContracts: true,
+        },
+      },
+      {
+        id: 'workspace-2',
+        name: 'Equipo Plataforma',
+        kind: 'team',
+        role: 'editor',
+        isPersonal: false,
+        capabilities: {
+          canEdit: true,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
+      },
+    ]);
 
     projectsRepository.getProject.mockImplementation(async (projectId: string) =>
       projectId === secondProjectFixture.id ? secondProjectFixture : projectFixture,
@@ -436,8 +547,15 @@ describe('WorkspaceShellComponent', () => {
           ...projectFixture,
           workspace: {
             id: 'workspace-1',
+            name: 'Personal workspace',
+            kind: 'personal',
             role: 'viewer',
-            capabilities: { canEdit: false, canManageMembers: false },
+            capabilities: {
+              canEdit: false,
+              canManageMembers: false,
+              canRestoreSnapshots: false,
+              canImportContracts: false,
+            },
           },
         },
       ]),
@@ -446,8 +564,15 @@ describe('WorkspaceShellComponent', () => {
       ...projectFixture,
       workspace: {
         id: 'workspace-1',
+        name: 'Personal workspace',
+        kind: 'personal',
         role: 'viewer',
-        capabilities: { canEdit: false, canManageMembers: false },
+        capabilities: {
+          canEdit: false,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
       },
     });
 
@@ -470,11 +595,20 @@ describe('WorkspaceShellComponent', () => {
   it('only allows owners to mutate workspace members', async () => {
     projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     projectsRepository.getProject.mockResolvedValue(projectFixture);
-    workspaceMembersRepository.addMember.mockResolvedValue({
+    workspaceInvitationsRepository.createInvitation.mockResolvedValue({
+      id: 'invite-1',
+      workspaceId: 'workspace-1',
+      workspaceName: 'Personal workspace',
+      email: 'editor@example.com',
+      role: 'editor',
+      status: 'pending',
+      createdAt: '2026-04-08T10:00:00.000Z',
+    });
+    workspaceMembersRepository.updateMemberRole.mockResolvedValue({
       userId: 'user-2',
       email: 'editor@example.com',
       displayName: 'Editor User',
-      role: 'editor',
+      role: 'owner',
       createdAt: '2026-04-08T10:00:00.000Z',
     });
     workspaceMembersRepository.removeMember.mockResolvedValue(undefined);
@@ -484,12 +618,17 @@ describe('WorkspaceShellComponent', () => {
 
     component.addWorkspaceMember({ email: 'editor@example.com', role: 'editor' });
     await flushAsyncWork();
+    component.updateWorkspaceMemberRole({ memberUserId: 'user-2', role: 'owner' });
+    await flushAsyncWork();
     component.removeWorkspaceMember('user-2');
     await flushAsyncWork();
 
-    expect(workspaceMembersRepository.addMember).toHaveBeenCalledWith('workspace-1', {
+    expect(workspaceInvitationsRepository.createInvitation).toHaveBeenCalledWith('workspace-1', {
       email: 'editor@example.com',
       role: 'editor',
+    });
+    expect(workspaceMembersRepository.updateMemberRole).toHaveBeenCalledWith('workspace-1', 'user-2', {
+      role: 'owner',
     });
     expect(workspaceMembersRepository.removeMember).toHaveBeenCalledWith('workspace-1', 'user-2');
 
@@ -498,17 +637,88 @@ describe('WorkspaceShellComponent', () => {
       workspace: {
         id: 'workspace-1',
         role: 'editor',
-        capabilities: { canEdit: true, canManageMembers: false },
+        capabilities: {
+          canEdit: true,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
       },
     });
     const editorComponent = createComponent();
     await flushAsyncWork();
 
     editorComponent.addWorkspaceMember({ email: 'viewer@example.com', role: 'viewer' });
+    editorComponent.updateWorkspaceMemberRole({ memberUserId: 'user-2', role: 'owner' });
     editorComponent.removeWorkspaceMember('user-2');
 
-    expect(workspaceMembersRepository.addMember).toHaveBeenCalledTimes(1);
+    expect(workspaceInvitationsRepository.createInvitation).toHaveBeenCalledTimes(1);
+    expect(workspaceMembersRepository.updateMemberRole).toHaveBeenCalledTimes(1);
     expect(workspaceMembersRepository.removeMember).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads and accepts pending invitations for the authenticated actor', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectsRepository.getProject.mockResolvedValue(projectFixture);
+    workspaceInvitationsRepository.listPendingInvitations.mockResolvedValue([
+      {
+        id: 'invite-1',
+        workspaceId: 'workspace-2',
+        workspaceName: 'Equipo Plataforma',
+        email: 'owner@example.com',
+        role: 'editor',
+        status: 'pending',
+        createdAt: '2026-04-08T10:10:00.000Z',
+      },
+    ]);
+    workspaceInvitationsRepository.acceptInvitation.mockResolvedValue(undefined);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    expect(component.pendingWorkspaceInvitations()).toEqual([
+      {
+        id: 'invite-1',
+        workspaceId: 'workspace-2',
+        workspaceName: 'Equipo Plataforma',
+        email: 'owner@example.com',
+        role: 'editor',
+        status: 'pending',
+        createdAt: '2026-04-08T10:10:00.000Z',
+      },
+    ]);
+
+    workspaceInvitationsRepository.listPendingInvitations.mockClear();
+
+    component.acceptWorkspaceInvitation('invite-1');
+    await flushAsyncWork();
+
+    expect(workspaceInvitationsRepository.acceptInvitation).toHaveBeenCalledWith('invite-1');
+    expect(workspaceInvitationsRepository.listPendingInvitations).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes project summary and workspace members after updating a member role', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectsRepository.getProject.mockResolvedValue(projectFixture);
+    workspaceMembersRepository.listMembers.mockResolvedValue([] as WorkspaceMember[]);
+    workspaceMembersRepository.updateMemberRole.mockResolvedValue({
+      userId: 'user-2',
+      email: 'editor@example.com',
+      displayName: 'Editor User',
+      role: 'owner',
+      createdAt: '2026-04-08T10:00:00.000Z',
+    });
+
+    const component = createComponent();
+    await flushAsyncWork();
+    projectsRepository.getProject.mockClear();
+    workspaceMembersRepository.listMembers.mockClear();
+
+    component.updateWorkspaceMemberRole({ memberUserId: 'user-2', role: 'owner' });
+    await flushAsyncWork();
+
+    expect(projectsRepository.getProject).toHaveBeenCalledWith('project-1');
+    expect(workspaceMembersRepository.listMembers).toHaveBeenCalledWith('workspace-1');
   });
 
   it('reloads workspace members and exposes a workspace summary when the user navigates to the workspace section', async () => {
@@ -535,10 +745,15 @@ describe('WorkspaceShellComponent', () => {
     expect(workspaceMembersRepository.listMembers).toHaveBeenCalledWith('workspace-1');
     expect(component.activeWorkspaceSummary()).toEqual({
       id: 'workspace-1',
-      name: 'Workspace project',
+      name: 'Personal workspace',
       role: 'owner',
       isPersonal: undefined,
-      capabilities: { canEdit: true, canManageMembers: true },
+      capabilities: {
+        canEdit: true,
+        canManageMembers: true,
+        canRestoreSnapshots: true,
+        canImportContracts: true,
+      },
     });
   });
 
@@ -773,6 +988,7 @@ describe('WorkspaceShellComponent', () => {
     component.onCreateProjectModalWithEndpoint({
       name: 'Manual API',
       description: 'Created manually',
+      workspaceId: 'workspace-2',
       endpointPrompt: 'POST /orders',
     });
 
@@ -781,6 +997,7 @@ describe('WorkspaceShellComponent', () => {
     expect(projectsRepository.createProject).toHaveBeenCalledWith({
       name: 'Manual API',
       description: 'Created manually',
+      workspaceId: 'workspace-2',
     });
     expect(endpointsRepository.generateAiEndpoint).toHaveBeenCalledWith('project-2', 'POST /orders');
     expect(projectsRepository.listProjects).toHaveBeenCalledTimes(2);
@@ -883,6 +1100,63 @@ describe('WorkspaceShellComponent', () => {
     expect(component.endpointWizardMode()).toBe('manual');
   });
 
+  it('uses the real workspace identity instead of faking workspace name from the project name', async () => {
+    projectsRepository.listProjects.mockResolvedValue(
+      pagedProjectsResult([
+        {
+          ...projectFixture,
+          name: 'Payments API',
+          workspace: {
+            ...projectFixture.workspace,
+            name: 'Equipo Plataforma',
+            kind: 'team',
+          },
+        },
+      ]),
+    );
+    const component = createComponent();
+    await flushAsyncWork();
+
+    expect(component.activeWorkspaceSummary()).toEqual({
+      id: 'workspace-1',
+      name: 'Personal workspace',
+      role: 'owner',
+      isPersonal: undefined,
+      capabilities: {
+        canEdit: true,
+        canManageMembers: true,
+        canRestoreSnapshots: true,
+        canImportContracts: true,
+      },
+    });
+  });
+
+  it('loads accessible workspaces and forwards the selected workspaceId when creating a project', async () => {
+    projectsRepository.listProjects
+      .mockResolvedValueOnce(pagedProjectsResult([projectFixture]))
+      .mockResolvedValueOnce(pagedProjectsResult([projectFixture]));
+    projectsRepository.createProject.mockResolvedValue({ ...projectFixture, id: 'project-2' });
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.openCreateProjectModal();
+    await flushAsyncWork();
+    component.onCreateProjectModalProjectOnly({
+      name: 'Generated API',
+      description: 'Workspace scoped',
+      workspaceId: 'workspace-2',
+    });
+    await flushAsyncWork();
+
+    expect(workspacesRepository.listWorkspaces).toHaveBeenCalledTimes(1);
+    expect(projectsRepository.createProject).toHaveBeenCalledWith({
+      name: 'Generated API',
+      description: 'Workspace scoped',
+      workspaceId: 'workspace-2',
+    });
+  });
+
   it('updates the active project and keeps it selected after a successful edit', async () => {
     const updatedProject: DashboardProject = {
       ...projectFixture,
@@ -902,6 +1176,7 @@ describe('WorkspaceShellComponent', () => {
     component.onEditProjectModalSave({
       name: 'Renamed workspace',
       description: 'Fresh description',
+      slug: 'project-1',
     });
 
     await flushAsyncWork();
@@ -909,10 +1184,91 @@ describe('WorkspaceShellComponent', () => {
     expect(projectsRepository.updateProject).toHaveBeenCalledWith('project-1', {
       name: 'Renamed workspace',
       description: 'Fresh description',
+      slug: 'project-1',
     });
     expect(component.selectedProjectId()).toBe('project-1');
     expect(component.projects()[0]?.name).toBe('Renamed workspace');
     expect(component.editProjectModalOpen()).toBe(false);
+  });
+
+  it('loads accessible workspaces for edit mode and preselects the current workspace', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.openEditProjectModal();
+    await flushAsyncWork();
+
+    expect(workspacesRepository.listWorkspaces).toHaveBeenCalledTimes(1);
+    expect(component.availableWorkspaces()).toEqual([
+      expect.objectContaining({ id: 'workspace-1' }),
+      expect.objectContaining({ id: 'workspace-2' }),
+    ]);
+    expect(component.editProjectInitialValues()).toEqual({
+      name: 'Workspace project',
+      description: 'Live backend project',
+      slug: 'project-1',
+      workspaceId: 'workspace-1',
+    });
+  });
+
+  it('refreshes workspace members after transferring the active project to another workspace', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectsRepository.updateProject.mockResolvedValue({
+      ...projectFixture,
+      workspace: {
+        id: 'workspace-2',
+        name: 'Equipo Plataforma',
+        kind: 'team',
+        role: 'editor',
+        isPersonal: false,
+        capabilities: {
+          canEdit: true,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
+      },
+    });
+    workspaceMembersRepository.listMembers.mockResolvedValue([] as WorkspaceMember[]);
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.activeNav.set('workspace');
+    component.workspaceMembers.set([
+      {
+        userId: 'user-legacy',
+        email: 'legacy@example.com',
+        displayName: 'Legacy',
+        role: 'owner',
+        createdAt: '2026-04-08T10:00:00.000Z',
+      },
+    ]);
+    workspaceMembersRepository.listMembers.mockClear();
+
+    component.onEditProjectModalSave({
+      name: 'Workspace project',
+      description: 'Demo project',
+      slug: 'project-1',
+      workspaceId: 'workspace-2',
+    });
+    await flushAsyncWork();
+
+    expect(workspaceMembersRepository.listMembers).toHaveBeenCalledWith('workspace-2');
+    expect(component.activeWorkspaceSummary()).toEqual({
+      id: 'workspace-2',
+      name: 'Equipo Plataforma',
+      role: 'editor',
+      isPersonal: false,
+      capabilities: {
+        canEdit: true,
+        canManageMembers: false,
+        canRestoreSnapshots: false,
+        canImportContracts: false,
+      },
+    });
   });
 
   it('prevents duplicate edit submissions while the repository update is pending', async () => {
@@ -928,8 +1284,12 @@ describe('WorkspaceShellComponent', () => {
     await flushAsyncWork();
 
     component.openEditProjectModal();
-    component.onEditProjectModalSave({ name: 'Renamed workspace', description: 'Fresh description' });
-    component.onEditProjectModalSave({ name: 'Renamed again', description: 'Second click' });
+    component.onEditProjectModalSave({
+      name: 'Renamed workspace',
+      description: 'Fresh description',
+      slug: 'project-1',
+    });
+    component.onEditProjectModalSave({ name: 'Renamed again', description: 'Second click', slug: 'project-2' });
 
     expect(projectsRepository.updateProject).toHaveBeenCalledTimes(1);
     expect(component.editProjectModalLoading()).toBe(true);
@@ -948,13 +1308,47 @@ describe('WorkspaceShellComponent', () => {
     await flushAsyncWork();
 
     component.openEditProjectModal();
-    component.onEditProjectModalSave({ name: 'Duplicated', description: 'Fresh description' });
+    component.onEditProjectModalSave({ name: 'Duplicated', description: 'Fresh description', slug: 'project-1' });
 
     await flushAsyncWork();
 
     expect(component.editProjectModalOpen()).toBe(true);
     expect(component.editProjectError()).toBe('Name already exists in this workspace.');
     expect(component.selectedProjectId()).toBe('project-1');
+  });
+
+  it('shows duplicate-slug feedback when backend rejects project slug reuse', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectsRepository.updateProject.mockRejectedValue(
+      new ApiError(409, 'Project slug already exists', undefined, 'PROJECT_SLUG_DUPLICATE'),
+    );
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.openEditProjectModal();
+    component.onEditProjectModalSave({ name: 'Renamed', description: 'Fresh', slug: 'project-2' });
+
+    await flushAsyncWork();
+
+    expect(component.editProjectError()).toBe('This mock route slug is already in use. Try a different slug.');
+  });
+
+  it('shows reserved-slug feedback when backend blocks protected slug names', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectsRepository.updateProject.mockRejectedValue(
+      new ApiError(409, 'Project slug is reserved', undefined, 'PROJECT_SLUG_RESERVED'),
+    );
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    component.openEditProjectModal();
+    component.onEditProjectModalSave({ name: 'Renamed', description: 'Fresh', slug: 'mock' });
+
+    await flushAsyncWork();
+
+    expect(component.editProjectError()).toBe('This slug is reserved by the platform. Choose another one.');
   });
 
   it('cleans project-scoped state and reselects another project after delete succeeds', async () => {
@@ -1066,6 +1460,96 @@ describe('WorkspaceShellComponent', () => {
     expect(component.contractImportReview()).toBe(null);
   });
 
+  it('opens a restore preview first and only restores after explicit confirmation', async () => {
+    projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
+    projectSnapshotsRepository.previewRestore.mockResolvedValue({
+      snapshotId: 'snapshot-1',
+      snapshotName: 'Before imports',
+      revision: {
+        endpointCount: 2,
+        scenarioCount: 3,
+        globalScope: 'unset',
+        projectSlug: 'workspace-project',
+        projectName: 'Snapshot project',
+        isLegacySnapshot: false,
+      },
+      project: {
+        name: { current: 'Workspace project', snapshot: 'Snapshot project', changed: true },
+        description: { current: 'Live backend project', snapshot: 'Snapshot description', changed: true },
+      },
+      globalConfig: {
+        changed: true,
+        changes: [{ field: 'scope', current: 'all', snapshot: 'unset' }],
+      },
+      endpoints: {
+        create: [{ key: 'POST /users', method: 'POST', path: '/users' }],
+        update: [{ key: 'GET /users', method: 'GET', path: '/users' }],
+        delete: [{ key: 'DELETE /users/:id', method: 'DELETE', path: '/users/:id' }],
+        keep: [],
+      },
+      counts: { create: 1, update: 1, delete: 1, keep: 0, totalAfterRestore: 2 },
+    });
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    await component.restoreSnapshot('snapshot-1');
+
+    expect(projectSnapshotsRepository.previewRestore).toHaveBeenCalledWith('project-1', 'snapshot-1');
+    expect(projectSnapshotsRepository.restore).not.toHaveBeenCalled();
+    expect(component.restorePreviewDialogOpen()).toBe(true);
+    expect(component.restorePreviewState()).toMatchObject({ snapshotId: 'snapshot-1', snapshotName: 'Before imports' });
+    expect(component.restorePreviewState()?.preview.revision.scenarioCount).toBe(3);
+
+    await component.confirmRestoreSnapshot();
+    await flushAsyncWork();
+
+    expect(projectSnapshotsRepository.restore).toHaveBeenCalledWith('project-1', 'snapshot-1');
+    expect(component.restorePreviewDialogOpen()).toBe(false);
+  });
+
+  it('does not open snapshot restore flows for editors without the explicit restore capability', async () => {
+    projectsRepository.listProjects.mockResolvedValue(
+      pagedProjectsResult([
+        {
+          ...projectFixture,
+          workspace: {
+            ...projectFixture.workspace,
+            role: 'editor',
+            capabilities: {
+              canEdit: true,
+              canManageMembers: false,
+              canRestoreSnapshots: false,
+              canImportContracts: false,
+            },
+          },
+        },
+      ]),
+    );
+    projectsRepository.getProject.mockResolvedValue({
+      ...projectFixture,
+      workspace: {
+        ...projectFixture.workspace,
+        role: 'editor',
+        capabilities: {
+          canEdit: true,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
+      },
+    });
+
+    const component = createComponent();
+    await flushAsyncWork();
+
+    await component.restoreSnapshot('snapshot-1');
+
+    expect(projectSnapshotsRepository.previewRestore).not.toHaveBeenCalled();
+    expect(projectSnapshotsRepository.restore).not.toHaveBeenCalled();
+    expect(component.restorePreviewDialogOpen()).toBe(false);
+  });
+
   it('commits the reviewed contract import through the backend repository', async () => {
     projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
 
@@ -1089,5 +1573,59 @@ describe('WorkspaceShellComponent', () => {
 
     expect(projectContractsRepository.importContract).toHaveBeenCalledWith('project-1', file);
     expect(component.contractImportReview()).toBe(null);
+  });
+
+  it('does not commit contract import for editors without the explicit import capability', async () => {
+    projectsRepository.listProjects.mockResolvedValue(
+      pagedProjectsResult([
+        {
+          ...projectFixture,
+          workspace: {
+            ...projectFixture.workspace,
+            role: 'editor',
+            capabilities: {
+              canEdit: true,
+              canManageMembers: false,
+              canRestoreSnapshots: false,
+              canImportContracts: false,
+            },
+          },
+        },
+      ]),
+    );
+    projectsRepository.getProject.mockResolvedValue({
+      ...projectFixture,
+      workspace: {
+        ...projectFixture.workspace,
+        role: 'editor',
+        capabilities: {
+          canEdit: true,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
+      },
+    });
+
+    const component = createComponent();
+    await flushAsyncWork();
+    const file = new File(['{}'], 'contract.json', { type: 'application/json' });
+
+    component.contractImportReview.set({
+      file,
+      analysis: {
+        document: { title: 'Users API', version: '1.0.0', format: 'json' },
+        summary: { create: 1, update: 0, delete: 0, warnings: 0, errors: 0 },
+        operations: [{ method: 'POST', path: '/accounts', action: 'create', warnings: [] }],
+        warnings: [],
+        errors: [],
+      },
+    });
+
+    component.confirmContractImport();
+    await flushAsyncWork();
+
+    expect(projectContractsRepository.importContract).not.toHaveBeenCalled();
+    expect(component.contractImportReview()).not.toBe(null);
   });
 });

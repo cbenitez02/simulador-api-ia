@@ -1,7 +1,7 @@
 import type { HttpMethod } from '../../../shared/models/endpoint-preview.model';
 
 /** High-level scenario kind for mock simulation UX. */
-export type EndpointScenarioKind = 'success' | 'empty' | 'error' | 'timeout' | 'custom';
+export type EndpointScenarioKind = 'success' | 'empty' | 'error' | 'timeout' | 'unauthorized' | 'custom';
 
 export type EndpointDraftSource = 'manual' | 'ai-preview' | 'existing';
 export type EndpointFlowMode = 'ai' | 'manual' | 'edit';

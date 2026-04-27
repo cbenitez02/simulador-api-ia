@@ -201,6 +201,13 @@
   color: var(--cp-text-subtle);
 }
 
+.dash__hero-url-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 100%;
+}
+
 .dash__hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -211,6 +218,77 @@
 .dash__hero-url {
   color: var(--cp-text-muted);
   word-break: break-all;
+  flex: 0 1 auto;
+  min-width: 1px;
+}
+
+.dash__hero-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.dash__hero-copy-btn:hover:not(:disabled) {
+  background: var(--cp-surface-muted);
+  color: var(--cp-text-body);
+}
+
+.dash__hero-copy-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dash__hero-copy-btn--copied {
+  background: var(--cp-surface-muted);
+  color: var(--cp-accent-primary);
+  transform: scale(1.03);
+}
+
+.dash__hero-copy-icon-wrap {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+
+.dash__hero-copy-icon {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+.dash__hero-copy-icon--copy {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.dash__hero-copy-icon--check {
+  opacity: 0;
+  transform: scale(0.65);
+}
+
+.dash__hero-copy-icon--hidden {
+  opacity: 0;
+  transform: scale(0.65);
+}
+
+.dash__hero-copy-icon--visible {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .dash__hero-stats {

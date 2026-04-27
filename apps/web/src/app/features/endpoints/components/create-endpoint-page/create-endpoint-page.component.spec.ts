@@ -103,6 +103,7 @@ const previewFixture: EndpointPreview = {
       empty: false,
       error: false,
       timeout: false,
+      unauthorized: false,
     },
   },
 };

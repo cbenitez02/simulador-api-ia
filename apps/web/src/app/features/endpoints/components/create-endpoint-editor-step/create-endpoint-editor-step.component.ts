@@ -30,6 +30,7 @@ const SCENARIO_TYPE_OPTIONS: SelectMenuOption[] = [
   { value: 'empty', label: 'empty' },
   { value: 'error', label: 'error' },
   { value: 'timeout', label: 'timeout' },
+  { value: 'unauthorized', label: 'unauthorized' },
   { value: 'custom', label: 'custom' },
 ];
 
@@ -277,7 +278,6 @@ export class CreateEndpointEditorStepComponent {
   }
 
   protected addPreset(kind: 'empty' | 'error' | 'timeout' | 'unauthorized'): void {
-    if (this.draft().locks.scenarioType && kind === 'unauthorized') return;
     const d = this.draft();
     let row: EndpointScenario;
     switch (kind) {
@@ -314,16 +314,17 @@ export class CreateEndpointEditorStepComponent {
           weight: 5,
         };
         break;
-      default:
+      case 'unauthorized':
         row = {
           id: newScenarioId(),
           name: 'Unauthorized',
-          type: 'custom',
+          type: 'unauthorized',
           statusCode: 401,
           body: { error: 'Unauthorized', message: 'Invalid or missing token' },
           delayMs: 0,
           weight: 8,
         };
+        break;
     }
     this.emit({ ...d, scenarios: [...d.scenarios, row] });
     this.queueScenarioScroll(row.id);
