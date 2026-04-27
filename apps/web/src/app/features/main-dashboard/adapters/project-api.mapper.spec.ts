@@ -29,6 +29,8 @@ describe('project-api.mapper', () => {
         mockUrl: 'https://mock.example.com/users-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Equipo',
+          kind: 'team',
           role: 'editor',
           capabilities: {
             canEdit: true,
@@ -115,6 +117,8 @@ describe('project-api.mapper', () => {
         mockUrl: 'https://mock.example.com/empty-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Equipo',
+          kind: 'team',
           role: 'viewer',
           capabilities: {
             canEdit: false,
@@ -170,6 +174,8 @@ describe('project-api.mapper', () => {
       updatedAt: new Date().toISOString(),
       workspace: {
         id: 'workspace-1',
+        name: 'Personal',
+        kind: 'personal',
         role: 'owner',
         capabilities: {
           canEdit: true,
@@ -193,6 +199,8 @@ describe('project-api.mapper', () => {
       updatedAt: new Date().toISOString(),
       workspace: {
         id: 'workspace-1',
+        name: 'Personal',
+        kind: 'personal',
         role: 'owner',
         capabilities: {
           canEdit: true,

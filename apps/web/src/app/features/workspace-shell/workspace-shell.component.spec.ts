@@ -20,12 +20,14 @@ import type { WorkspaceMember } from '../workspace-members/models/workspace-memb
 import { ToastService } from '../../shared/ui/toast/toast.service';
 import { WorkspaceInvitationsRepository } from '../workspace-invitations/data-access/workspace-invitations.repository';
 import type {
+  CreateProjectModalPayload,
   CreateProjectWithEndpointPayload,
   EditProjectModalPayload,
   ProjectModalInitialValues,
 } from '../../shared/ui/create-project-modal/create-project-modal.model';
 import type { ApiLogEntry } from '../logs/models/api-log.model';
 import type { CreateProjectAiFlowState } from './models/workspace-shell.model';
+import type { ProjectSnapshotRestorePreview } from '../project-snapshots/models/project-snapshot.model';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 import { signal } from '@angular/core';
 import type { EndpointFlowMode } from '../endpoints/models/endpoint-draft.model';
@@ -92,7 +94,11 @@ type WorkspaceShellTestApi = {
   deleteProjectError: () => string | null;
   restorePreviewDialogOpen: () => boolean;
   restorePreviewPending: () => boolean;
-  restorePreviewState: () => { snapshotId: string; snapshotName: string } | null;
+  restorePreviewState: () => {
+    snapshotId: string;
+    snapshotName: string;
+    preview: ProjectSnapshotRestorePreview;
+  } | null;
   retryLoadProjects(): void;
   loadMoreProjects(): void;
   selectProject(id: string): void;
@@ -109,6 +115,7 @@ type WorkspaceShellTestApi = {
       canImportContracts: boolean;
     };
   } | null;
+  workspaceMembers: WritableSignalLike<WorkspaceMember[]>;
   pendingWorkspaceInvitations: () => Array<{
     id: string;
     workspaceId: string;
@@ -119,6 +126,8 @@ type WorkspaceShellTestApi = {
     createdAt: string;
   }>;
   editGlobalConfig(): void;
+  openCreateProjectModal(): void;
+  onCreateProjectModalProjectOnly(payload: CreateProjectModalPayload): void;
   openEditProjectModal(): void;
   onEditProjectModalSave(payload: EditProjectModalPayload): void;
   openDeleteProjectDialog(): void;
@@ -538,6 +547,8 @@ describe('WorkspaceShellComponent', () => {
           ...projectFixture,
           workspace: {
             id: 'workspace-1',
+            name: 'Personal workspace',
+            kind: 'personal',
             role: 'viewer',
             capabilities: {
               canEdit: false,
@@ -553,6 +564,8 @@ describe('WorkspaceShellComponent', () => {
       ...projectFixture,
       workspace: {
         id: 'workspace-1',
+        name: 'Personal workspace',
+        kind: 'personal',
         role: 'viewer',
         capabilities: {
           canEdit: false,

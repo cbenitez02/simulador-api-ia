@@ -169,7 +169,7 @@ async function renderLogsFiltersHarness(component: LogsFiltersHarnessComponent['
 }
 
 async function pickSelectMenuOption(
-  fixture: Awaited<ReturnType<typeof renderLogsComponent>>,
+  fixture: Awaited<ReturnType<typeof renderLogsFiltersHarness>>,
   triggerId: string,
   listboxId: string,
   optionLabel: string,

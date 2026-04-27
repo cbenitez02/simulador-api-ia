@@ -25,6 +25,8 @@ const projectFixture: DashboardProject = {
   slug: 'users-api',
   workspace: {
     id: 'workspace-1',
+    name: 'Personal',
+    kind: 'personal',
     role: 'owner',
     capabilities: {
       canEdit: true,

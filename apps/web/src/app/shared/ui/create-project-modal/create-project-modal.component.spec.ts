@@ -54,7 +54,12 @@ const workspaceOptions: ProjectModalWorkspaceOption[] = [
     kind: 'personal',
     role: 'owner',
     isPersonal: true,
-    capabilities: { canEdit: true, canManageMembers: true },
+    capabilities: {
+      canEdit: true,
+      canManageMembers: true,
+      canRestoreSnapshots: true,
+      canImportContracts: true,
+    },
   },
   {
     id: 'workspace-2',
@@ -62,7 +67,12 @@ const workspaceOptions: ProjectModalWorkspaceOption[] = [
     kind: 'team',
     role: 'editor',
     isPersonal: false,
-    capabilities: { canEdit: true, canManageMembers: false },
+    capabilities: {
+      canEdit: true,
+      canManageMembers: false,
+      canRestoreSnapshots: false,
+      canImportContracts: false,
+    },
   },
 ];
 
