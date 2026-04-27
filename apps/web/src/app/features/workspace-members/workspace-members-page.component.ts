@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideUsers } from '@lucide/angular';
+import { LucideTrash2, LucideUsers } from '@lucide/angular';
 import { SelectMenuComponent, type SelectMenuOption } from '../../shared/ui/select-menu/select-menu.component';
 
 import type { InvitableWorkspaceRoleDto, WorkspaceInvitationDto, WorkspaceRoleDto } from '../../shared/http/api.types';
@@ -20,7 +20,7 @@ export interface WorkspacePageWorkspaceSummary {
 @Component({
   selector: 'app-workspace-members-page',
   standalone: true,
-  imports: [FormsModule, LucideUsers, SelectMenuComponent],
+  imports: [FormsModule, LucideTrash2, LucideUsers, SelectMenuComponent],
   templateUrl: './workspace-members-page.component.html',
   styleUrls: ['./workspace-members-page.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,13 +43,13 @@ export class WorkspaceMembersPageComponent {
   readonly removeMember = output<string>();
 
   protected readonly memberRoleOptions: readonly SelectMenuOption[] = [
-    { value: 'viewer', label: 'Viewer' },
-    { value: 'editor', label: 'Editor' },
-    { value: 'owner', label: 'Owner' },
+    { value: 'viewer', label: 'Viewer', icon: 'eye' },
+    { value: 'editor', label: 'Editor', icon: 'pencil' },
+    { value: 'owner', label: 'Owner', icon: 'crown' },
   ];
   protected readonly inviteRoleOptions: readonly SelectMenuOption[] = [
-    { value: 'viewer', label: 'Viewer' },
-    { value: 'editor', label: 'Editor' },
+    { value: 'viewer', label: 'Viewer', icon: 'eye' },
+    { value: 'editor', label: 'Editor', icon: 'pencil' },
   ];
   protected readonly selectedRole = signal<InvitableWorkspaceRoleDto>(
     WorkspaceMembersPageComponent.DEFAULT_INVITE_ROLE,
@@ -102,7 +102,7 @@ export class WorkspaceMembersPageComponent {
   }
 
   protected canEditMemberRole(member: WorkspaceMember): boolean {
-    if (!this.canManageMembers() || this.mutationPending()) {
+    if (!this.canManageMembers()) {
       return false;
     }
 
