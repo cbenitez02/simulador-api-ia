@@ -20,6 +20,11 @@ import { projectContractsRouter } from './management/project-contracts/router.js
 import { scenariosRouter } from './management/scenarios/router.js';
 import { opsRouter } from './management/ops/router.js';
 import { workspaceMembersRouter } from './management/workspace-members/router.js';
+import {
+  workspaceInvitationsRouter,
+  workspaceScopedInvitationsRouter,
+} from './management/workspace-invitations/router.js';
+import { workspacesRouter } from './management/workspaces/router.js';
 import { mockRouter } from './mock-server/mock.router.js';
 
 export const app = express();
@@ -50,7 +55,10 @@ app.use('/api/v1/projects/:projectId/logs', logsRouter);
 app.use('/api/v1/projects/:projectId/audit-events', auditEventsRouter);
 app.use('/api/v1/projects/:projectId/snapshots', projectSnapshotsRouter);
 app.use('/api/v1/projects/:projectId/openapi', projectContractsRouter);
+app.use('/api/v1/workspaces', workspacesRouter);
 app.use('/api/v1/workspaces/:workspaceId/members', workspaceMembersRouter);
+app.use('/api/v1/workspaces/:workspaceId/invitations', workspaceScopedInvitationsRouter);
+app.use('/api/v1/workspace-invitations', workspaceInvitationsRouter);
 app.use('/mock', mockRouter);
 
 app.use(errorHandler);

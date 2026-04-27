@@ -1,7 +1,7 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
 import type { OpenAPIV3 } from 'openapi-types';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { authorizeProjectAccess } from '../../auth/authorization.js';
+import { authorizeProjectAccess, authorizeProjectCapability } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
@@ -214,7 +214,10 @@ function normalizeScenarioList(
           ? item['name'].trim()
           : `Scenario ${index + 1}`,
       type:
-        item['type'] === 'error' || item['type'] === 'timeout' || item['type'] === 'empty'
+        item['type'] === 'error' ||
+        item['type'] === 'timeout' ||
+        item['type'] === 'empty' ||
+        item['type'] === 'unauthorized'
           ? item['type']
           : 'success',
       statusCode: typeof item['statusCode'] === 'number' ? item['statusCode'] : fallbackStatus,
@@ -731,7 +734,7 @@ export async function importProjectContract(
   sourceText: string,
   sourceName?: string
 ): Promise<ProjectContractImportResult> {
-  const access = await authorizeProjectAccess(actor, projectId, 'mutate');
+  const access = await authorizeProjectCapability(actor, projectId, 'canImportContracts');
   const parsed = await parseProjectContractDocument(sourceText, sourceName);
   const liveProject = await loadLiveProjectState(projectId);
   const plan = buildAnalysisPlan(parsed, liveProject);

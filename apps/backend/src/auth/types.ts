@@ -18,10 +18,14 @@ export interface WorkspaceMembershipActor {
 export interface WorkspaceCapabilities {
   canEdit: boolean;
   canManageMembers: boolean;
+  canRestoreSnapshots: boolean;
+  canImportContracts: boolean;
 }
 
 export interface WorkspaceAccessSummary {
   id: string;
+  name: string;
+  kind: 'personal' | 'team';
   role: WorkspaceRole;
   isPersonal: boolean;
   capabilities: WorkspaceCapabilities;
@@ -29,6 +33,8 @@ export interface WorkspaceAccessSummary {
 
 export interface AuthenticatedActor {
   userId: string;
+  email: string | null;
+  displayName: string | null;
   personalWorkspaceId: string | null;
   identity: {
     provider: string;

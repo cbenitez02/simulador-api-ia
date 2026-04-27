@@ -209,7 +209,7 @@ describe('project contracts integration', () => {
     );
   });
 
-  it('rejects import for read-only viewers and writes an import audit event for mutators', async () => {
+  it('rejects import for viewers and editors, then writes an import audit event for owners', async () => {
     prismaMock.externalIdentity.findUnique.mockResolvedValue(buildActorIdentity('viewer'));
 
     const denied = await request(app)
@@ -239,8 +239,45 @@ describe('project contracts integration', () => {
       );
 
     expect(denied.status).toBe(403);
+    expect(denied.body).toEqual({
+      error: 'You do not have permission to import OpenAPI contracts',
+      code: 'WORKSPACE_CONTRACT_IMPORT_DENIED',
+    });
 
     prismaMock.externalIdentity.findUnique.mockResolvedValue(buildActorIdentity('editor'));
+    const editorDenied = await request(app)
+      .post('/api/v1/projects/project-1/openapi/import')
+      .set(authHeaders())
+      .attach(
+        'file',
+        Buffer.from(
+          JSON.stringify({
+            openapi: '3.0.3',
+            info: { title: 'Users API', version: '1.0.0' },
+            paths: {
+              '/accounts': {
+                post: {
+                  responses: {
+                    '201': {
+                      description: 'created',
+                      content: { 'application/json': { example: { ok: true } } },
+                    },
+                  },
+                },
+              },
+            },
+          })
+        ),
+        'contract.json'
+      );
+
+    expect(editorDenied.status).toBe(403);
+    expect(editorDenied.body).toEqual({
+      error: 'You do not have permission to import OpenAPI contracts',
+      code: 'WORKSPACE_CONTRACT_IMPORT_DENIED',
+    });
+
+    prismaMock.externalIdentity.findUnique.mockResolvedValue(buildActorIdentity('owner'));
     const allowed = await request(app)
       .post('/api/v1/projects/project-1/openapi/import')
       .set(authHeaders())

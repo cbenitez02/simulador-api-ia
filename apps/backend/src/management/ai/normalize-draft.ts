@@ -32,13 +32,14 @@ function normalizeScenarioType(
   type: string,
   statusCode: number,
   body: unknown
-): 'success' | 'error' | 'timeout' | 'empty' {
+): 'success' | 'error' | 'timeout' | 'empty' | 'unauthorized' {
   const normalizedType = type.trim().toLowerCase();
 
   if (normalizedType === 'success') return 'success';
   if (normalizedType === 'error') return 'error';
   if (normalizedType === 'timeout') return 'timeout';
   if (normalizedType === 'empty') return 'empty';
+  if (normalizedType === 'unauthorized') return 'unauthorized';
   if (normalizedType === 'edge-case') {
     if (statusCode === 204 || isEmptyBody(body)) {
       return 'empty';

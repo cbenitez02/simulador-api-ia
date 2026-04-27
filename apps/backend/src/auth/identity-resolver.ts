@@ -7,6 +7,8 @@ type ExternalIdentityRecord = {
   userId?: string;
   user: {
     id: string;
+    email?: string | null;
+    displayName?: string | null;
     memberships: Array<{ workspaceId: string; role: string }>;
     personalWorkspace: { id: string } | null;
   };
@@ -43,6 +45,8 @@ function toActor(
 ): AuthenticatedActor {
   return {
     userId: record.user.id,
+    email: record.user.email ?? identity.email ?? null,
+    displayName: record.user.displayName ?? identity.displayName ?? null,
     personalWorkspaceId: record.user.personalWorkspace?.id ?? null,
     identity: {
       provider: identity.provider,

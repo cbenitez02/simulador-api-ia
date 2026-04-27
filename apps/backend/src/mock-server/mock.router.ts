@@ -65,7 +65,11 @@ function toAbsoluteUrl(req: Request): string {
 }
 
 function toMockScenarioType(value: string | null | undefined): MockLogInput['scenarioType'] {
-  return value === 'success' || value === 'error' || value === 'timeout' || value === 'empty'
+  return value === 'success' ||
+    value === 'error' ||
+    value === 'timeout' ||
+    value === 'empty' ||
+    value === 'unauthorized'
     ? value
     : 'default';
 }

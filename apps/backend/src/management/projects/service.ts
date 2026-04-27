@@ -2,14 +2,14 @@ import {
   getAccessibleWorkspaceIds,
   authorizeProjectAccess,
   requireWorkspaceAccess,
-  resolveWorkspaceAccess,
+  summarizeWorkspaceAccess,
   resolveDefaultWorkspaceId,
 } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { writeAuditEvent } from '../audit-events/service.js';
-import { buildBaseSlug, resolveNextAvailableSlug } from './slug.js';
+import { buildBaseSlug, isReservedSlug, resolveNextAvailableSlug } from './slug.js';
 import type { CreateProjectInput, ListProjectsQueryInput, UpdateProjectInput } from './schema.js';
 
 type PagedResult<T> = {
@@ -64,6 +64,13 @@ export async function listProjects(
       skip: query.offset,
       take: query.limit,
       include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
         _count: {
           select: { endpoints: true },
         },
@@ -75,7 +82,7 @@ export async function listProjects(
   return {
     items: items.map((project) => ({
       ...project,
-      workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+      workspace: summarizeWorkspaceAccess(actor, project.workspace ?? project.workspaceId),
     })),
     page: {
       limit: query.limit,
@@ -91,7 +98,7 @@ export async function getProjectById(actor: AuthenticatedActor, projectId: strin
     where: { id: projectId },
     include: {
       workspace: {
-        select: { id: true },
+        select: { id: true, name: true, kind: true },
       },
       globalConfig: true,
       _count: {
@@ -108,13 +115,15 @@ export async function getProjectById(actor: AuthenticatedActor, projectId: strin
 
   return {
     ...project,
-    workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+    workspace: summarizeWorkspaceAccess(actor, project.workspace ?? project.workspaceId),
   };
 }
 
 export async function createProject(actor: AuthenticatedActor, input: CreateProjectInput) {
+  const workspaceId = input.workspaceId
+    ? requireWorkspaceAccess(actor, input.workspaceId, 'mutate')
+    : resolveDefaultWorkspaceId(actor);
   const slug = await generateUniqueProjectSlug(input.name);
-  const workspaceId = resolveDefaultWorkspaceId(actor);
 
   return prisma.$transaction(async (tx) => {
     const createdProject = await tx.project.create({
@@ -149,6 +158,13 @@ export async function createProject(actor: AuthenticatedActor, input: CreateProj
     const project = await tx.project.findUniqueOrThrow({
       where: { id: createdProject.id },
       include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
         globalConfig: true,
         _count: {
           select: { endpoints: true },
@@ -158,7 +174,11 @@ export async function createProject(actor: AuthenticatedActor, input: CreateProj
 
     return {
       ...project,
-      workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+      workspace: summarizeWorkspaceAccess(
+        actor,
+        project.workspace ?? project.workspaceId,
+        'mutate'
+      ),
     };
   });
 }
@@ -168,16 +188,66 @@ export async function updateProject(
   projectId: string,
   input: UpdateProjectInput
 ) {
-  await authorizeProjectAccess(actor, projectId, 'mutate');
+  const authorizedProject = await authorizeProjectAccess(actor, projectId, 'mutate');
+  const requestedWorkspaceId = input.workspaceId?.trim();
+  const transferWorkspaceId =
+    requestedWorkspaceId && requestedWorkspaceId !== authorizedProject.workspaceId
+      ? requireWorkspaceAccess(actor, requestedWorkspaceId, 'mutate')
+      : undefined;
 
   const project = await prisma.$transaction(async (tx) => {
+    const currentProject = await tx.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: {
+        id: true,
+        slug: true,
+        workspaceId: true,
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
+      },
+    });
+    const normalizedSlug = input.slug === undefined ? undefined : buildBaseSlug(input.slug);
+
+    if (normalizedSlug !== undefined) {
+      if (isReservedSlug(normalizedSlug)) {
+        throw new AppError(409, 'Project slug is reserved', {
+          code: 'PROJECT_SLUG_RESERVED',
+        });
+      }
+
+      const slugOwner = await tx.project.findUnique({
+        where: { slug: normalizedSlug },
+        select: { id: true },
+      });
+
+      if (slugOwner && slugOwner.id !== projectId) {
+        throw new AppError(409, 'Project slug already exists', {
+          code: 'PROJECT_SLUG_DUPLICATE',
+        });
+      }
+    }
+
     const updatedProject = await tx.project.update({
       where: { id: projectId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(normalizedSlug !== undefined ? { slug: normalizedSlug } : {}),
+        ...(transferWorkspaceId !== undefined ? { workspaceId: transferWorkspaceId } : {}),
       },
       include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
         globalConfig: true,
         _count: {
           select: { endpoints: true },
@@ -195,6 +265,20 @@ export async function updateProject(
       summary: `Updated project ${updatedProject.name}`,
       metadata: {
         projectName: updatedProject.name,
+        ...(normalizedSlug !== undefined && normalizedSlug !== currentProject.slug
+          ? {
+              previousProjectSlug: currentProject.slug,
+              projectSlug: updatedProject.slug,
+            }
+          : {}),
+        ...(transferWorkspaceId !== undefined
+          ? {
+              previousWorkspaceId: currentProject.workspaceId,
+              previousWorkspaceName: currentProject.workspace?.name ?? currentProject.workspaceId,
+              nextWorkspaceId: updatedProject.workspaceId,
+              nextWorkspaceName: updatedProject.workspace?.name ?? updatedProject.workspaceId,
+            }
+          : {}),
       },
     });
 
@@ -203,7 +287,7 @@ export async function updateProject(
 
   return {
     ...project,
-    workspace: resolveWorkspaceAccess(actor, project.workspaceId),
+    workspace: summarizeWorkspaceAccess(actor, project.workspace ?? project.workspaceId),
   };
 }
 

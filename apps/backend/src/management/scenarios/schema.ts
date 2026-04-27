@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const scenarioTypeSchema = z.enum(['success', 'error', 'timeout', 'empty']);
+export const scenarioTypeSchema = z.enum(['success', 'error', 'timeout', 'empty', 'unauthorized']);
 
 export const endpointParamsSchema = z.object({
   endpointId: z.string().min(1),

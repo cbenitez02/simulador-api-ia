@@ -9,6 +9,7 @@ import {
 import {
   createProjectSnapshot,
   getProjectSnapshotDetail,
+  getProjectSnapshotRestorePreview,
   listProjectSnapshots,
   restoreProjectSnapshot,
 } from './service.js';
@@ -41,6 +42,16 @@ projectSnapshotsRouter.get('/:snapshotId', async (req, res, next) => {
     const actor = requireRequestActor(req);
     const { projectId, snapshotId } = snapshotParamsSchema.parse(req.params);
     res.status(200).json(await getProjectSnapshotDetail(actor, projectId, snapshotId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+projectSnapshotsRouter.get('/:snapshotId/restore-preview', async (req, res, next) => {
+  try {
+    const actor = requireRequestActor(req);
+    const { projectId, snapshotId } = snapshotParamsSchema.parse(req.params);
+    res.status(200).json(await getProjectSnapshotRestorePreview(actor, projectId, snapshotId));
   } catch (error) {
     next(error);
   }

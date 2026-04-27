@@ -2,12 +2,18 @@ import { Router } from 'express';
 import { requireRequestActor } from '../../auth/request-context.js';
 import {
   addWorkspaceMemberSchema,
+  updateWorkspaceMemberRoleSchema,
   workspaceMemberParamsSchema,
   workspaceMemberResponseSchema,
   workspaceMembersListSchema,
   workspaceParamsSchema,
 } from './schema.js';
-import { addWorkspaceMember, listWorkspaceMembers, removeWorkspaceMember } from './service.js';
+import {
+  addWorkspaceMember,
+  listWorkspaceMembers,
+  removeWorkspaceMember,
+  updateWorkspaceMemberRole,
+} from './service.js';
 
 export const workspaceMembersRouter = Router({ mergeParams: true });
 
@@ -43,6 +49,19 @@ workspaceMembersRouter.delete('/:memberUserId', async (req, res, next) => {
     await removeWorkspaceMember(actor, workspaceId, memberUserId);
 
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+workspaceMembersRouter.patch('/:memberUserId', async (req, res, next) => {
+  try {
+    const actor = requireRequestActor(req);
+    const { workspaceId, memberUserId } = workspaceMemberParamsSchema.parse(req.params);
+    const input = updateWorkspaceMemberRoleSchema.parse(req.body);
+    const member = await updateWorkspaceMemberRole(actor, workspaceId, memberUserId, input);
+
+    res.status(200).json(workspaceMemberResponseSchema.parse(member));
   } catch (error) {
     next(error);
   }

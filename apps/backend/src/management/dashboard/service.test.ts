@@ -16,9 +16,16 @@ describe('dashboard/service', () => {
         slug: 'users-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Personal',
+          kind: 'personal',
           role: 'owner',
           isPersonal: true,
-          capabilities: { canEdit: true, canManageMembers: true },
+          capabilities: {
+            canEdit: true,
+            canManageMembers: true,
+            canRestoreSnapshots: true,
+            canImportContracts: true,
+          },
         },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: {
@@ -176,9 +183,16 @@ describe('dashboard/service', () => {
         slug: 'empty-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Team',
+          kind: 'team',
           role: 'viewer',
           isPersonal: false,
-          capabilities: { canEdit: false, canManageMembers: false },
+          capabilities: {
+            canEdit: false,
+            canManageMembers: false,
+            canRestoreSnapshots: false,
+            canImportContracts: false,
+          },
         },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: null,

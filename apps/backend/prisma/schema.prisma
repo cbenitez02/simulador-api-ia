@@ -49,7 +49,27 @@ model Workspace {
 
   personalForUser User?                  @relation("PersonalWorkspaceOwner", fields: [personalForUserId], references: [id], onDelete: SetNull)
   memberships     WorkspaceMembership[]
+  invitations     WorkspaceInvitation[]
   projects        Project[]
+}
+
+model WorkspaceInvitation {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  email            String
+  role             String   @default("viewer")
+  status           String   @default("pending")
+  invitedByUserId  String
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([email, status, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model WorkspaceMembership {
