@@ -81,6 +81,8 @@ describe('resolveActorIdentity', () => {
     });
     expect(actor).toEqual({
       userId: 'user-1',
+      email: 'owner@example.com',
+      displayName: 'Owner User',
       personalWorkspaceId: 'workspace-1',
       identity: { provider: 'clerk', subject: 'user_clerk_123' },
       workspaceMemberships: [{ workspaceId: 'workspace-1', role: 'owner' }],
