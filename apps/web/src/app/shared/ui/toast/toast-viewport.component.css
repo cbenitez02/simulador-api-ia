@@ -1,0 +1,145 @@
+.toast-viewport {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 0.65rem 0.75rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(240 6% 18%);
+  background: hsl(240 10% 6% / 0.96);
+  color: hsl(0 0% 98%);
+  box-shadow:
+    0 10px 40px hsl(0 0% 0% / 0.45),
+    0 0 0 1px hsl(0 0% 100% / 0.04) inset;
+  animation: toast-in 180ms ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast[data-variant='success'] {
+  border-color: hsl(142 40% 22%);
+}
+
+.toast[data-variant='error'] {
+  border-color: hsl(0 45% 28%);
+}
+
+.toast[data-variant='warning'] {
+  border-color: hsl(38 45% 26%);
+}
+
+.toast[data-variant='info'] {
+  border-color: hsl(217 40% 28%);
+}
+
+.toast__icon {
+  display: flex;
+  margin-top: 0.1rem;
+}
+
+.toast__icon-svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: hsl(0 0% 82%);
+}
+
+.toast[data-variant='success'] .toast__icon-svg {
+  color: hsl(142 70% 45%);
+}
+
+.toast[data-variant='error'] .toast__icon-svg {
+  color: hsl(0 72% 58%);
+}
+
+.toast[data-variant='warning'] .toast__icon-svg {
+  color: hsl(38 92% 50%);
+}
+
+.toast[data-variant='info'] .toast__icon-svg {
+  color: hsl(217 85% 60%);
+}
+
+.toast__icon-svg--muted {
+  opacity: 0.65;
+}
+
+.toast__body {
+  min-width: 0;
+}
+
+.toast__title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.toast__description {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: hsl(240 5% 72%);
+}
+
+.toast__action {
+  margin-top: 0.05rem;
+  align-self: center;
+  border: none;
+  border-radius: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(0 0% 98%);
+  background: hsl(240 6% 18%);
+  cursor: pointer;
+}
+
+.toast__action:hover {
+  background: hsl(240 6% 24%);
+}
+
+.toast__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -0.15rem -0.1rem 0 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 0.35rem;
+  padding: 0;
+  color: hsl(240 5% 65%);
+  background: transparent;
+  cursor: pointer;
+}
+
+.toast__close:hover {
+  color: hsl(0 0% 98%);
+  background: hsl(240 6% 16%);
+}
+
+.toast__close-icon {
+  width: 1rem;
+  height: 1rem;
+}
