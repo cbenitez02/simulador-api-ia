@@ -1,0 +1,37 @@
+<div class="toast-viewport" aria-live="polite" aria-relevant="additions text">
+  @for (t of toastService.toasts(); track t.id) {
+    <div class="toast" [attr.data-variant]="t.variant" role="status">
+      <div class="toast__icon" aria-hidden="true">
+        @switch (t.variant) {
+          @case ('success') {
+            <svg lucideCircleCheck class="toast__icon-svg" [size]="18" strokeWidth="2.25"></svg>
+          }
+          @case ('info') {
+            <svg lucideInfo class="toast__icon-svg" [size]="18" strokeWidth="2.25"></svg>
+          }
+          @case ('warning') {
+            <svg lucideAlertTriangle class="toast__icon-svg" [size]="18" strokeWidth="2.25"></svg>
+          }
+          @case ('error') {
+            <svg lucideAlertCircle class="toast__icon-svg" [size]="18" strokeWidth="2.25"></svg>
+          }
+          @default {
+            <svg lucideInfo class="toast__icon-svg toast__icon-svg--muted" [size]="18" strokeWidth="2.25"></svg>
+          }
+        }
+      </div>
+      <div class="toast__body">
+        <div class="toast__title">{{ t.title }}</div>
+        @if (t.description) {
+          <div class="toast__description">{{ t.description }}</div>
+        }
+      </div>
+      @if (t.action) {
+        <button type="button" class="toast__action" (click)="runAction(t)">{{ t.action.label }}</button>
+      }
+      <button type="button" class="toast__close" (click)="dismiss(t.id)" aria-label="Cerrar notificación">
+        <svg lucideX class="toast__close-icon" [size]="16" strokeWidth="2.25"></svg>
+      </button>
+    </div>
+  }
+</div>
