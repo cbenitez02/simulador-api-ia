@@ -28,6 +28,8 @@ import { updateScenario } from './service.js';
 
 const actor: AuthenticatedActor = {
   userId: 'user-1',
+  email: 'owner@example.com',
+  displayName: 'Owner User',
   personalWorkspaceId: 'workspace-1',
   identity: {
     provider: 'clerk',

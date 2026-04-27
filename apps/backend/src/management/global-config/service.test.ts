@@ -14,11 +14,15 @@ describe('global-config/service', () => {
         slug: 'users-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Personal',
+          kind: 'personal',
           role: 'owner',
           isPersonal: true,
           capabilities: {
             canEdit: true,
             canManageMembers: true,
+            canRestoreSnapshots: true,
+            canImportContracts: true,
           },
         },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),

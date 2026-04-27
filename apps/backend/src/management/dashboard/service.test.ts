@@ -16,6 +16,8 @@ describe('dashboard/service', () => {
         slug: 'users-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Personal',
+          kind: 'personal',
           role: 'owner',
           isPersonal: true,
           capabilities: {
@@ -181,6 +183,8 @@ describe('dashboard/service', () => {
         slug: 'empty-api',
         workspace: {
           id: 'workspace-1',
+          name: 'Team',
+          kind: 'team',
           role: 'viewer',
           isPersonal: false,
           capabilities: {
