@@ -123,7 +123,7 @@ describe('WorkspaceMembersPageComponent', () => {
     expect(rows[0]?.querySelector('.workspace-members-page__remove')).toBeNull();
     expect(rows[0]?.querySelector('.workspace-members-page__badge--owner')?.textContent).toContain('Owner');
     expect(rows[0]?.querySelector('.workspace-members-page__badge--self')?.textContent).toContain('You');
-    expect(rows[1]?.querySelector('.workspace-members-page__remove')?.textContent).toContain('Remove');
+    expect(rows[1]?.querySelector('.workspace-members-page__remove')?.getAttribute('aria-label')).toBe('Remove member');
   });
 
   it('shows remove button for owner self in non-personal workspaces when no other restriction applies', async () => {
@@ -137,7 +137,7 @@ describe('WorkspaceMembersPageComponent', () => {
     expect(rows[0]?.textContent).toContain('Owner User');
     expect(rows[0]?.querySelector('.workspace-members-page__badge--owner')?.textContent).toContain('Owner');
     expect(rows[0]?.querySelector('.workspace-members-page__badge--self')?.textContent).toContain('You');
-    expect(rows[0]?.querySelector('.workspace-members-page__remove')?.textContent).toContain('Remove');
+    expect(rows[0]?.querySelector('.workspace-members-page__remove')?.getAttribute('aria-label')).toBe('Remove member');
   });
 
   it('detects current user by email when userId differs in personal workspaces', async () => {
@@ -222,7 +222,7 @@ describe('WorkspaceMembersPageComponent', () => {
     form.dispatchEvent(new Event('submit'));
 
     expect(emitSpy).toHaveBeenCalledWith({ email: 'newcomer@example.com', role: 'editor' });
-    expect(roleTrigger.textContent).toContain('Editor');
+    expect(roleTrigger.getAttribute('aria-label')).toContain('Editor');
     expect(element.querySelector('.workspace-members-page__submit')?.textContent).toContain('Send invite');
   });
 

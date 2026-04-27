@@ -745,7 +745,7 @@ export class WorkspaceShellComponent implements OnInit {
       return;
     }
 
-    void this.updateWorkspaceMemberRoleRemote(activeProject.id, workspaceId, input);
+    void this.updateWorkspaceMemberRoleRemote(workspaceId, input);
   }
 
   protected removeWorkspaceMember(memberUserId: string): void {
@@ -893,7 +893,7 @@ export class WorkspaceShellComponent implements OnInit {
     try {
       const refreshed = await this.projectsRepository.getProject(projectId);
       this.projects.update((projects) => projects.map((project) => (project.id === projectId ? refreshed : project)));
-      await this.reloadWorkspaceMembers(refreshed.workspace.id);
+      await this.reloadWorkspaceMembers(refreshed.workspace.id, { silent: true });
       await this.reloadPendingWorkspaceInvitations();
       if (this.activeNav() === 'history') {
         await this.loadSnapshotHistory(projectId, true);
@@ -1288,8 +1288,11 @@ export class WorkspaceShellComponent implements OnInit {
     }
   }
 
-  private async reloadWorkspaceMembers(workspaceId: string): Promise<void> {
-    this.workspaceMembersLoading.set(true);
+  private async reloadWorkspaceMembers(workspaceId: string, options?: { silent?: boolean }): Promise<void> {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      this.workspaceMembersLoading.set(true);
+    }
     this.workspaceMembersError.set(null);
 
     try {
@@ -1301,7 +1304,9 @@ export class WorkspaceShellComponent implements OnInit {
       this.workspaceInvitations.set([]);
       this.workspaceMembersError.set(error instanceof Error ? error.message : 'Could not load workspace members.');
     } finally {
-      this.workspaceMembersLoading.set(false);
+      if (!silent) {
+        this.workspaceMembersLoading.set(false);
+      }
     }
   }
 
@@ -1384,7 +1389,6 @@ export class WorkspaceShellComponent implements OnInit {
   }
 
   private async updateWorkspaceMemberRoleRemote(
-    projectId: string,
     workspaceId: string,
     input: { memberUserId: string; role: 'owner' | 'editor' | 'viewer' },
   ): Promise<void> {
@@ -1392,8 +1396,12 @@ export class WorkspaceShellComponent implements OnInit {
     this.workspaceMembersError.set(null);
 
     try {
-      await this.workspaceMembersRepository.updateMemberRole(workspaceId, input.memberUserId, { role: input.role });
-      await this.reloadProjects(projectId);
+      const updated = await this.workspaceMembersRepository.updateMemberRole(workspaceId, input.memberUserId, {
+        role: input.role,
+      });
+      this.workspaceMembers.update((members) =>
+        members.map((member) => (member.userId === updated.userId ? updated : member)),
+      );
     } catch (error) {
       this.workspaceMembersError.set(
         error instanceof Error ? error.message : 'Could not update workspace member role.',

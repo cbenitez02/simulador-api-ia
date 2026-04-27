@@ -7,13 +7,25 @@
   @if (section() === 'account-profile-settings') {
     <section class="account-section-page__panel account-section-page__panel--profile" aria-label="Profile summary">
       <div class="account-section-page__profile-main">
-        <div class="account-section-page__avatar" aria-hidden="true">
-          <span>AC</span>
+        <div class="account-section-page__avatar-shell">
+          @if (profileDisplay().avatarUrl; as avatarSrc) {
+            <img
+              class="account-section-page__avatar account-section-page__avatar--image"
+              [src]="avatarSrc"
+              [alt]="'Avatar of ' + profileDisplay().fullName"
+            />
+          } @else {
+            <div class="account-section-page__avatar" aria-hidden="true">
+              <span>{{ profileDisplay().initials }}</span>
+            </div>
+          }
         </div>
         <div class="account-section-page__profile-meta">
-          <p class="account-section-page__name">{{ profile.fullName }}</p>
-          <p class="account-section-page__email">{{ profile.email }}</p>
-          <p class="account-section-page__company">{{ profile.company }}</p>
+          <p class="account-section-page__name">{{ profileDisplay().fullName }}</p>
+          <p class="account-section-page__email">{{ profileDisplay().email }}</p>
+          @if (profileDisplay().handle; as handle) {
+            <p class="account-section-page__company">{{ handle }}</p>
+          }
         </div>
       </div>
       <button type="button" class="account-section-page__edit-btn">
@@ -25,7 +37,7 @@
     <section class="account-section-page__panel" aria-label="Profile account information">
       <h2 class="account-section-page__section-title">Account Information</h2>
       <div class="account-section-page__info-list">
-        @for (field of accountFields; track field.label) {
+        @for (field of accountInfoFields(); track field.label) {
           <article class="account-section-page__info-row">
             <span class="account-section-page__info-icon" aria-hidden="true">
               @if (field.icon === 'copy') {
@@ -109,16 +121,6 @@
 
   @if (section() === 'account-plan-billing') {
     <section class="account-section-page__panel" aria-label="Plan and billing section">
-      <div class="account-section-page__panel-head account-section-page__panel-head--actions-only">
-        <button
-          type="button"
-          class="account-section-page__icon-btn"
-          title="Copy billing summary"
-          aria-label="Copy billing summary"
-        >
-          <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
-        </button>
-      </div>
       <article class="account-section-page__billing-card">
         <p class="account-section-page__billing-plan">
           Current Plan:

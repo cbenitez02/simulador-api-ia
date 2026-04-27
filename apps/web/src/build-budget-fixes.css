@@ -1183,8 +1183,12 @@ app-global-config-drawer,
 }
 
 .gcfg-dual-range {
+  --gcfg-dual-track-h: 0.35rem;
+  --gcfg-dual-thumb: 1rem;
+  --gcfg-dual-slot-h: 1.5rem;
+
   position: relative;
-  height: 1.35rem;
+  height: var(--gcfg-dual-slot-h);
   margin-top: 0.15rem;
 }
 
@@ -1193,8 +1197,8 @@ app-global-config-drawer,
   left: 0;
   right: 0;
   top: 50%;
-  height: 0.35rem;
-  margin-top: -0.175rem;
+  height: var(--gcfg-dual-track-h);
+  margin-top: calc(var(--gcfg-dual-track-h) / -2);
   border-radius: 999px;
   pointer-events: none;
 }
@@ -1203,29 +1207,35 @@ app-global-config-drawer,
   position: absolute;
   left: 0;
   width: 100%;
-  height: 1.35rem;
+  height: var(--gcfg-dual-slot-h);
   margin: 0;
+  padding: 0;
   background: none;
   pointer-events: none;
   appearance: none;
   top: 0;
+  box-sizing: border-box;
 }
 
 .gcfg-dual-range__input::-webkit-slider-thumb {
   appearance: none;
-  width: 1rem;
-  height: 1rem;
+  box-sizing: border-box;
+  width: var(--gcfg-dual-thumb);
+  height: var(--gcfg-dual-thumb);
   border-radius: 50%;
   background: #f4f4f5;
   border: 2px solid rgba(15, 23, 42, 0.9);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   cursor: grab;
   pointer-events: auto;
+  /* Centrar el thumb sobre la pista (Chrome/Safari/Edge). */
+  margin-top: calc((var(--gcfg-dual-track-h) - var(--gcfg-dual-thumb)) / 2);
 }
 
 .gcfg-dual-range__input::-moz-range-thumb {
-  width: 1rem;
-  height: 1rem;
+  box-sizing: border-box;
+  width: var(--gcfg-dual-thumb);
+  height: var(--gcfg-dual-thumb);
   border-radius: 50%;
   background: #f4f4f5;
   border: 2px solid rgba(15, 23, 42, 0.9);
@@ -1235,13 +1245,16 @@ app-global-config-drawer,
 }
 
 .gcfg-dual-range__input::-webkit-slider-runnable-track {
-  height: 0.35rem;
+  height: var(--gcfg-dual-track-h);
   background: transparent;
   border-radius: 999px;
+  /* La pista por defecto queda arriba del área del input; centrarla en el slot. */
+  margin-top: calc((var(--gcfg-dual-slot-h) - var(--gcfg-dual-track-h)) / 2);
+  margin-bottom: calc((var(--gcfg-dual-slot-h) - var(--gcfg-dual-track-h)) / 2);
 }
 
 .gcfg-dual-range__input::-moz-range-track {
-  height: 0.35rem;
+  height: var(--gcfg-dual-track-h);
   background: transparent;
   border-radius: 999px;
 }

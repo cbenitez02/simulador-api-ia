@@ -697,16 +697,32 @@ describe('WorkspaceShellComponent', () => {
     expect(workspaceInvitationsRepository.listPendingInvitations).toHaveBeenCalledTimes(2);
   });
 
-  it('refreshes project summary and workspace members after updating a member role', async () => {
+  it('updates workspace members from PATCH response after updating a member role', async () => {
     projectsRepository.listProjects.mockResolvedValue(pagedProjectsResult([projectFixture]));
     projectsRepository.getProject.mockResolvedValue(projectFixture);
-    workspaceMembersRepository.listMembers.mockResolvedValue([] as WorkspaceMember[]);
+    const initialMembers: WorkspaceMember[] = [
+      {
+        userId: 'user-1',
+        email: 'owner@example.com',
+        displayName: 'Owner User',
+        role: 'owner',
+        createdAt: '2026-04-08T10:00:00.000Z',
+      },
+      {
+        userId: 'user-2',
+        email: 'editor@example.com',
+        displayName: 'Editor User',
+        role: 'editor',
+        createdAt: '2026-04-08T10:05:00.000Z',
+      },
+    ];
+    workspaceMembersRepository.listMembers.mockResolvedValue(initialMembers);
     workspaceMembersRepository.updateMemberRole.mockResolvedValue({
       userId: 'user-2',
       email: 'editor@example.com',
       displayName: 'Editor User',
       role: 'owner',
-      createdAt: '2026-04-08T10:00:00.000Z',
+      createdAt: '2026-04-08T10:05:00.000Z',
     });
 
     const component = createComponent();
@@ -717,8 +733,12 @@ describe('WorkspaceShellComponent', () => {
     component.updateWorkspaceMemberRole({ memberUserId: 'user-2', role: 'owner' });
     await flushAsyncWork();
 
-    expect(projectsRepository.getProject).toHaveBeenCalledWith('project-1');
-    expect(workspaceMembersRepository.listMembers).toHaveBeenCalledWith('workspace-1');
+    expect(workspaceMembersRepository.updateMemberRole).toHaveBeenCalledWith('workspace-1', 'user-2', {
+      role: 'owner',
+    });
+    expect(projectsRepository.getProject).not.toHaveBeenCalled();
+    expect(workspaceMembersRepository.listMembers).not.toHaveBeenCalled();
+    expect(component.workspaceMembers().find((m) => m.userId === 'user-2')?.role).toBe('owner');
   });
 
   it('reloads workspace members and exposes a workspace summary when the user navigates to the workspace section', async () => {

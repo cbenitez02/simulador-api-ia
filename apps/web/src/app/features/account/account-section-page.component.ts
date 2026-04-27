@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideCopy, LucideFileText, LucideHistory, LucidePencilLine, LucideUsers } from '@lucide/angular';
+
+import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
 
 type AccountSectionNavId =
   | 'account-profile-settings'
@@ -24,20 +26,46 @@ interface AccountField {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AccountSectionPageComponent {
+  private readonly authSession = inject(FrontendAuthSessionService);
+
   readonly section = input.required<AccountSectionNavId>();
 
-  protected readonly profile = {
-    fullName: 'Alex Chen',
-    email: 'alex.chen@company.com',
-    company: 'TechCorp Inc',
-  };
+  /** Mock: sustituir por dato real cuando exista API de billing (`Free` | `Pro`). */
+  protected readonly accountPlanMock: 'Free' | 'Pro' = 'Free';
 
-  protected readonly accountFields: readonly AccountField[] = [
-    { icon: 'copy', label: 'Email', value: 'alex.chen@company.com' },
-    { icon: 'users', label: 'Role', value: 'Admin' },
-    { icon: 'history', label: 'Joined', value: 'January 14, 2023' },
-    { icon: 'file', label: 'Last login', value: 'Apr 25, 2026 at 07:38 PM' },
-  ];
+  /** Perfil desde la sesión Clerk (misma fuente que el sidebar y las llamadas API). */
+  protected readonly profileDisplay = computed(() => {
+    const s = this.authSession.snapshot();
+    const email = s.email?.trim() || null;
+    const displayName = s.displayName?.trim() || null;
+    const primaryLabel = displayName || email;
+    const rawUser = s.username?.trim();
+    const handle = rawUser != null && rawUser.length > 0 ? (rawUser.startsWith('@') ? rawUser : `@${rawUser}`) : null;
+    const avatarUrl = s.avatarUrl?.trim() || null;
+
+    return {
+      fullName: primaryLabel ?? '—',
+      email: email ?? '—',
+      handle,
+      avatarUrl,
+      initials: initialsFromName(primaryLabel ?? email ?? '?'),
+    };
+  });
+
+  protected readonly accountInfoFields = computed((): AccountField[] => {
+    const s = this.authSession.snapshot();
+    const email = s.email?.trim() || '—';
+    const raw = s.username?.trim();
+    const username = raw != null && raw.length > 0 ? (raw.startsWith('@') ? raw : `@${raw}`) : '—';
+    const verified = s.emailVerified ? 'Yes' : 'No';
+
+    return [
+      { icon: 'copy', label: 'Email', value: email },
+      { icon: 'users', label: 'Username', value: username },
+      { icon: 'history', label: 'Email verified', value: verified },
+      { icon: 'file', label: 'Account plan', value: this.accountPlanMock },
+    ];
+  });
 
   protected readonly billingHighlights: readonly string[] = ['5 endpoints', '1000 requests/month', 'No AI generation'];
 
@@ -63,4 +91,16 @@ export class AccountSectionPageComponent {
         return 'Plan / Billing';
     }
   });
+}
+
+function initialsFromName(displayName: string): string {
+  const words = displayName.split(/\s+/).filter(Boolean);
+  if (words.length === 1) {
+    const w = words[0] ?? '';
+    return w.slice(0, 2).toUpperCase();
+  }
+  return words
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() ?? '')
+    .join('');
 }

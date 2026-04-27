@@ -51,6 +51,7 @@
                   [options]="memberRoleOptions"
                   [value]="member.role"
                   [disabled]="!canEditMemberRole(member)"
+                  [iconOnlyTrigger]="true"
                   (valueChange)="onMemberRoleChange(member, $event)"
                   [triggerId]="'workspace-member-role-trigger-' + member.userId"
                   [listboxId]="'workspace-member-role-listbox-' + member.userId"
@@ -59,11 +60,13 @@
               @if (canManageMembers() && canRemoveMember(member)) {
                 <button
                   type="button"
-                  class="workspace-members-page__remove"
+                  class="workspace-members-page__remove workspace-members-page__remove--icon"
+                  title="Remove member"
+                  aria-label="Remove member"
                   [disabled]="mutationPending()"
                   (click)="onRemoveMember(member.userId)"
                 >
-                  Remove
+                  <svg lucideTrash2 [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
                 </button>
               }
             </li>
@@ -82,6 +85,15 @@
           "
         >
           <div class="workspace-members-page__form-fields">
+            <app-select-menu
+              class="workspace-members-page__role-menu"
+              [options]="inviteRoleOptions"
+              [value]="selectedRole()"
+              [iconOnlyTrigger]="true"
+              (valueChange)="onRoleChange($event)"
+              [triggerId]="'workspace-members-role-trigger'"
+              [listboxId]="'workspace-members-role-listbox'"
+            />
             <input
               #memberEmail
               type="email"
@@ -89,14 +101,6 @@
               required
               placeholder="colleague@example.com"
               class="workspace-members-page__input"
-            />
-            <app-select-menu
-              class="workspace-members-page__role-menu"
-              [options]="inviteRoleOptions"
-              [value]="selectedRole()"
-              (valueChange)="onRoleChange($event)"
-              [triggerId]="'workspace-members-role-trigger'"
-              [listboxId]="'workspace-members-role-listbox'"
             />
           </div>
           <button

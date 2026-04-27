@@ -219,6 +219,20 @@
   cursor: not-allowed;
 }
 
+.workspace-members-page__remove--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  color: var(--cp-text-icon-muted);
+}
+
+.workspace-members-page__remove--icon:hover:not(:disabled) {
+  color: var(--cp-text-primary);
+}
+
 .workspace-members-page__form {
   display: flex;
   flex-direction: row;
@@ -269,7 +283,17 @@
 
 .workspace-members-page__role-menu::ng-deep .select-menu__trigger {
   min-height: 2.25rem;
+}
+
+/* Ancho amplio solo cuando el trigger muestra texto; si no, gana el compacto del select-menu. */
+.workspace-members-page__role-menu::ng-deep .select-menu:not(.select-menu--trigger-icon-only) .select-menu__trigger {
   min-width: 8.5rem;
+}
+
+.workspace-members-page__role-menu::ng-deep .select-menu--trigger-icon-only .select-menu__trigger {
+  min-width: 2.85rem;
+  width: auto;
+  max-width: none;
 }
 
 .workspace-members-page__submit {

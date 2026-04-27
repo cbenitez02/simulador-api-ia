@@ -9,15 +9,21 @@ import {
   Output,
   signal,
 } from '@angular/core';
+import { LucideCrown, LucideEye, LucidePencil } from '@lucide/angular';
+
+/** Iconos admitidos en opciones con pictograma (p. ej. roles de workspace). */
+export type SelectMenuIconKey = 'eye' | 'pencil' | 'crown';
 
 export interface SelectMenuOption {
   readonly value: string;
   readonly label: string;
+  readonly icon?: SelectMenuIconKey;
 }
 
 @Component({
   selector: 'app-select-menu',
   standalone: true,
+  imports: [LucideCrown, LucideEye, LucidePencil],
   templateUrl: './select-menu.component.html',
   styleUrls: ['./select-menu.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,11 +37,25 @@ export class SelectMenuComponent {
   @Output() readonly valueChange = new EventEmitter<string>();
   @Input({ required: true }) triggerId = '';
   @Input({ required: true }) listboxId = '';
+  /** Si es true y la opción activa tiene `icon`, el trigger muestra solo icono + chevron (p. ej. roles). */
+  @Input() iconOnlyTrigger = false;
 
   protected readonly open = signal(false);
 
   protected get currentLabel(): string {
     return this.options.find((option) => option.value === this.value)?.label ?? '';
+  }
+
+  protected get currentIcon(): SelectMenuIconKey | undefined {
+    return this.options.find((option) => option.value === this.value)?.icon;
+  }
+
+  protected get triggerHidesLabel(): boolean {
+    return this.iconOnlyTrigger && this.currentIcon !== undefined;
+  }
+
+  protected get triggerAccessibleName(): string | null {
+    return this.triggerHidesLabel ? this.currentLabel.trim() || 'Option' : null;
   }
 
   protected toggle(): void {

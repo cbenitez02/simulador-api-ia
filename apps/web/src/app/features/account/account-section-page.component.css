@@ -55,19 +55,40 @@
   min-width: 0;
 }
 
-.account-section-page__avatar {
-  width: 40px;
-  height: 40px;
+.account-section-page__avatar-shell {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
   border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
+  line-height: 0;
   border: 1px solid var(--cp-border-muted);
+  box-sizing: border-box;
+}
+
+.account-section-page__avatar {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+  border: none;
   background: var(--cp-surface-app);
   color: var(--cp-text-icon-muted);
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.03em;
+}
+
+.account-section-page__avatar:not(.account-section-page__avatar--image) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.account-section-page__avatar--image {
+  display: block;
+  padding: 0;
+  object-fit: cover;
 }
 
 .account-section-page__profile-meta {
@@ -306,10 +327,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  border: 1px solid transparent;
+  border: 1px solid var(--cp-border-default);
   border-radius: 8px;
-  background: var(--cp-accent-primary);
-  color: var(--cp-accent-on-primary);
+  background: var(--cp-surface-app);
+  color: var(--cp-text-primary);
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -319,7 +340,8 @@
 }
 
 .account-section-page__edit-btn:hover {
-  background: var(--cp-accent-primary-hover);
+  background: var(--cp-surface-subtle);
+  border-color: var(--cp-border-input-hover);
 }
 
 @media (max-width: 720px) {
