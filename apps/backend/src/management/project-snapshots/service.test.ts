@@ -14,10 +14,12 @@ vi.mock('../../lib/prisma.js', () => ({
 let buildSnapshotPayload: typeof ProjectSnapshotsService.buildSnapshotPayload;
 let buildSnapshotEndpointKey: typeof ProjectSnapshotsService.buildSnapshotEndpointKey;
 let planSnapshotEndpointReconciliation: typeof ProjectSnapshotsService.planSnapshotEndpointReconciliation;
+let buildProjectSnapshotRestorePreview: typeof ProjectSnapshotsService.buildProjectSnapshotRestorePreview;
 
 beforeAll(async () => {
   ({ buildSnapshotPayload, buildSnapshotEndpointKey, planSnapshotEndpointReconciliation } =
     await import('./service.js'));
+  ({ buildProjectSnapshotRestorePreview } = await import('./service.js'));
 });
 
 describe('project-snapshots/service helpers', () => {
@@ -226,6 +228,189 @@ describe('project-snapshots/service helpers', () => {
           ],
         },
       ],
+    });
+  });
+
+  it('preserves snapshot globalConfig scope instead of coercing it to all', () => {
+    const payload = buildSnapshotPayload({
+      id: 'project-1',
+      slug: 'users-api',
+      name: 'Users API',
+      description: 'Project snapshot',
+      globalConfig: {
+        latencyEnabled: false,
+        latencyMinMs: 0,
+        latencyMaxMs: 1000,
+        latencyMode: 'fixed',
+        errorSimulationEnabled: false,
+        errorSimulationRate: 0,
+        errorSimulationCodes: [500],
+        rateLimitingEnabled: false,
+        rateLimitingRpm: 60,
+        loggingLevel: 'basic',
+        scope: 'unset',
+      },
+      endpoints: [],
+    });
+
+    expect(payload.globalConfig.scope).toBe('unset');
+  });
+
+  it('builds a restore preview with metadata, config, and endpoint change groups', () => {
+    const preview = buildProjectSnapshotRestorePreview(
+      {
+        project: {
+          id: 'project-1',
+          slug: 'users-api',
+          name: 'Snapshot Users API',
+          description: 'Snapshot description',
+        },
+        globalConfig: {
+          projectId: 'project-1',
+          latencyEnabled: true,
+          latencyMinMs: 10,
+          latencyMaxMs: 20,
+          latencyMode: 'range',
+          errorSimulationEnabled: false,
+          errorSimulationRate: 0,
+          errorSimulationCodes: [500],
+          rateLimitingEnabled: false,
+          rateLimitingRpm: 60,
+          loggingLevel: 'full',
+          scope: 'unset',
+        },
+        endpoints: [
+          {
+            method: 'GET',
+            path: '/users',
+            description: 'Snapshot list users',
+            statusCode: 200,
+            responseBody: [{ id: 1 }],
+            endpointConfig: {
+              latencyMode: 'fixed',
+              fixedDelayMs: 0,
+              minDelayMs: 0,
+              maxDelayMs: 500,
+              errorRate: 0,
+              useScenarioWeights: true,
+            },
+            scenarios: [],
+          },
+          {
+            method: 'POST',
+            path: '/users',
+            description: 'Create user',
+            statusCode: 201,
+            responseBody: { ok: true },
+            endpointConfig: {
+              latencyMode: 'fixed',
+              fixedDelayMs: 0,
+              minDelayMs: 0,
+              maxDelayMs: 500,
+              errorRate: 0,
+              useScenarioWeights: true,
+            },
+            scenarios: [],
+          },
+        ],
+      },
+      {
+        project: {
+          id: 'project-1',
+          slug: 'users-api',
+          name: 'Live Users API',
+          description: 'Live description',
+        },
+        globalConfig: {
+          projectId: 'project-1',
+          latencyEnabled: false,
+          latencyMinMs: 0,
+          latencyMaxMs: 1000,
+          latencyMode: 'fixed',
+          errorSimulationEnabled: false,
+          errorSimulationRate: 0,
+          errorSimulationCodes: [500],
+          rateLimitingEnabled: false,
+          rateLimitingRpm: 60,
+          loggingLevel: 'basic',
+          scope: 'all',
+        },
+        endpoints: [
+          {
+            id: 'endpoint-1',
+            method: 'GET',
+            path: '/users',
+            description: 'Live list users',
+            statusCode: 200,
+            responseBody: [],
+            endpointConfig: {
+              latencyMode: 'fixed',
+              fixedDelayMs: 0,
+              minDelayMs: 0,
+              maxDelayMs: 500,
+              errorRate: 0,
+              useScenarioWeights: true,
+            },
+            scenarios: [],
+          },
+          {
+            id: 'endpoint-2',
+            method: 'DELETE',
+            path: '/users/:id',
+            description: 'Delete user',
+            statusCode: 204,
+            responseBody: null,
+            endpointConfig: {
+              latencyMode: 'fixed',
+              fixedDelayMs: 0,
+              minDelayMs: 0,
+              maxDelayMs: 500,
+              errorRate: 0,
+              useScenarioWeights: true,
+            },
+            scenarios: [],
+          },
+        ],
+      }
+    );
+
+    expect(preview.project.name).toEqual({
+      current: 'Live Users API',
+      snapshot: 'Snapshot Users API',
+      changed: true,
+    });
+    expect(preview.project.description).toEqual({
+      current: 'Live description',
+      snapshot: 'Snapshot description',
+      changed: true,
+    });
+    expect(preview.revision).toEqual({
+      endpointCount: 2,
+      scenarioCount: 0,
+      globalScope: 'unset',
+      projectSlug: 'users-api',
+      projectName: 'Snapshot Users API',
+      isLegacySnapshot: false,
+    });
+    expect(preview.globalConfig.changed).toBe(true);
+    expect(preview.globalConfig.changes.map((entry) => entry.field)).toEqual([
+      'latencyEnabled',
+      'latencyMinMs',
+      'latencyMaxMs',
+      'latencyMode',
+      'loggingLevel',
+      'scope',
+    ]);
+    expect(preview.endpoints.create.map((entry) => entry.key)).toEqual(['POST /users']);
+    expect(preview.endpoints.update.map((entry) => entry.key)).toEqual(['GET /users']);
+    expect(preview.endpoints.delete.map((entry) => entry.key)).toEqual(['DELETE /users/:id']);
+    expect(preview.endpoints.keep).toEqual([]);
+    expect(preview.counts).toEqual({
+      create: 1,
+      update: 1,
+      delete: 1,
+      keep: 0,
+      totalAfterRestore: 2,
     });
   });
 });

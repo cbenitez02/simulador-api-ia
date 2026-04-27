@@ -18,7 +18,12 @@ describe('dashboard/service', () => {
           id: 'workspace-1',
           role: 'owner',
           isPersonal: true,
-          capabilities: { canEdit: true, canManageMembers: true },
+          capabilities: {
+            canEdit: true,
+            canManageMembers: true,
+            canRestoreSnapshots: true,
+            canImportContracts: true,
+          },
         },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: {
@@ -178,7 +183,12 @@ describe('dashboard/service', () => {
           id: 'workspace-1',
           role: 'viewer',
           isPersonal: false,
-          capabilities: { canEdit: false, canManageMembers: false },
+          capabilities: {
+            canEdit: false,
+            canManageMembers: false,
+            canRestoreSnapshots: false,
+            canImportContracts: false,
+          },
         },
         updatedAt: new Date('2026-04-08T10:00:00.000Z'),
         globalConfig: null,

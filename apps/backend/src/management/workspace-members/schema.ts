@@ -15,6 +15,10 @@ export const addWorkspaceMemberSchema = z.object({
   role: workspaceRoleSchema,
 });
 
+export const updateWorkspaceMemberRoleSchema = z.object({
+  role: workspaceRoleSchema,
+});
+
 export const workspaceMemberResponseSchema = z.object({
   userId: z.string(),
   email: z.string().nullable(),
@@ -28,3 +32,4 @@ export const workspaceMembersListSchema = z.object({
 });
 
 export type AddWorkspaceMemberInput = z.infer<typeof addWorkspaceMemberSchema>;
+export type UpdateWorkspaceMemberRoleInput = z.infer<typeof updateWorkspaceMemberRoleSchema>;

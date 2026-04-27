@@ -19,13 +19,24 @@ export const listProjectsQuerySchema = z.object({
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
+  workspaceId: z.string().min(1).optional(),
 });
 
 export const updateProjectSchema = createProjectSchema
+  .extend({
+    slug: z.string().trim().min(1).max(100).optional(),
+  })
   .partial()
-  .refine((input) => input.name !== undefined || input.description !== undefined, {
-    message: 'At least one field (name or description) is required',
-  });
+  .refine(
+    (input) =>
+      input.name !== undefined ||
+      input.description !== undefined ||
+      input.slug !== undefined ||
+      input.workspaceId !== undefined,
+    {
+      message: 'At least one field (name, description, slug or workspaceId) is required',
+    }
+  );
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;

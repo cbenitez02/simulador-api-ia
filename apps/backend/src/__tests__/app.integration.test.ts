@@ -22,9 +22,19 @@ const prismaMock = {
   },
   workspaceMembership: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  workspaceInvitation: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
-    delete: vi.fn(),
+    update: vi.fn(),
   },
   externalIdentity: {
     findUnique: vi.fn(),
@@ -208,6 +218,7 @@ describe('app integration', () => {
     resetNestedMocks(prismaMock.user);
     resetNestedMocks(prismaMock.workspace);
     resetNestedMocks(prismaMock.workspaceMembership);
+    resetNestedMocks(prismaMock.workspaceInvitation);
     resetNestedMocks(prismaMock.externalIdentity);
     resetNestedMocks(prismaMock.project);
     resetNestedMocks(prismaMock.endpoint);
@@ -467,8 +478,102 @@ describe('app integration', () => {
     expect(tx.globalConfig.create).toHaveBeenCalledTimes(1);
   });
 
+  it('POST /api/v1/projects acepta workspaceId explícito cuando el actor puede mutar ese workspace', async () => {
+    const actorIdentity = buildActorIdentity('owner');
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce({
+      ...actorIdentity,
+      user: {
+        ...actorIdentity.user,
+        memberships: [
+          { workspaceId: 'workspace-1', role: 'owner' },
+          { workspaceId: 'workspace-2', role: 'editor' },
+        ],
+      },
+    });
+    prismaMock.project.findMany.mockResolvedValueOnce([]);
+
+    const tx = {
+      project: {
+        create: vi.fn().mockResolvedValue({
+          id: 'p2',
+          workspaceId: 'workspace-2',
+          name: 'Equipo API',
+          slug: 'equipo-api',
+          description: '',
+        }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 'p2',
+          workspaceId: 'workspace-2',
+          name: 'Equipo API',
+          slug: 'equipo-api',
+          description: '',
+          workspace: {
+            id: 'workspace-2',
+            name: 'Equipo Plataforma',
+            kind: 'team',
+          },
+          globalConfig: { projectId: 'p2' },
+          _count: { endpoints: 0 },
+        }),
+      },
+      globalConfig: {
+        create: vi.fn().mockResolvedValue({ id: 'gc2' }),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          email: 'owner@example.com',
+          displayName: 'Owner User',
+        }),
+      },
+      auditEvent: {
+        create: vi.fn().mockResolvedValue({ id: 'audit-2' }),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
+
+    const response = await request(app)
+      .post('/api/v1/projects')
+      .set(authHeaders())
+      .send({ name: 'Equipo API', workspaceId: 'workspace-2' });
+
+    expect(response.status).toBe(201);
+    expect(tx.project.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ workspaceId: 'workspace-2' }),
+      })
+    );
+    expect(response.body.workspace).toEqual({
+      id: 'workspace-2',
+      name: 'Equipo Plataforma',
+      kind: 'team',
+      role: 'editor',
+      isPersonal: false,
+      capabilities: {
+        canEdit: true,
+        canManageMembers: false,
+        canRestoreSnapshots: false,
+        canImportContracts: false,
+      },
+    });
+  });
+
+  it('POST /api/v1/projects rechaza workspaceId explícito sin permisos de mutación', async () => {
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('viewer'));
+
+    const response = await request(app)
+      .post('/api/v1/projects')
+      .set(authHeaders())
+      .send({ name: 'Sin permiso', workspaceId: 'workspace-1' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('WORKSPACE_MUTATION_DENIED');
+    expect(prismaMock.project.create).not.toHaveBeenCalled();
+  });
+
   it('PATCH /api/v1/projects/:projectId actualiza metadata sin cambiar slug', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.project.findUniqueOrThrow.mockResolvedValueOnce({ slug: 'mi-api' });
     prismaMock.project.update.mockResolvedValueOnce({
       id: 'p1',
       workspaceId: 'workspace-1',
@@ -489,6 +594,253 @@ describe('app integration', () => {
     expect(response.body.slug).toBe('mi-api');
   });
 
+  it('PATCH /api/v1/projects/:projectId permite actualizar slug y devuelve nueva mock URL en dashboard', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.project.findUniqueOrThrow.mockResolvedValueOnce({ slug: 'mi-api' });
+    prismaMock.project.findUnique.mockResolvedValueOnce(null);
+    prismaMock.project.update.mockResolvedValueOnce({
+      id: 'p1',
+      workspaceId: 'workspace-1',
+      name: 'Mi API',
+      slug: 'mi-api-v2',
+      description: 'Nuevo texto',
+      globalConfig: { projectId: 'p1' },
+      _count: { endpoints: 0 },
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({ slug: 'Mi API v2' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.slug).toBe('mi-api-v2');
+    expect(prismaMock.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ slug: 'mi-api-v2' }),
+      })
+    );
+  });
+
+  it('PATCH /api/v1/projects/:projectId transfiere el proyecto entre workspaces y registra metadata de auditoría clara', async () => {
+    const actorIdentity = buildActorIdentity('owner');
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce({
+      ...actorIdentity,
+      user: {
+        ...actorIdentity.user,
+        memberships: [
+          { workspaceId: 'workspace-1', role: 'owner' },
+          { workspaceId: 'workspace-2', role: 'editor' },
+        ],
+      },
+    });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+
+    const tx = {
+      project: {
+        findUniqueOrThrow: vi
+          .fn()
+          .mockResolvedValueOnce({
+            id: 'p1',
+            slug: 'mi-api',
+            workspaceId: 'workspace-1',
+            workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
+          })
+          .mockResolvedValueOnce({
+            id: 'p1',
+            workspaceId: 'workspace-2',
+            name: 'Mi API trasladada',
+            slug: 'mi-api',
+            description: 'Nuevo workspace',
+            workspace: { id: 'workspace-2', name: 'Equipo Plataforma', kind: 'team' },
+            globalConfig: { projectId: 'p1' },
+            _count: { endpoints: 0 },
+          }),
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn().mockResolvedValue({
+          id: 'p1',
+          workspaceId: 'workspace-2',
+          name: 'Mi API trasladada',
+          slug: 'mi-api',
+          description: 'Nuevo workspace',
+          workspace: { id: 'workspace-2', name: 'Equipo Plataforma', kind: 'team' },
+          globalConfig: { projectId: 'p1' },
+          _count: { endpoints: 0 },
+        }),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          email: 'owner@example.com',
+          displayName: 'Owner User',
+        }),
+      },
+      auditEvent: {
+        create: vi.fn().mockResolvedValue({ id: 'audit-transfer' }),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({
+        name: 'Mi API trasladada',
+        description: 'Nuevo workspace',
+        workspaceId: 'workspace-2',
+      });
+
+    expect(response.status).toBe(200);
+    expect(tx.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ workspaceId: 'workspace-2' }),
+      })
+    );
+    expect(tx.auditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          workspaceId: 'workspace-2',
+          metadata: expect.objectContaining({
+            previousWorkspaceId: 'workspace-1',
+            previousWorkspaceName: 'Personal workspace',
+            nextWorkspaceId: 'workspace-2',
+            nextWorkspaceName: 'Equipo Plataforma',
+          }),
+        }),
+      })
+    );
+    expect(response.body.workspace).toEqual({
+      id: 'workspace-2',
+      name: 'Equipo Plataforma',
+      kind: 'team',
+      role: 'editor',
+      isPersonal: false,
+      capabilities: {
+        canEdit: true,
+        canManageMembers: false,
+        canRestoreSnapshots: false,
+        canImportContracts: false,
+      },
+    });
+  });
+
+  it('PATCH /api/v1/projects/:projectId rechaza transferencias a workspaces destino sin permisos de mutación', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({ workspaceId: 'workspace-2' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('WORKSPACE_ACCESS_DENIED');
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('PATCH /api/v1/projects/:projectId trata workspaceId igual al actual como no-op de transferencia', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+
+    const tx = {
+      project: {
+        findUniqueOrThrow: vi
+          .fn()
+          .mockResolvedValueOnce({
+            id: 'p1',
+            slug: 'mi-api',
+            workspaceId: 'workspace-1',
+            workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
+          })
+          .mockResolvedValueOnce({
+            id: 'p1',
+            workspaceId: 'workspace-1',
+            name: 'Mi API v2',
+            slug: 'mi-api',
+            description: 'Sin traslado',
+            workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
+            globalConfig: { projectId: 'p1' },
+            _count: { endpoints: 0 },
+          }),
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn().mockResolvedValue({
+          id: 'p1',
+          workspaceId: 'workspace-1',
+          name: 'Mi API v2',
+          slug: 'mi-api',
+          description: 'Sin traslado',
+          workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
+          globalConfig: { projectId: 'p1' },
+          _count: { endpoints: 0 },
+        }),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          email: 'owner@example.com',
+          displayName: 'Owner User',
+        }),
+      },
+      auditEvent: {
+        create: vi.fn().mockResolvedValue({ id: 'audit-noop' }),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({ name: 'Mi API v2', description: 'Sin traslado', workspaceId: 'workspace-1' });
+
+    expect(response.status).toBe(200);
+    expect(tx.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ workspaceId: expect.any(String) }),
+      })
+    );
+    expect(tx.auditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.not.objectContaining({
+            previousWorkspaceId: expect.any(String),
+            nextWorkspaceId: expect.any(String),
+          }),
+        }),
+      })
+    );
+  });
+
+  it('PATCH /api/v1/projects/:projectId responde 409 cuando el slug ya existe', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.project.findUniqueOrThrow.mockResolvedValueOnce({ slug: 'mi-api' });
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p2' });
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({ slug: 'other-api' });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      error: 'Project slug already exists',
+      code: 'PROJECT_SLUG_DUPLICATE',
+    });
+  });
+
+  it('PATCH /api/v1/projects/:projectId responde 409 cuando el slug está reservado', async () => {
+    prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.project.findUniqueOrThrow.mockResolvedValueOnce({ slug: 'mi-api' });
+
+    const response = await request(app)
+      .patch('/api/v1/projects/p1')
+      .set(authHeaders())
+      .send({ slug: 'mock' });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      error: 'Project slug is reserved',
+      code: 'PROJECT_SLUG_RESERVED',
+    });
+  });
+
   it('permite a viewer acceder a dashboard summary y expone rol/capabilities del workspace', async () => {
     prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('viewer'));
     const { env } = await import('../config/env.js');
@@ -499,6 +851,7 @@ describe('app integration', () => {
       prismaMock.project.findUnique.mockResolvedValueOnce({
         id: 'p1',
         workspaceId: 'workspace-1',
+        workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
         name: 'Proyecto',
         slug: 'proyecto',
         description: 'Demo',
@@ -528,9 +881,16 @@ describe('app integration', () => {
       expect(response.status).toBe(200);
       expect(response.body.project.workspace).toEqual({
         id: 'workspace-1',
+        name: 'Personal workspace',
+        kind: 'personal',
         role: 'viewer',
         isPersonal: true,
-        capabilities: { canEdit: false, canManageMembers: false },
+        capabilities: {
+          canEdit: false,
+          canManageMembers: false,
+          canRestoreSnapshots: false,
+          canImportContracts: false,
+        },
       });
     } finally {
       env.MOCK_BASE_URL = originalMockBaseUrl;
@@ -554,9 +914,11 @@ describe('app integration', () => {
   it('permite mutaciones de proyecto para editor', async () => {
     prismaMock.externalIdentity.findUnique.mockResolvedValueOnce(buildActorIdentity('editor'));
     prismaMock.project.findUnique.mockResolvedValueOnce({ id: 'p1', workspaceId: 'workspace-1' });
+    prismaMock.project.findUniqueOrThrow.mockResolvedValueOnce({ slug: 'mi-api' });
     prismaMock.project.update.mockResolvedValueOnce({
       id: 'p1',
       workspaceId: 'workspace-1',
+      workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
       name: 'Editado',
       slug: 'mi-api',
       description: 'Nuevo texto',
@@ -572,9 +934,143 @@ describe('app integration', () => {
     expect(response.status).toBe(200);
     expect(response.body.workspace).toEqual({
       id: 'workspace-1',
+      name: 'Personal workspace',
+      kind: 'personal',
       role: 'editor',
       isPersonal: true,
-      capabilities: { canEdit: true, canManageMembers: false },
+      capabilities: {
+        canEdit: true,
+        canManageMembers: false,
+        canRestoreSnapshots: false,
+        canImportContracts: false,
+      },
+    });
+  });
+
+  it('GET /api/v1/workspaces lista workspaces accesibles con identidad para la UI', async () => {
+    const actorIdentity = buildActorIdentity('owner');
+    prismaMock.externalIdentity.findUnique.mockResolvedValueOnce({
+      ...actorIdentity,
+      user: {
+        ...actorIdentity.user,
+        memberships: [
+          { workspaceId: 'workspace-1', role: 'owner' },
+          { workspaceId: 'workspace-2', role: 'editor' },
+        ],
+      },
+    });
+    prismaMock.workspaceMembership.findMany.mockResolvedValueOnce([
+      {
+        workspaceId: 'workspace-1',
+        role: 'owner',
+        workspace: {
+          id: 'workspace-1',
+          name: 'Personal workspace',
+          kind: 'personal',
+        },
+      },
+      {
+        workspaceId: 'workspace-2',
+        role: 'editor',
+        workspace: {
+          id: 'workspace-2',
+          name: 'Equipo Plataforma',
+          kind: 'team',
+        },
+      },
+    ]);
+
+    const response = await request(app).get('/api/v1/workspaces').set(authHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      items: [
+        {
+          id: 'workspace-1',
+          name: 'Personal workspace',
+          kind: 'personal',
+          role: 'owner',
+          isPersonal: true,
+          capabilities: {
+            canEdit: true,
+            canManageMembers: true,
+            canRestoreSnapshots: true,
+            canImportContracts: true,
+          },
+        },
+        {
+          id: 'workspace-2',
+          name: 'Equipo Plataforma',
+          kind: 'team',
+          role: 'editor',
+          isPersonal: false,
+          capabilities: {
+            canEdit: true,
+            canManageMembers: false,
+            canRestoreSnapshots: false,
+            canImportContracts: false,
+          },
+        },
+      ],
+    });
+  });
+
+  it('POST /api/v1/workspaces crea team workspace y membresía owner para el actor', async () => {
+    const tx = {
+      workspace: {
+        create: vi.fn().mockResolvedValue({
+          id: 'workspace-2',
+          name: 'Equipo Plataforma',
+          kind: 'team',
+        }),
+      },
+      workspaceMembership: {
+        create: vi.fn().mockResolvedValue({
+          workspaceId: 'workspace-2',
+          userId: 'user-1',
+          role: 'owner',
+        }),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback(tx));
+
+    const response = await request(app)
+      .post('/api/v1/workspaces')
+      .set(authHeaders())
+      .send({ name: 'Equipo Plataforma' });
+
+    expect(response.status).toBe(201);
+    expect(tx.workspace.create).toHaveBeenCalledWith({
+      data: {
+        name: 'Equipo Plataforma',
+        kind: 'team',
+      },
+      select: {
+        id: true,
+        name: true,
+        kind: true,
+      },
+    });
+    expect(tx.workspaceMembership.create).toHaveBeenCalledWith({
+      data: {
+        workspaceId: 'workspace-2',
+        userId: 'user-1',
+        role: 'owner',
+      },
+    });
+    expect(response.body).toEqual({
+      id: 'workspace-2',
+      name: 'Equipo Plataforma',
+      kind: 'team',
+      role: 'owner',
+      isPersonal: false,
+      capabilities: {
+        canEdit: true,
+        canManageMembers: true,
+        canRestoreSnapshots: true,
+        canImportContracts: true,
+      },
     });
   });
 
@@ -734,6 +1230,7 @@ describe('app integration', () => {
       prismaMock.project.findUnique.mockResolvedValueOnce({
         id: 'p1',
         workspaceId: 'workspace-1',
+        workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
         name: 'Proyecto',
         slug: 'proyecto',
         description: 'Demo',
@@ -828,9 +1325,16 @@ describe('app integration', () => {
         mockUrl: 'https://mock.example.com/public-base/proyecto',
         workspace: {
           id: 'workspace-1',
+          name: 'Personal workspace',
+          kind: 'personal',
           role: 'owner',
           isPersonal: true,
-          capabilities: { canEdit: true, canManageMembers: true },
+          capabilities: {
+            canEdit: true,
+            canManageMembers: true,
+            canRestoreSnapshots: true,
+            canImportContracts: true,
+          },
         },
         updatedAt: '2026-04-08T10:00:00.000Z',
         status: 'attention',
@@ -1009,6 +1513,380 @@ describe('app integration', () => {
     expect(prismaMock.workspaceMembership.delete).not.toHaveBeenCalled();
   });
 
+  it('permite a owner actualizar el rol de un miembro existente', async () => {
+    prismaMock.workspaceMembership.findUnique.mockResolvedValueOnce({
+      userId: 'user-2',
+      role: 'viewer',
+      createdAt: new Date('2026-04-08T09:05:00.000Z'),
+      user: { email: 'viewer@example.com', displayName: 'Viewer User' },
+    });
+    prismaMock.workspaceMembership.update.mockResolvedValueOnce({
+      userId: 'user-2',
+      role: 'editor',
+      createdAt: new Date('2026-04-08T09:05:00.000Z'),
+      user: { email: 'viewer@example.com', displayName: 'Viewer User' },
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/workspaces/workspace-1/members/user-2')
+      .set(authHeaders())
+      .send({ role: 'editor' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      userId: 'user-2',
+      email: 'viewer@example.com',
+      displayName: 'Viewer User',
+      role: 'editor',
+      createdAt: '2026-04-08T09:05:00.000Z',
+    });
+    expect(prismaMock.workspaceMembership.update).toHaveBeenCalledWith({
+      where: {
+        workspaceId_userId: {
+          workspaceId: 'workspace-1',
+          userId: 'user-2',
+        },
+      },
+      data: { role: 'editor' },
+      select: {
+        userId: true,
+        role: true,
+        createdAt: true,
+        user: {
+          select: {
+            email: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+  });
+
+  it('devuelve 404 al actualizar una membresía inexistente', async () => {
+    prismaMock.workspaceMembership.findUnique.mockResolvedValueOnce(null);
+
+    const response = await request(app)
+      .patch('/api/v1/workspaces/workspace-1/members/user-404')
+      .set(authHeaders())
+      .send({ role: 'editor' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.code).toBe('WORKSPACE_MEMBER_NOT_FOUND');
+    expect(prismaMock.workspaceMembership.update).not.toHaveBeenCalled();
+  });
+
+  it('bloquea degradar al último owner del workspace', async () => {
+    prismaMock.workspaceMembership.findUnique.mockResolvedValueOnce({
+      userId: 'user-2',
+      role: 'owner',
+      createdAt: new Date('2026-04-08T09:05:00.000Z'),
+      user: { email: 'owner2@example.com', displayName: 'Second Owner' },
+    });
+    prismaMock.workspaceMembership.count.mockResolvedValueOnce(1);
+
+    const response = await request(app)
+      .patch('/api/v1/workspaces/workspace-1/members/user-2')
+      .set(authHeaders())
+      .send({ role: 'editor' });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('WORKSPACE_LAST_OWNER_REQUIRED');
+    expect(prismaMock.workspaceMembership.update).not.toHaveBeenCalled();
+  });
+
+  it('bloquea auto-degradación del owner autenticado', async () => {
+    const response = await request(app)
+      .patch('/api/v1/workspaces/workspace-1/members/user-1')
+      .set(authHeaders())
+      .send({ role: 'editor' });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('WORKSPACE_MEMBER_SELF_DEMOTION_BLOCKED');
+    expect(prismaMock.workspaceMembership.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.workspaceMembership.update).not.toHaveBeenCalled();
+  });
+
+  it('permite a owner crear, listar y revocar invitaciones pendientes', async () => {
+    prismaMock.workspaceInvitation.create.mockResolvedValueOnce({
+      id: 'invite-1',
+      workspaceId: 'workspace-1',
+      email: 'viewer@example.com',
+      role: 'viewer',
+      status: 'pending',
+      createdAt: new Date('2026-04-08T09:10:00.000Z'),
+      workspace: { id: 'workspace-1', name: 'Personal workspace' },
+    });
+    prismaMock.workspaceInvitation.findMany.mockResolvedValueOnce([
+      {
+        id: 'invite-1',
+        workspaceId: 'workspace-1',
+        email: 'viewer@example.com',
+        role: 'viewer',
+        status: 'pending',
+        createdAt: new Date('2026-04-08T09:10:00.000Z'),
+        workspace: { id: 'workspace-1', name: 'Personal workspace' },
+      },
+    ]);
+    prismaMock.workspaceInvitation.findUnique.mockResolvedValueOnce({
+      id: 'invite-1',
+      workspaceId: 'workspace-1',
+      status: 'pending',
+    });
+    prismaMock.workspaceInvitation.update.mockResolvedValueOnce({
+      id: 'invite-1',
+      workspaceId: 'workspace-1',
+      email: 'viewer@example.com',
+      role: 'viewer',
+      status: 'revoked',
+      createdAt: new Date('2026-04-08T09:10:00.000Z'),
+      workspace: { id: 'workspace-1', name: 'Personal workspace' },
+    });
+
+    const createResponse = await request(app)
+      .post('/api/v1/workspaces/workspace-1/invitations')
+      .set(authHeaders())
+      .send({ email: 'viewer@example.com', role: 'viewer' });
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body).toEqual({
+      id: 'invite-1',
+      workspaceId: 'workspace-1',
+      workspaceName: 'Personal workspace',
+      email: 'viewer@example.com',
+      role: 'viewer',
+      status: 'pending',
+      createdAt: '2026-04-08T09:10:00.000Z',
+    });
+
+    const listResponse = await request(app)
+      .get('/api/v1/workspaces/workspace-1/invitations')
+      .set(authHeaders());
+
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body.items).toEqual([
+      {
+        id: 'invite-1',
+        workspaceId: 'workspace-1',
+        workspaceName: 'Personal workspace',
+        email: 'viewer@example.com',
+        role: 'viewer',
+        status: 'pending',
+        createdAt: '2026-04-08T09:10:00.000Z',
+      },
+    ]);
+
+    const revokeResponse = await request(app)
+      .delete('/api/v1/workspaces/workspace-1/invitations/invite-1')
+      .set(authHeaders());
+
+    expect(revokeResponse.status).toBe(204);
+    expect(prismaMock.workspaceInvitation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'invite-1' },
+        data: expect.objectContaining({
+          status: 'revoked',
+        }),
+      })
+    );
+  });
+
+  it('permite crear invitaciones con rol editor', async () => {
+    prismaMock.workspaceInvitation.create.mockResolvedValueOnce({
+      id: 'invite-editor-1',
+      workspaceId: 'workspace-1',
+      email: 'editor@example.com',
+      role: 'editor',
+      status: 'pending',
+      createdAt: new Date('2026-04-08T09:11:00.000Z'),
+      workspace: { id: 'workspace-1', name: 'Personal workspace' },
+    });
+
+    const response = await request(app)
+      .post('/api/v1/workspaces/workspace-1/invitations')
+      .set(authHeaders())
+      .send({ email: 'editor@example.com', role: 'editor' });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({
+      id: 'invite-editor-1',
+      workspaceId: 'workspace-1',
+      workspaceName: 'Personal workspace',
+      email: 'editor@example.com',
+      role: 'editor',
+      status: 'pending',
+      createdAt: '2026-04-08T09:11:00.000Z',
+    });
+    expect(prismaMock.workspaceInvitation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          role: 'editor',
+        }),
+      })
+    );
+  });
+
+  it('rechaza invitaciones pendientes duplicadas para el mismo workspace y email', async () => {
+    prismaMock.workspaceInvitation.findFirst.mockResolvedValueOnce({ id: 'invite-1' });
+
+    const response = await request(app)
+      .post('/api/v1/workspaces/workspace-1/invitations')
+      .set(authHeaders())
+      .send({ email: 'viewer@example.com', role: 'viewer' });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('WORKSPACE_INVITATION_ALREADY_PENDING');
+    expect(prismaMock.workspaceInvitation.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza crear invitaciones con rol owner', async () => {
+    const response = await request(app)
+      .post('/api/v1/workspaces/workspace-1/invitations')
+      .set(authHeaders())
+      .send({ email: 'owner-invite@example.com', role: 'owner' });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Validation Error',
+    });
+    expect(response.body.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'role',
+        }),
+      ])
+    );
+    expect(prismaMock.workspaceInvitation.create).not.toHaveBeenCalled();
+  });
+
+  it('lista las invitaciones pendientes del actor autenticado por email', async () => {
+    prismaMock.workspaceInvitation.findMany.mockResolvedValueOnce([
+      {
+        id: 'invite-1',
+        workspaceId: 'workspace-2',
+        email: 'owner@example.com',
+        role: 'editor',
+        status: 'pending',
+        createdAt: new Date('2026-04-08T09:20:00.000Z'),
+        workspace: { id: 'workspace-2', name: 'Equipo Plataforma' },
+      },
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/workspace-invitations/pending')
+      .set(authHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.items).toEqual([
+      {
+        id: 'invite-1',
+        workspaceId: 'workspace-2',
+        workspaceName: 'Equipo Plataforma',
+        email: 'owner@example.com',
+        role: 'editor',
+        status: 'pending',
+        createdAt: '2026-04-08T09:20:00.000Z',
+      },
+    ]);
+    expect(prismaMock.workspaceInvitation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          email: 'owner@example.com',
+          status: 'pending',
+        }),
+      })
+    );
+  });
+
+  it('acepta invitaciones pendientes en-app creando la membresía transaccionalmente', async () => {
+    prismaMock.workspaceInvitation.findUnique.mockResolvedValueOnce({
+      id: 'invite-1',
+      workspaceId: 'workspace-2',
+      email: 'owner@example.com',
+      role: 'editor',
+      status: 'pending',
+    });
+    prismaMock.workspaceMembership.findUnique.mockResolvedValueOnce(null);
+
+    const response = await request(app)
+      .post('/api/v1/workspace-invitations/invite-1/accept')
+      .set(authHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ accepted: true });
+    expect(prismaMock.$transaction).toHaveBeenCalled();
+    expect(prismaMock.workspaceMembership.create).toHaveBeenCalledWith({
+      data: {
+        workspaceId: 'workspace-2',
+        userId: 'user-1',
+        role: 'editor',
+      },
+    });
+    expect(prismaMock.workspaceInvitation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'invite-1' },
+        data: expect.objectContaining({
+          status: 'accepted',
+          acceptedByUserId: 'user-1',
+        }),
+      })
+    );
+  });
+
+  it('bloquea aceptar invitaciones si el email autenticado no coincide', async () => {
+    prismaMock.workspaceInvitation.findUnique.mockResolvedValueOnce({
+      id: 'invite-1',
+      workspaceId: 'workspace-2',
+      email: 'someone@example.com',
+      role: 'editor',
+      status: 'pending',
+    });
+
+    const response = await request(app)
+      .post('/api/v1/workspace-invitations/invite-1/accept')
+      .set(authHeaders());
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('WORKSPACE_INVITATION_EMAIL_MISMATCH');
+    expect(prismaMock.workspaceMembership.create).not.toHaveBeenCalled();
+  });
+
+  it('bloquea aceptar invitaciones ya revocadas', async () => {
+    prismaMock.workspaceInvitation.findUnique.mockResolvedValueOnce({
+      id: 'invite-1',
+      workspaceId: 'workspace-2',
+      email: 'owner@example.com',
+      role: 'editor',
+      status: 'revoked',
+    });
+
+    const response = await request(app)
+      .post('/api/v1/workspace-invitations/invite-1/accept')
+      .set(authHeaders());
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('WORKSPACE_INVITATION_ALREADY_REVOKED');
+    expect(prismaMock.workspaceMembership.create).not.toHaveBeenCalled();
+  });
+
+  it('bloquea aceptar invitaciones cuando la membresía ya existe', async () => {
+    prismaMock.workspaceInvitation.findUnique.mockResolvedValueOnce({
+      id: 'invite-1',
+      workspaceId: 'workspace-2',
+      email: 'owner@example.com',
+      role: 'editor',
+      status: 'pending',
+    });
+    prismaMock.workspaceMembership.findUnique.mockResolvedValueOnce({ userId: 'user-1' });
+
+    const response = await request(app)
+      .post('/api/v1/workspace-invitations/invite-1/accept')
+      .set(authHeaders());
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('WORKSPACE_MEMBER_ALREADY_EXISTS');
+    expect(prismaMock.workspaceInvitation.update).not.toHaveBeenCalled();
+  });
+
   it('GET /api/v1/projects/:projectId/dashboard-summary responde 404 cuando falta el proyecto', async () => {
     prismaMock.project.findUnique.mockResolvedValueOnce(null);
 
@@ -1024,6 +1902,7 @@ describe('app integration', () => {
     prismaMock.project.findUnique.mockResolvedValueOnce({
       id: 'p1',
       workspaceId: 'workspace-1',
+      workspace: { id: 'workspace-1', name: 'Personal workspace', kind: 'personal' },
       name: 'Proyecto vacío',
       slug: 'proyecto-vacio',
       description: '',

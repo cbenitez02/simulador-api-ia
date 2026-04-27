@@ -1,4 +1,4 @@
-import { authorizeProjectAccess } from '../../auth/authorization.js';
+import { authorizeProjectAccess, authorizeProjectCapability } from '../../auth/authorization.js';
 import type { AuthenticatedActor } from '../../auth/types.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPrismaJson } from '../../lib/prisma-json.js';
@@ -37,7 +37,7 @@ interface SnapshotScenarioSource {
 
 interface SnapshotScenarioPayload {
   name: string;
-  type: 'success' | 'error' | 'timeout' | 'empty';
+  type: 'success' | 'error' | 'timeout' | 'empty' | 'unauthorized';
   statusCode: number;
   body: unknown;
   delayMs: number;
@@ -87,6 +87,7 @@ interface ProjectSnapshotSummary {
   name: string;
   description: string;
   createdAt: string;
+  revision: SnapshotRevisionMetadata;
   createdBy: {
     userId: string;
     email: string | null;
@@ -96,6 +97,51 @@ interface ProjectSnapshotSummary {
 
 interface ProjectSnapshotDetail extends ProjectSnapshotSummary {
   payload: ProjectSnapshotPayload;
+}
+
+interface RestorePreviewValue<T> {
+  current: T;
+  snapshot: T;
+  changed: boolean;
+}
+
+interface RestorePreviewConfigChange {
+  field: keyof Omit<SnapshotGlobalConfigPayload, 'projectId'>;
+  current: unknown;
+  snapshot: unknown;
+}
+
+interface RestorePreviewEndpointSummary {
+  key: string;
+  method: string;
+  path: string;
+}
+
+export interface ProjectSnapshotRestorePreview {
+  snapshotId: string;
+  snapshotName: string;
+  revision: SnapshotRevisionMetadata;
+  project: {
+    name: RestorePreviewValue<string>;
+    description: RestorePreviewValue<string>;
+  };
+  globalConfig: {
+    changed: boolean;
+    changes: RestorePreviewConfigChange[];
+  };
+  endpoints: {
+    create: RestorePreviewEndpointSummary[];
+    update: RestorePreviewEndpointSummary[];
+    delete: RestorePreviewEndpointSummary[];
+    keep: RestorePreviewEndpointSummary[];
+  };
+  counts: {
+    create: number;
+    update: number;
+    delete: number;
+    keep: number;
+    totalAfterRestore: number;
+  };
 }
 
 interface ProjectSnapshotRecord {
@@ -110,6 +156,25 @@ interface ProjectSnapshotRecord {
   createdAt: Date;
 }
 
+interface SnapshotRevisionMetadata {
+  endpointCount: number;
+  scenarioCount: number;
+  globalScope: 'all' | 'unset' | null;
+  projectSlug: string | null;
+  projectName: string | null;
+  isLegacySnapshot: boolean;
+}
+
+interface LiveRestoreEndpoint extends SnapshotEndpointPayload {
+  id: string;
+}
+
+interface LiveProjectRestoreState {
+  project: ProjectSnapshotPayload['project'];
+  globalConfig: SnapshotGlobalConfigPayload;
+  endpoints: LiveRestoreEndpoint[];
+}
+
 const DEFAULT_ENDPOINT_CONFIG: SnapshotEndpointConfigPayload = {
   latencyMode: 'fixed',
   fixedDelayMs: 0,
@@ -121,6 +186,110 @@ const DEFAULT_ENDPOINT_CONFIG: SnapshotEndpointConfigPayload = {
 
 export function buildSnapshotEndpointKey(method: string, path: string): string {
   return `${method.trim().toUpperCase()} ${path.trim()}`;
+}
+
+function toStableJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function toEndpointSummary(endpoint: {
+  method: string;
+  path: string;
+}): RestorePreviewEndpointSummary {
+  return {
+    key: buildSnapshotEndpointKey(endpoint.method, endpoint.path),
+    method: endpoint.method.toUpperCase(),
+    path: endpoint.path,
+  };
+}
+
+function toSnapshotRevisionMetadata(payload: unknown): SnapshotRevisionMetadata {
+  const snapshotPayload = payload as Partial<ProjectSnapshotPayload> | null | undefined;
+  const endpoints = Array.isArray(snapshotPayload?.endpoints) ? snapshotPayload.endpoints : null;
+  const globalScope =
+    snapshotPayload?.globalConfig?.scope === 'all' ||
+    snapshotPayload?.globalConfig?.scope === 'unset'
+      ? snapshotPayload.globalConfig.scope
+      : null;
+
+  return {
+    endpointCount: endpoints?.length ?? 0,
+    scenarioCount:
+      endpoints?.reduce(
+        (total, endpoint) =>
+          total + (Array.isArray(endpoint?.scenarios) ? endpoint.scenarios.length : 0),
+        0
+      ) ?? 0,
+    globalScope,
+    projectSlug:
+      typeof snapshotPayload?.project?.slug === 'string' ? snapshotPayload.project.slug : null,
+    projectName:
+      typeof snapshotPayload?.project?.name === 'string' ? snapshotPayload.project.name : null,
+    isLegacySnapshot: !snapshotPayload?.project || !endpoints || !snapshotPayload?.globalConfig,
+  };
+}
+
+function areSnapshotEndpointsEquivalent(
+  snapshotEndpoint: SnapshotEndpointPayload,
+  liveEndpoint: SnapshotEndpointPayload
+): boolean {
+  return (
+    snapshotEndpoint.description === liveEndpoint.description &&
+    snapshotEndpoint.statusCode === liveEndpoint.statusCode &&
+    toStableJson(snapshotEndpoint.responseBody) === toStableJson(liveEndpoint.responseBody) &&
+    toStableJson(snapshotEndpoint.endpointConfig) === toStableJson(liveEndpoint.endpointConfig) &&
+    toStableJson(snapshotEndpoint.scenarios) === toStableJson(liveEndpoint.scenarios)
+  );
+}
+
+function buildEndpointRestorePlan(
+  snapshotEndpoints: SnapshotEndpointPayload[],
+  liveEndpoints: LiveRestoreEndpoint[]
+) {
+  const snapshotByKey = new Map(
+    snapshotEndpoints.map((endpoint) => [
+      buildSnapshotEndpointKey(endpoint.method, endpoint.path),
+      endpoint,
+    ])
+  );
+  const liveByKey = new Map(
+    liveEndpoints.map((endpoint) => [
+      buildSnapshotEndpointKey(endpoint.method, endpoint.path),
+      endpoint,
+    ])
+  );
+
+  const create: SnapshotEndpointPayload[] = [];
+  const update: Array<{ snapshot: SnapshotEndpointPayload; live: LiveRestoreEndpoint }> = [];
+  const keep: Array<{ snapshot: SnapshotEndpointPayload; live: LiveRestoreEndpoint }> = [];
+
+  for (const snapshotEndpoint of snapshotEndpoints) {
+    const key = buildSnapshotEndpointKey(snapshotEndpoint.method, snapshotEndpoint.path);
+    const liveEndpoint = liveByKey.get(key);
+    if (!liveEndpoint) {
+      create.push(snapshotEndpoint);
+      continue;
+    }
+
+    if (areSnapshotEndpointsEquivalent(snapshotEndpoint, liveEndpoint)) {
+      keep.push({ snapshot: snapshotEndpoint, live: liveEndpoint });
+      continue;
+    }
+
+    update.push({ snapshot: snapshotEndpoint, live: liveEndpoint });
+  }
+
+  const deleted = liveEndpoints.filter(
+    (endpoint) => !snapshotByKey.has(buildSnapshotEndpointKey(endpoint.method, endpoint.path))
+  );
+
+  return {
+    create,
+    update,
+    keep,
+    delete: deleted,
+    deleteIds: deleted.map((endpoint) => endpoint.id),
+  };
 }
 
 export function planSnapshotEndpointReconciliation(
@@ -187,6 +356,7 @@ function toSnapshotSummary(snapshot: ProjectSnapshotRecord): ProjectSnapshotSumm
     name: snapshot.name,
     description: snapshot.description,
     createdAt: snapshot.createdAt.toISOString(),
+    revision: toSnapshotRevisionMetadata(snapshot.payload),
     createdBy: {
       userId: snapshot.createdByUserId,
       email: snapshot.createdByEmail,
@@ -244,7 +414,72 @@ function normalizeSnapshotGlobalConfig(
       config?.loggingLevel === 'full' || config?.loggingLevel === 'off'
         ? config.loggingLevel
         : defaults.loggingLevel,
-    scope: config?.scope === 'unset' ? 'unset' : 'all',
+    scope: config?.scope === 'unset' || config?.scope === 'all' ? config.scope : defaults.scope,
+  };
+}
+
+function toRestorePreviewValue<T>(current: T, snapshot: T): RestorePreviewValue<T> {
+  return {
+    current,
+    snapshot,
+    changed: toStableJson(current) !== toStableJson(snapshot),
+  };
+}
+
+const RESTORE_PREVIEW_GLOBAL_CONFIG_FIELDS: Array<
+  keyof Omit<SnapshotGlobalConfigPayload, 'projectId'>
+> = [
+  'latencyEnabled',
+  'latencyMinMs',
+  'latencyMaxMs',
+  'latencyMode',
+  'errorSimulationEnabled',
+  'errorSimulationRate',
+  'errorSimulationCodes',
+  'rateLimitingEnabled',
+  'rateLimitingRpm',
+  'loggingLevel',
+  'scope',
+];
+
+export function buildProjectSnapshotRestorePreview(
+  snapshot: ProjectSnapshotPayload,
+  live: LiveProjectRestoreState,
+  snapshotMeta?: { id: string; name: string }
+): ProjectSnapshotRestorePreview {
+  const name = toRestorePreviewValue(live.project.name, snapshot.project.name);
+  const description = toRestorePreviewValue(live.project.description, snapshot.project.description);
+  const configChanges = RESTORE_PREVIEW_GLOBAL_CONFIG_FIELDS.flatMap((field) => {
+    const current = live.globalConfig[field];
+    const next = snapshot.globalConfig[field];
+    return toStableJson(current) === toStableJson(next)
+      ? []
+      : [{ field, current, snapshot: next } satisfies RestorePreviewConfigChange];
+  });
+  const endpointPlan = buildEndpointRestorePlan(snapshot.endpoints, live.endpoints);
+
+  return {
+    snapshotId: snapshotMeta?.id ?? '',
+    snapshotName: snapshotMeta?.name ?? '',
+    revision: toSnapshotRevisionMetadata(snapshot),
+    project: { name, description },
+    globalConfig: {
+      changed: configChanges.length > 0,
+      changes: configChanges,
+    },
+    endpoints: {
+      create: endpointPlan.create.map(toEndpointSummary),
+      update: endpointPlan.update.map(({ snapshot: endpoint }) => toEndpointSummary(endpoint)),
+      delete: endpointPlan.delete.map(toEndpointSummary),
+      keep: endpointPlan.keep.map(({ snapshot: endpoint }) => toEndpointSummary(endpoint)),
+    },
+    counts: {
+      create: endpointPlan.create.length,
+      update: endpointPlan.update.length,
+      delete: endpointPlan.delete.length,
+      keep: endpointPlan.keep.length,
+      totalAfterRestore: snapshot.endpoints.length,
+    },
   };
 }
 
@@ -288,7 +523,10 @@ export function buildSnapshotPayload(project: {
         scenarios: endpoint.scenarios.map((scenario) => ({
           name: scenario.name,
           type:
-            scenario.type === 'error' || scenario.type === 'timeout' || scenario.type === 'empty'
+            scenario.type === 'error' ||
+            scenario.type === 'timeout' ||
+            scenario.type === 'empty' ||
+            scenario.type === 'unauthorized'
               ? scenario.type
               : 'success',
           statusCode: scenario.statusCode,
@@ -315,6 +553,42 @@ async function loadSnapshotRecord(
   return snapshot as ProjectSnapshotRecord;
 }
 
+async function loadLiveProjectRestoreState(projectId: string): Promise<LiveProjectRestoreState> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      globalConfig: true,
+      endpoints: {
+        include: {
+          endpointConfig: true,
+          scenarios: {
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          },
+        },
+        orderBy: [{ method: 'asc' }, { path: 'asc' }, { id: 'asc' }],
+      },
+    },
+  });
+
+  if (!project) {
+    throw new AppError(404, 'Project not found');
+  }
+
+  return {
+    project: {
+      id: project.id,
+      slug: project.slug,
+      name: project.name,
+      description: project.description,
+    },
+    globalConfig: normalizeSnapshotGlobalConfig(projectId, project.globalConfig),
+    endpoints: buildSnapshotPayload(project).endpoints.map((endpoint, index) => ({
+      id: project.endpoints[index]!.id,
+      ...endpoint,
+    })),
+  };
+}
+
 export async function listProjectSnapshots(actor: AuthenticatedActor, projectId: string) {
   await authorizeProjectAccess(actor, projectId, 'read');
 
@@ -336,6 +610,21 @@ export async function getProjectSnapshotDetail(
   await authorizeProjectAccess(actor, projectId, 'read');
   const snapshot = await loadSnapshotRecord(projectId, snapshotId);
   return toSnapshotDetail(snapshot);
+}
+
+export async function getProjectSnapshotRestorePreview(
+  actor: AuthenticatedActor,
+  projectId: string,
+  snapshotId: string
+) {
+  await authorizeProjectAccess(actor, projectId, 'read');
+  const snapshot = await loadSnapshotRecord(projectId, snapshotId);
+  const detail = toSnapshotDetail(snapshot);
+  const live = await loadLiveProjectRestoreState(projectId);
+  return buildProjectSnapshotRestorePreview(detail.payload, live, {
+    id: snapshot.id,
+    name: snapshot.name,
+  });
 }
 
 export async function createProjectSnapshot(
@@ -386,10 +675,15 @@ export async function createProjectSnapshot(
       resourceType: 'snapshot',
       resourceId: snapshot.id,
       action: 'created',
-      summary: `Created snapshot ${snapshot.name}`,
+      summary: `Created revision ${snapshot.name}`,
       metadata: {
         snapshotName: snapshot.name,
         endpointCount: payload.endpoints.length,
+        scenarioCount: payload.endpoints.reduce(
+          (total, endpoint) => total + endpoint.scenarios.length,
+          0
+        ),
+        scope: payload.globalConfig.scope,
       },
     });
 
@@ -402,9 +696,11 @@ export async function restoreProjectSnapshot(
   projectId: string,
   snapshotId: string
 ) {
-  const projectAccess = await authorizeProjectAccess(actor, projectId, 'mutate');
+  const projectAccess = await authorizeProjectCapability(actor, projectId, 'canRestoreSnapshots');
   const snapshot = await loadSnapshotRecord(projectId, snapshotId);
   const detail = toSnapshotDetail(snapshot);
+  const live = await loadLiveProjectRestoreState(projectId);
+  const plan = buildEndpointRestorePlan(detail.payload.endpoints, live.endpoints);
 
   await prisma.$transaction(async (tx) => {
     await tx.project.update({
@@ -428,7 +724,7 @@ export async function restoreProjectSnapshot(
         rateLimitingEnabled: detail.payload.globalConfig.rateLimitingEnabled,
         rateLimitingRpm: detail.payload.globalConfig.rateLimitingRpm,
         loggingLevel: detail.payload.globalConfig.loggingLevel,
-        scope: 'all',
+        scope: detail.payload.globalConfig.scope,
       },
       create: {
         projectId,
@@ -442,46 +738,70 @@ export async function restoreProjectSnapshot(
         rateLimitingEnabled: detail.payload.globalConfig.rateLimitingEnabled,
         rateLimitingRpm: detail.payload.globalConfig.rateLimitingRpm,
         loggingLevel: detail.payload.globalConfig.loggingLevel,
-        scope: 'all',
+        scope: detail.payload.globalConfig.scope,
       },
     });
 
-    const liveEndpoints = await tx.endpoint.findMany({
-      where: { projectId },
-      select: { id: true, method: true, path: true },
-    });
-    const plan = planSnapshotEndpointReconciliation(detail.payload.endpoints, liveEndpoints);
-    const liveByKey = new Map(
-      liveEndpoints.map((endpoint) => [
-        buildSnapshotEndpointKey(endpoint.method, endpoint.path),
-        endpoint,
-      ])
-    );
+    for (const endpoint of plan.update) {
+      const restored = await tx.endpoint.update({
+        where: { id: endpoint.live.id },
+        data: {
+          description: endpoint.snapshot.description,
+          statusCode: endpoint.snapshot.statusCode,
+          responseBody: toPrismaJson(endpoint.snapshot.responseBody),
+        },
+        select: { id: true },
+      });
 
-    for (const endpoint of detail.payload.endpoints) {
-      const key = buildSnapshotEndpointKey(endpoint.method, endpoint.path);
-      const existing = liveByKey.get(key);
-      const restored = existing
-        ? await tx.endpoint.update({
-            where: { id: existing.id },
-            data: {
-              description: endpoint.description,
-              statusCode: endpoint.statusCode,
-              responseBody: toPrismaJson(endpoint.responseBody),
-            },
-            select: { id: true },
-          })
-        : await tx.endpoint.create({
-            data: {
-              projectId,
-              method: endpoint.method,
-              path: endpoint.path,
-              description: endpoint.description,
-              statusCode: endpoint.statusCode,
-              responseBody: toPrismaJson(endpoint.responseBody),
-            },
-            select: { id: true },
-          });
+      await tx.endpointConfig.upsert({
+        where: { endpointId: restored.id },
+        update: {
+          latencyMode: endpoint.snapshot.endpointConfig.latencyMode,
+          fixedDelayMs: endpoint.snapshot.endpointConfig.fixedDelayMs,
+          minDelayMs: endpoint.snapshot.endpointConfig.minDelayMs,
+          maxDelayMs: endpoint.snapshot.endpointConfig.maxDelayMs,
+          errorRate: endpoint.snapshot.endpointConfig.errorRate,
+          useScenarioWeights: endpoint.snapshot.endpointConfig.useScenarioWeights,
+        },
+        create: {
+          endpointId: restored.id,
+          latencyMode: endpoint.snapshot.endpointConfig.latencyMode,
+          fixedDelayMs: endpoint.snapshot.endpointConfig.fixedDelayMs,
+          minDelayMs: endpoint.snapshot.endpointConfig.minDelayMs,
+          maxDelayMs: endpoint.snapshot.endpointConfig.maxDelayMs,
+          errorRate: endpoint.snapshot.endpointConfig.errorRate,
+          useScenarioWeights: endpoint.snapshot.endpointConfig.useScenarioWeights,
+        },
+      });
+
+      await tx.scenario.deleteMany({ where: { endpointId: restored.id } });
+      if (endpoint.snapshot.scenarios.length > 0) {
+        await tx.scenario.createMany({
+          data: endpoint.snapshot.scenarios.map((scenario) => ({
+            endpointId: restored.id,
+            name: scenario.name,
+            type: scenario.type,
+            statusCode: scenario.statusCode,
+            body: toPrismaJson(scenario.body),
+            delayMs: scenario.delayMs,
+            weight: scenario.weight,
+          })),
+        });
+      }
+    }
+
+    for (const endpoint of plan.create) {
+      const restored = await tx.endpoint.create({
+        data: {
+          projectId,
+          method: endpoint.method,
+          path: endpoint.path,
+          description: endpoint.description,
+          statusCode: endpoint.statusCode,
+          responseBody: toPrismaJson(endpoint.responseBody),
+        },
+        select: { id: true },
+      });
 
       await tx.endpointConfig.upsert({
         where: { endpointId: restored.id },
@@ -531,11 +851,16 @@ export async function restoreProjectSnapshot(
       resourceType: 'snapshot',
       resourceId: snapshot.id,
       action: 'restored',
-      summary: `Restored snapshot ${snapshot.name}`,
+      summary: `Restored revision ${snapshot.name}`,
       metadata: {
         snapshotName: snapshot.name,
         restoredEndpointCount: detail.payload.endpoints.length,
         deletedEndpointCount: plan.deleteIds.length,
+        scenarioCount: detail.payload.endpoints.reduce(
+          (total, endpoint) => total + endpoint.scenarios.length,
+          0
+        ),
+        scope: detail.payload.globalConfig.scope,
       },
     });
   });

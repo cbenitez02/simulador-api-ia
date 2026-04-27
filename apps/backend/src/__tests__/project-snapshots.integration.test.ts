@@ -29,9 +29,11 @@ const prismaMock = {
   },
   globalConfig: {
     upsert: vi.fn(),
+    findUnique: vi.fn(),
   },
   endpoint: {
     findMany: vi.fn(),
+    findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     deleteMany: vi.fn(),
@@ -121,10 +123,30 @@ describe('project snapshots integration', () => {
     vi.clearAllMocks();
     prismaMock.externalIdentity.findUnique.mockResolvedValue(buildActorIdentity());
     prismaMock.project.findUnique.mockImplementation(
-      async ({ where }: { where: { id: string } }) => ({
-        id: where.id,
-        workspaceId: 'workspace-1',
-      })
+      async ({
+        where,
+        include,
+      }: {
+        where: { id: string };
+        include?: { globalConfig?: boolean; endpoints?: unknown };
+      }) => {
+        if (include) {
+          return {
+            id: where.id,
+            workspaceId: 'workspace-1',
+            slug: 'users-api',
+            name: 'Live Users API',
+            description: 'Live description',
+            globalConfig: null,
+            endpoints: [],
+          };
+        }
+
+        return {
+          id: where.id,
+          workspaceId: 'workspace-1',
+        };
+      }
     );
     prismaMock.user.findUnique.mockResolvedValue({
       email: 'owner@example.com',
@@ -200,7 +222,7 @@ describe('project snapshots integration', () => {
           resourceType: 'snapshot',
           resourceId: 'snapshot-1',
           action: 'created',
-          summary: 'Created snapshot Before edits',
+          summary: 'Created revision Before edits',
         }),
       })
     );
@@ -227,6 +249,19 @@ describe('project snapshots integration', () => {
         createdByUserId: 'user-1',
         createdByEmail: 'owner@example.com',
         createdByDisplayName: 'Owner User',
+        payload: {
+          project: {
+            id: 'project-1',
+            slug: 'users-api',
+            name: 'Users API',
+            description: 'Project snapshot',
+          },
+          globalConfig: { projectId: 'project-1', scope: 'unset' },
+          endpoints: [
+            { method: 'GET', path: '/users', scenarios: [{ name: 'ok' }] },
+            { method: 'POST', path: '/users', scenarios: [] },
+          ],
+        },
         createdAt: new Date('2026-04-17T09:00:00.000Z'),
       },
       {
@@ -237,6 +272,16 @@ describe('project snapshots integration', () => {
         createdByUserId: 'user-2',
         createdByEmail: 'other@example.com',
         createdByDisplayName: 'Other User',
+        payload: {
+          project: {
+            id: 'project-2',
+            slug: 'foreign-api',
+            name: 'Foreign API',
+            description: '',
+          },
+          globalConfig: { projectId: 'project-2', scope: 'all' },
+          endpoints: [],
+        },
         createdAt: new Date('2026-04-17T11:00:00.000Z'),
       },
       {
@@ -247,6 +292,16 @@ describe('project snapshots integration', () => {
         createdByUserId: 'user-1',
         createdByEmail: 'owner@example.com',
         createdByDisplayName: 'Owner User',
+        payload: {
+          project: {
+            id: 'project-1',
+            slug: 'users-api',
+            name: 'Users API',
+            description: 'Project snapshot',
+          },
+          globalConfig: { projectId: 'project-1', scope: 'all' },
+          endpoints: [{ method: 'GET', path: '/health', scenarios: [] }],
+        },
         createdAt: new Date('2026-04-17T10:00:00.000Z'),
       },
     ];
@@ -284,6 +339,22 @@ describe('project snapshots integration', () => {
       'snapshot-newest',
       'snapshot-older',
     ]);
+    expect(response.body.items[0]?.revision).toEqual({
+      endpointCount: 1,
+      scenarioCount: 0,
+      globalScope: 'all',
+      projectSlug: 'users-api',
+      projectName: 'Users API',
+      isLegacySnapshot: false,
+    });
+    expect(response.body.items[1]?.revision).toEqual({
+      endpointCount: 2,
+      scenarioCount: 1,
+      globalScope: 'unset',
+      projectSlug: 'users-api',
+      projectName: 'Users API',
+      isLegacySnapshot: false,
+    });
     expect(
       response.body.items.every((item: { projectId: string }) => item.projectId === 'project-1')
     ).toBe(true);
@@ -337,6 +408,14 @@ describe('project snapshots integration', () => {
       id: 'snapshot-1',
       projectId: 'project-1',
       name: 'Before edits',
+      revision: {
+        endpointCount: 0,
+        scenarioCount: 0,
+        globalScope: 'all',
+        projectSlug: 'users-api',
+        projectName: 'Users API',
+        isLegacySnapshot: false,
+      },
       createdBy: {
         userId: 'user-1',
         email: 'owner@example.com',
@@ -437,6 +516,23 @@ describe('project snapshots integration', () => {
     expect(prismaMock.auditEvent.create).not.toHaveBeenCalled();
   });
 
+  it('rejects snapshot restore for editors even when normal workspace edits are still allowed', async () => {
+    prismaMock.externalIdentity.findUnique.mockResolvedValue(buildActorIdentity('editor'));
+
+    const restoreResponse = await request(app)
+      .post('/api/v1/projects/project-1/snapshots/snapshot-1/restore')
+      .set(authHeaders())
+      .send({});
+
+    expect(restoreResponse.status).toBe(403);
+    expect(restoreResponse.body).toEqual({
+      error: 'You do not have permission to restore project snapshots',
+      code: 'WORKSPACE_SNAPSHOT_RESTORE_DENIED',
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.auditEvent.create).not.toHaveBeenCalled();
+  });
+
   it('blocks snapshot list and detail reads for non-members', async () => {
     prismaMock.externalIdentity.findUnique.mockResolvedValue(
       buildActorIdentityForWorkspace([{ workspaceId: 'workspace-2', role: 'viewer' }])
@@ -464,6 +560,40 @@ describe('project snapshots integration', () => {
   });
 
   it('restores a snapshot through one transaction and emits a single restore audit event', async () => {
+    prismaMock.project.findUnique.mockImplementation(
+      async ({
+        where,
+        include,
+      }: {
+        where: { id: string };
+        include?: { globalConfig?: boolean; endpoints?: unknown };
+      }) => {
+        if (include) {
+          return {
+            id: where.id,
+            workspaceId: 'workspace-1',
+            slug: 'users-api',
+            name: 'Live Users API',
+            description: 'Live description',
+            globalConfig: null,
+            endpoints: [
+              {
+                id: 'endpoint-old',
+                method: 'DELETE',
+                path: '/users/:id',
+                description: 'Delete user',
+                statusCode: 204,
+                responseBody: null,
+                endpointConfig: null,
+                scenarios: [],
+              },
+            ],
+          };
+        }
+
+        return { id: where.id, workspaceId: 'workspace-1' };
+      }
+    );
     prismaMock.projectSnapshot.findFirst.mockResolvedValue({
       id: 'snapshot-1',
       projectId: 'project-1',
@@ -528,6 +658,7 @@ describe('project snapshots integration', () => {
       },
       endpoint: {
         findMany: vi.fn(async () => [{ id: 'endpoint-old', method: 'DELETE', path: '/users/:id' }]),
+        findUnique: vi.fn(),
         create: vi.fn(async () => ({ id: 'endpoint-1' })),
         update: vi.fn(),
         deleteMany: vi.fn(async () => ({ count: 1 })),
@@ -555,6 +686,12 @@ describe('project snapshots integration', () => {
       .send({});
 
     expect(response.status).toBe(200);
+    expect(tx.globalConfig.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ scope: 'all' }),
+        create: expect.objectContaining({ scope: 'all' }),
+      })
+    );
     expect(tx.endpoint.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ['endpoint-old'] } },
     });
@@ -565,7 +702,7 @@ describe('project snapshots integration', () => {
           resourceType: 'snapshot',
           resourceId: 'snapshot-1',
           action: 'restored',
-          summary: 'Restored snapshot Before imports',
+          summary: 'Restored revision Before imports',
         }),
       })
     );
@@ -637,6 +774,7 @@ describe('project snapshots integration', () => {
       },
       endpoint: {
         findMany: vi.fn(async () => []),
+        findUnique: vi.fn(),
         create: vi.fn(async () => {
           throw new Error('restore failed');
         }),
@@ -812,11 +950,13 @@ describe('project snapshots integration', () => {
               workingState.globalConfig = { ...update };
               return workingState.globalConfig;
             }),
+            findUnique: vi.fn(),
           },
           endpoint: {
             findMany: vi.fn(async () =>
               workingState.endpoints.map(({ id, method, path }) => ({ id, method, path }))
             ),
+            findUnique: vi.fn(),
             create: vi.fn(
               async ({
                 data,
@@ -895,5 +1035,259 @@ describe('project snapshots integration', () => {
       },
     ]);
     expect(liveState.auditEvents).toEqual([]);
+  });
+
+  it('returns a restore preview diff before mutating live state', async () => {
+    prismaMock.project.findUnique.mockImplementation(
+      async ({
+        where,
+        include,
+      }: {
+        where: { id: string };
+        include?: { globalConfig?: boolean; endpoints?: unknown };
+      }) => {
+        if (where.id !== 'project-1') return null;
+        if (include) {
+          return {
+            id: 'project-1',
+            workspaceId: 'workspace-1',
+            slug: 'users-api',
+            name: 'Live Users API',
+            description: 'Live description',
+            globalConfig: {
+              projectId: 'project-1',
+              latencyEnabled: false,
+              latencyMinMs: 0,
+              latencyMaxMs: 1000,
+              latencyMode: 'fixed',
+              errorSimulationEnabled: false,
+              errorSimulationRate: 0,
+              errorSimulationCodes: [500],
+              rateLimitingEnabled: false,
+              rateLimitingRpm: 60,
+              loggingLevel: 'basic',
+              scope: 'all',
+            },
+            endpoints: [
+              {
+                id: 'endpoint-1',
+                method: 'GET',
+                path: '/users',
+                description: 'Live list users',
+                statusCode: 200,
+                responseBody: [],
+                endpointConfig: {
+                  latencyMode: 'fixed',
+                  fixedDelayMs: 0,
+                  minDelayMs: 0,
+                  maxDelayMs: 500,
+                  errorRate: 0,
+                  useScenarioWeights: true,
+                },
+                scenarios: [],
+              },
+              {
+                id: 'endpoint-2',
+                method: 'DELETE',
+                path: '/users/:id',
+                description: 'Delete user',
+                statusCode: 204,
+                responseBody: null,
+                endpointConfig: {
+                  latencyMode: 'fixed',
+                  fixedDelayMs: 0,
+                  minDelayMs: 0,
+                  maxDelayMs: 500,
+                  errorRate: 0,
+                  useScenarioWeights: true,
+                },
+                scenarios: [],
+              },
+            ],
+          };
+        }
+
+        return {
+          id: 'project-1',
+          workspaceId: 'workspace-1',
+        };
+      }
+    );
+    prismaMock.projectSnapshot.findFirst.mockResolvedValue({
+      id: 'snapshot-1',
+      projectId: 'project-1',
+      name: 'Before imports',
+      description: '',
+      createdByUserId: 'user-1',
+      createdByEmail: 'owner@example.com',
+      createdByDisplayName: 'Owner User',
+      payload: {
+        project: {
+          id: 'project-1',
+          slug: 'users-api',
+          name: 'Snapshot Users API',
+          description: 'Snapshot description',
+        },
+        globalConfig: {
+          projectId: 'project-1',
+          latencyEnabled: true,
+          latencyMinMs: 10,
+          latencyMaxMs: 20,
+          latencyMode: 'range',
+          errorSimulationEnabled: false,
+          errorSimulationRate: 0,
+          errorSimulationCodes: [500],
+          rateLimitingEnabled: false,
+          rateLimitingRpm: 60,
+          loggingLevel: 'full',
+          scope: 'unset',
+        },
+        endpoints: [
+          {
+            method: 'GET',
+            path: '/users',
+            description: 'Snapshot list users',
+            statusCode: 200,
+            responseBody: [{ id: 1 }],
+            endpointConfig: {
+              latencyMode: 'fixed',
+              fixedDelayMs: 0,
+              minDelayMs: 0,
+              maxDelayMs: 500,
+              errorRate: 0,
+              useScenarioWeights: true,
+            },
+            scenarios: [],
+          },
+          {
+            method: 'POST',
+            path: '/users',
+            description: 'Create user',
+            statusCode: 201,
+            responseBody: { ok: true },
+            endpointConfig: {
+              latencyMode: 'fixed',
+              fixedDelayMs: 0,
+              minDelayMs: 0,
+              maxDelayMs: 500,
+              errorRate: 0,
+              useScenarioWeights: true,
+            },
+            scenarios: [],
+          },
+        ],
+      },
+      createdAt: new Date('2026-04-17T10:00:00.000Z'),
+    });
+    const response = await request(app)
+      .get('/api/v1/projects/project-1/snapshots/snapshot-1/restore-preview')
+      .set(authHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.project.name).toEqual({
+      current: 'Live Users API',
+      snapshot: 'Snapshot Users API',
+      changed: true,
+    });
+    expect(response.body.revision).toEqual({
+      endpointCount: 2,
+      scenarioCount: 0,
+      globalScope: 'unset',
+      projectSlug: 'users-api',
+      projectName: 'Snapshot Users API',
+      isLegacySnapshot: false,
+    });
+    expect(response.body.globalConfig.changed).toBe(true);
+    expect(response.body.endpoints.create.map((entry: { key: string }) => entry.key)).toEqual([
+      'POST /users',
+    ]);
+    expect(response.body.endpoints.update.map((entry: { key: string }) => entry.key)).toEqual([
+      'GET /users',
+    ]);
+    expect(response.body.endpoints.delete.map((entry: { key: string }) => entry.key)).toEqual([
+      'DELETE /users/:id',
+    ]);
+    expect(response.body.counts).toEqual({
+      create: 1,
+      update: 1,
+      delete: 1,
+      keep: 0,
+      totalAfterRestore: 2,
+    });
+  });
+
+  it('restores snapshot scope from the snapshot payload instead of forcing all', async () => {
+    prismaMock.projectSnapshot.findFirst.mockResolvedValue({
+      id: 'snapshot-1',
+      projectId: 'project-1',
+      name: 'Before imports',
+      description: '',
+      createdByUserId: 'user-1',
+      createdByEmail: 'owner@example.com',
+      createdByDisplayName: 'Owner User',
+      payload: {
+        project: { id: 'project-1', slug: 'users-api', name: 'Users API', description: 'Baseline' },
+        globalConfig: {
+          projectId: 'project-1',
+          latencyEnabled: false,
+          latencyMinMs: 0,
+          latencyMaxMs: 1000,
+          latencyMode: 'fixed',
+          errorSimulationEnabled: false,
+          errorSimulationRate: 0,
+          errorSimulationCodes: [500],
+          rateLimitingEnabled: false,
+          rateLimitingRpm: 60,
+          loggingLevel: 'basic',
+          scope: 'unset',
+        },
+        endpoints: [],
+      },
+      createdAt: new Date('2026-04-17T10:00:00.000Z'),
+    });
+
+    const tx = {
+      project: {
+        update: vi.fn(async () => ({ id: 'project-1', workspaceId: 'workspace-1' })),
+      },
+      globalConfig: {
+        upsert: vi.fn(async () => ({ projectId: 'project-1' })),
+      },
+      endpoint: {
+        findMany: vi.fn(async () => []),
+        findUnique: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        deleteMany: vi.fn(async () => ({ count: 0 })),
+      },
+      endpointConfig: {
+        upsert: vi.fn(),
+      },
+      scenario: {
+        deleteMany: vi.fn(async () => ({ count: 0 })),
+        createMany: vi.fn(async () => ({ count: 0 })),
+      },
+      user: prismaMock.user,
+      auditEvent: {
+        create: vi.fn(async () => ({ id: 'audit-restore' })),
+      },
+    };
+
+    prismaMock.$transaction.mockImplementation(
+      async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)
+    );
+
+    const response = await request(app)
+      .post('/api/v1/projects/project-1/snapshots/snapshot-1/restore')
+      .set(authHeaders())
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(tx.globalConfig.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ scope: 'unset' }),
+        create: expect.objectContaining({ scope: 'unset' }),
+      })
+    );
   });
 });

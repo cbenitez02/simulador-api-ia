@@ -7,6 +7,7 @@ export type MockLogScenarioType =
   | 'error'
   | 'timeout'
   | 'empty'
+  | 'unauthorized'
   | 'forced-error'
   | 'default'
   | 'rate-limit-block';

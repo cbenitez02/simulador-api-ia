@@ -2,7 +2,13 @@ import { z } from 'zod';
 
 export const dashboardProjectStatusSchema = z.enum(['empty', 'attention', 'running']);
 export const dashboardEndpointStatusSchema = z.enum(['ready', 'needs-attention']);
-export const dashboardScenarioTypeSchema = z.enum(['success', 'error', 'timeout', 'empty']);
+export const dashboardScenarioTypeSchema = z.enum([
+  'success',
+  'error',
+  'timeout',
+  'empty',
+  'unauthorized',
+]);
 export const dashboardLatencyModeSchema = z.enum(['fixed', 'range']);
 export const dashboardLoggingLevelSchema = z.enum(['basic', 'full', 'off']);
 export const dashboardScopeSchema = z.enum(['all', 'unset']);
@@ -10,9 +16,13 @@ export const workspaceRoleSchema = z.enum(['owner', 'editor', 'viewer']);
 export const workspaceCapabilitiesSchema = z.object({
   canEdit: z.boolean(),
   canManageMembers: z.boolean(),
+  canRestoreSnapshots: z.boolean(),
+  canImportContracts: z.boolean(),
 });
 export const workspaceSummarySchema = z.object({
   id: z.string(),
+  name: z.string(),
+  kind: z.enum(['personal', 'team']),
   role: workspaceRoleSchema,
   isPersonal: z.boolean(),
   capabilities: workspaceCapabilitiesSchema,
