@@ -8,9 +8,25 @@
             type="button"
             class="utility__action"
             [class.utility__action--featured]="action.featured"
-            [disabled]="action.disabled === true || (!canMutate() && action.id !== 'test' && action.id !== 'export')"
+            [disabled]="
+              action.disabled === true ||
+              (action.id === 'export'
+                ? false
+                : action.id === 'snapshot'
+                  ? !canCreateSnapshot()
+                  : action.id === 'import'
+                    ? !canImportContracts()
+                    : !canMutate())
+            "
             [attr.aria-disabled]="
-              action.disabled === true || (!canMutate() && action.id !== 'test' && action.id !== 'export')
+              action.disabled === true ||
+              (action.id === 'export'
+                ? false
+                : action.id === 'snapshot'
+                  ? !canCreateSnapshot()
+                  : action.id === 'import'
+                    ? !canImportContracts()
+                    : !canMutate())
             "
             [title]="action.disabled ? action.subtitle : null"
             (click)="onQuickAction(action.id)"
@@ -27,12 +43,6 @@
                 [size]="18"
                 strokeWidth="1.75"
                 [style.display]="action.icon === 'plus' ? null : 'none'"
-              ></svg>
-              <svg
-                lucidePlay
-                [size]="18"
-                strokeWidth="1.75"
-                [style.display]="action.icon === 'play' ? null : 'none'"
               ></svg>
               <svg
                 lucideDownload

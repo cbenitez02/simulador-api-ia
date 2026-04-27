@@ -20,6 +20,7 @@ import type {
   EditProjectModalPayload,
   ProjectModalInitialValues,
   ProjectModalMode,
+  ProjectModalWorkspaceOption,
 } from './create-project-modal.model';
 
 let createProjectModalUid = 0;
@@ -40,6 +41,7 @@ export class CreateProjectModalComponent {
   readonly loading = input(false);
   readonly errorMessage = input<string | null>(null);
   readonly partialSuccessState = input<CreateProjectPartialSuccessState | null>(null);
+  readonly availableWorkspaces = input<ProjectModalWorkspaceOption[]>([]);
 
   readonly cancelled = output<void>();
   readonly createProjectOnly = output<CreateProjectModalPayload>();
@@ -53,12 +55,16 @@ export class CreateProjectModalComponent {
   protected readonly aiToggleId = `cnp-ai-toggle-${this.instanceId}`;
   protected readonly projectNameInputId = `cnp-project-name-${this.instanceId}`;
   protected readonly descriptionInputId = `cnp-description-${this.instanceId}`;
+  protected readonly slugInputId = `cnp-slug-${this.instanceId}`;
   protected readonly promptInputId = `cnp-prompt-${this.instanceId}`;
+  protected readonly workspaceSelectId = `cnp-workspace-${this.instanceId}`;
 
   protected readonly projectName = signal('');
   protected readonly description = signal('');
+  protected readonly slug = signal('');
   protected readonly aiEnabled = signal(true);
   protected readonly prompt = signal('');
+  protected readonly selectedWorkspaceId = signal('');
 
   protected readonly isEditMode = computed(() => this.mode() === 'edit');
   protected readonly isPartialSuccess = computed(() => this.partialSuccessState() !== null);
@@ -70,6 +76,8 @@ export class CreateProjectModalComponent {
     if (this.isPartialSuccess()) return !(this.partialSuccessState()?.retryable ?? false);
     const name = this.projectName().trim();
     if (!name) return true;
+    if (this.isEditMode() && !this.slug().trim()) return true;
+    if (this.availableWorkspaces().length > 0 && !this.selectedWorkspaceId().trim()) return true;
     if (!this.isEditMode() && this.aiEnabled() && !this.prompt().trim()) return true;
     return false;
   });
@@ -87,11 +95,13 @@ export class CreateProjectModalComponent {
     this.isPartialSuccess()
       ? projectRecoverySubtitle()
       : this.isEditMode()
-        ? 'Update the project name and description. The stable mock URL stays exactly the same.'
+        ? 'Update name, description and slug. The base mock domain stays the same.'
         : 'Name your project and optionally generate your first mock endpoint with AI.',
   );
 
-  protected readonly stableUrlMessage = computed(() => 'Renaming this project does not change its slug or mock URL.');
+  protected readonly stableUrlMessage = computed(
+    () => 'Changing the slug updates the mock URL path immediately. Previous URL stops working.',
+  );
 
   protected readonly primaryLabel = computed(() => {
     if (this.loading())
@@ -109,13 +119,15 @@ export class CreateProjectModalComponent {
       const isOpen = this.open();
       const isEditMode = this.isEditMode();
       const initialValues = this.initialValues();
-      const initialKey = `${this.mode()}::${initialValues?.name ?? ''}::${initialValues?.description ?? ''}`;
+      const initialKey = `${this.mode()}::${initialValues?.name ?? ''}::${initialValues?.description ?? ''}::${initialValues?.slug ?? ''}`;
 
       if (isOpen && (!prevOpen || initialKey !== prevInitialKey)) {
         this.projectName.set(initialValues?.name ?? '');
         this.description.set(initialValues?.description ?? '');
+        this.slug.set(initialValues?.slug ?? '');
         this.aiEnabled.set(isEditMode ? false : true);
         this.prompt.set('');
+        this.selectedWorkspaceId.set(initialValues?.workspaceId ?? this.availableWorkspaces()[0]?.id ?? '');
       }
 
       prevOpen = isOpen;
@@ -144,9 +156,17 @@ export class CreateProjectModalComponent {
     this.prompt.set((event.target as HTMLTextAreaElement).value);
   }
 
+  protected onSlugInput(event: Event): void {
+    this.slug.set((event.target as HTMLInputElement).value);
+  }
+
   protected onAiToggle(checked: boolean): void {
     if (this.loading()) return;
     this.aiEnabled.set(checked);
+  }
+
+  protected onWorkspaceChange(event: Event): void {
+    this.selectedWorkspaceId.set((event.target as HTMLSelectElement).value);
   }
 
   protected onCreateProjectOnlyClick(): void {
@@ -154,6 +174,7 @@ export class CreateProjectModalComponent {
     this.createProjectOnly.emit({
       name: this.projectName().trim(),
       description: this.description().trim(),
+      workspaceId: this.selectedWorkspaceId().trim() || undefined,
     });
   }
 
@@ -166,7 +187,12 @@ export class CreateProjectModalComponent {
     const name = this.projectName().trim();
     const description = this.description().trim();
     if (this.isEditMode()) {
-      this.saveProject.emit({ name, description });
+      this.saveProject.emit({
+        name,
+        description,
+        slug: this.slug().trim(),
+        workspaceId: this.selectedWorkspaceId().trim() || undefined,
+      });
       return;
     }
 
@@ -174,10 +200,11 @@ export class CreateProjectModalComponent {
       this.createProjectAndEndpoint.emit({
         name,
         description,
+        workspaceId: this.selectedWorkspaceId().trim() || undefined,
         endpointPrompt: this.prompt().trim(),
       });
     } else {
-      this.createProjectOnly.emit({ name, description });
+      this.createProjectOnly.emit({ name, description, workspaceId: this.selectedWorkspaceId().trim() || undefined });
     }
   }
 

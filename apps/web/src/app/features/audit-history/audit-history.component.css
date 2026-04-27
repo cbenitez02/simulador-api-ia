@@ -88,7 +88,7 @@
   padding: 0.22rem 0.58rem;
   border-radius: 0.42rem;
   border: 1px solid var(--cp-border-default);
-  background: var(--cp-surface-page);
+  background: transparent;
   color: var(--cp-text-subtle);
   font: inherit;
   font-size: 0.6875rem;
@@ -96,12 +96,14 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
+  appearance: none;
+  box-shadow: none;
 }
 
 .audit-history__filter:hover {
   color: var(--cp-text-body);
   border-color: var(--cp-border-input-hover);
-  background: var(--cp-surface-subtle);
+  background: transparent;
 }
 
 .audit-history__filter--active {

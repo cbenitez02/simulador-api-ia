@@ -1,9 +1,15 @@
-import { Injector, runInInjectionContext } from '@angular/core';
+import { Component, Injector, runInInjectionContext } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../testing/angular-vitest';
+import {
+  provideAngularReactiveSchedulers,
+  resolveAngularExternalResources,
+  setupAngularVitest,
+} from '../../testing/angular-vitest';
 import type { ApiLogEntry, ApiLogListResult } from './models/api-log.model';
 import { LogsRepository } from './data-access/logs.repository';
 import { LogsComponent } from './logs.component';
+import { SelectMenuComponent } from '../../shared/ui/select-menu/select-menu.component';
 
 setupAngularVitest();
 
@@ -78,6 +84,119 @@ async function flushAsyncWork(cycles = 6): Promise<void> {
   }
 }
 
+@Component({
+  standalone: true,
+  imports: [SelectMenuComponent],
+  template: `
+    <app-select-menu
+      [options]="methodFilterOptions"
+      [value]="methodFilter()"
+      (valueChange)="onMethodChange($event)"
+      [triggerId]="'logs-method-filter-trigger'"
+      [listboxId]="'logs-method-filter-listbox'"
+    />
+    <app-select-menu
+      [options]="statusFilterOptions"
+      [value]="statusFilter()"
+      (valueChange)="onStatusChange($event)"
+      [triggerId]="'logs-status-filter-trigger'"
+      [listboxId]="'logs-status-filter-listbox'"
+    />
+    <app-select-menu
+      [options]="endpointFilterOptions()"
+      [value]="endpointFilter()"
+      (valueChange)="onEndpointChange($event)"
+      [triggerId]="'logs-endpoint-filter-trigger'"
+      [listboxId]="'logs-endpoint-filter-listbox'"
+    />
+  `,
+})
+class LogsFiltersHarnessComponent {
+  component!: LogsComponentHarness & {
+    methodFilterOptions: readonly { value: string; label: string }[];
+    statusFilterOptions: readonly { value: string; label: string }[];
+    endpointFilterOptions: () => readonly { value: string; label: string }[];
+  };
+
+  get methodFilterOptions() {
+    return this.component.methodFilterOptions;
+  }
+
+  get statusFilterOptions() {
+    return this.component.statusFilterOptions;
+  }
+
+  endpointFilterOptions() {
+    return this.component.endpointFilterOptions();
+  }
+
+  methodFilter() {
+    return this.component.methodFilter();
+  }
+
+  statusFilter() {
+    return this.component.statusFilter();
+  }
+
+  endpointFilter() {
+    return this.component.endpointFilter();
+  }
+
+  onMethodChange(value: string) {
+    this.component.onMethodChange(value);
+  }
+
+  onStatusChange(value: string) {
+    this.component.onStatusChange(value);
+  }
+
+  onEndpointChange(value: string) {
+    this.component.onEndpointChange(value);
+  }
+}
+
+async function renderLogsFiltersHarness(component: LogsFiltersHarnessComponent['component']) {
+  await resolveAngularExternalResources();
+  await TestBed.configureTestingModule({
+    imports: [LogsFiltersHarnessComponent],
+  }).compileComponents();
+
+  const fixture = TestBed.createComponent(LogsFiltersHarnessComponent);
+  fixture.componentInstance.component = component;
+  fixture.detectChanges(false);
+
+  return fixture;
+}
+
+async function pickSelectMenuOption(
+  fixture: Awaited<ReturnType<typeof renderLogsComponent>>,
+  triggerId: string,
+  listboxId: string,
+  optionLabel: string,
+): Promise<void> {
+  const element = fixture.nativeElement as HTMLElement;
+  const trigger = element.querySelector<HTMLButtonElement>(`#${triggerId}`);
+
+  if (!trigger) {
+    throw new Error(`Select menu trigger not rendered: ${triggerId}`);
+  }
+
+  trigger.click();
+  fixture.detectChanges(false);
+
+  const option = Array.from(element.querySelectorAll<HTMLButtonElement>(`#${listboxId} .select-menu__option`)).find(
+    (candidate) => candidate.textContent?.includes(optionLabel),
+  );
+
+  if (!option) {
+    throw new Error(`Select menu option not rendered: ${optionLabel}`);
+  }
+
+  option.click();
+  await fixture.whenStable();
+  fixture.detectChanges(false);
+}
+
 describe('LogsComponent', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -121,10 +240,15 @@ describe('LogsComponent', () => {
     expect(component.selectedLog()?.id).toBe('log-2');
   });
 
-  it('reloads from the backend when server-side filters change', async () => {
+  it('reloads from the backend when server-side filters change through the rendered select menus', async () => {
     const listLogs = vi
       .fn<LogsRepository['listLogs']>()
-      .mockResolvedValueOnce(createListResponse([newestLogFixture]))
+      .mockImplementationOnce(
+        async () =>
+          await new Promise<ApiLogListResult>((resolve) => {
+            setTimeout(() => resolve(createListResponse([newestLogFixture])), 0);
+          }),
+      )
       .mockResolvedValueOnce(createListResponse([newestLogFixture], '2026-04-08T10:00:04.000Z'))
       .mockResolvedValueOnce(createListResponse([newestLogFixture], '2026-04-08T10:00:05.000Z'))
       .mockResolvedValueOnce(createListResponse([newestLogFixture], '2026-04-08T10:00:06.000Z'));
@@ -142,19 +266,19 @@ describe('LogsComponent', () => {
       ],
     });
 
-    const component = runInInjectionContext(injector, () => new LogsComponent()) as unknown as LogsComponentHarness;
+    const component = runInInjectionContext(
+      injector,
+      () => new LogsComponent(),
+    ) as unknown as LogsFiltersHarnessComponent['component'];
     component.projectId = () => 'p1';
-
     await component.loadProject('p1');
 
-    component.onMethodChange('POST');
-    await flushAsyncWork();
+    const fixture = await renderLogsFiltersHarness(component);
+    const element = fixture.nativeElement as HTMLElement;
 
-    component.onStatusChange('3xx');
-    await flushAsyncWork();
-
-    component.onEndpointChange('/users');
-    await flushAsyncWork();
+    await pickSelectMenuOption(fixture, 'logs-method-filter-trigger', 'logs-method-filter-listbox', 'POST');
+    await pickSelectMenuOption(fixture, 'logs-status-filter-trigger', 'logs-status-filter-listbox', '3xx');
+    await pickSelectMenuOption(fixture, 'logs-endpoint-filter-trigger', 'logs-endpoint-filter-listbox', '/users');
 
     expect(listLogs).toHaveBeenNthCalledWith(2, 'p1', { method: 'POST' });
     expect(listLogs).toHaveBeenNthCalledWith(3, 'p1', { method: 'POST', statusBucket: '3xx' });
@@ -163,6 +287,9 @@ describe('LogsComponent', () => {
       statusBucket: '3xx',
       path: '/users',
     });
+    expect(element.querySelector('#logs-method-filter-trigger')?.textContent).toContain('POST');
+    expect(element.querySelector('#logs-status-filter-trigger')?.textContent).toContain('3xx');
+    expect(element.querySelector('#logs-endpoint-filter-trigger')?.textContent).toContain('/users');
   });
 
   it('loads older history with older tuple cursors and merges without duplicates', async () => {

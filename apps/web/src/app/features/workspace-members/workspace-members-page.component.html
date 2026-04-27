@@ -45,6 +45,17 @@
                   {{ member.email || 'No email' }} · {{ member.role }}
                 </span>
               </div>
+              @if (canManageMembers() && !isCurrentUser(member)) {
+                <app-select-menu
+                  class="workspace-members-page__role-menu workspace-members-page__role-menu--member"
+                  [options]="memberRoleOptions"
+                  [value]="member.role"
+                  [disabled]="!canEditMemberRole(member)"
+                  (valueChange)="onMemberRoleChange(member, $event)"
+                  [triggerId]="'workspace-member-role-trigger-' + member.userId"
+                  [listboxId]="'workspace-member-role-listbox-' + member.userId"
+                />
+              }
               @if (canManageMembers() && canRemoveMember(member)) {
                 <button
                   type="button"
@@ -81,7 +92,7 @@
             />
             <app-select-menu
               class="workspace-members-page__role-menu"
-              [options]="roleOptions"
+              [options]="inviteRoleOptions"
               [value]="selectedRole()"
               (valueChange)="onRoleChange($event)"
               [triggerId]="'workspace-members-role-trigger'"
@@ -93,9 +104,44 @@
             class="workspace-members-page__submit"
             [disabled]="mutationPending() || !memberForm.form.valid"
           >
-            Add member
+            Send invite
           </button>
         </form>
+
+        <section class="workspace-members-page__invites" aria-label="Pending invitations">
+          <h2 class="workspace-members-page__section-title">Pending invitations</h2>
+
+          @if (invitations().length > 0) {
+            <ul class="workspace-members-page__list workspace-members-page__list--invites">
+              @for (invitation of invitations(); track invitation.id) {
+                <li class="workspace-members-page__invite-row workspace-members-page__row--invite">
+                  <div class="workspace-members-page__avatar" aria-hidden="true">
+                    <svg lucideUsers [size]="18" strokeWidth="1.75"></svg>
+                  </div>
+                  <div class="workspace-members-page__meta">
+                    <div class="workspace-members-page__name-row">
+                      <strong class="workspace-members-page__name">{{ invitation.email }}</strong>
+                      <span class="workspace-members-page__badge">Pending</span>
+                    </div>
+                    <span class="workspace-members-page__details">{{ invitation.role }} invitation</span>
+                  </div>
+                  @if (invitation.status === 'pending') {
+                    <button
+                      type="button"
+                      class="workspace-members-page__remove workspace-members-page__revoke-invite"
+                      [disabled]="mutationPending()"
+                      (click)="onRevokeInvitation(invitation.id)"
+                    >
+                      Revoke
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="workspace-members-page__empty">No pending invitations.</p>
+          }
+        </section>
       }
     </section>
   </main>

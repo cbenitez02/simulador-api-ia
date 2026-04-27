@@ -16,6 +16,25 @@
   (signOutRequested)="signOut()"
 />
 
+@if (pendingWorkspaceInvitations().length > 0 && !showProtectedApiBoundary()) {
+  <section class="workspace__status-card" aria-label="Pending workspace invitations">
+    <h2 class="workspace__needs-project-title">Pending invitations</h2>
+    <p class="workspace__needs-project-sub">Accept workspace access for the signed-in email.</p>
+    <div class="workspace__needs-project-actions">
+      @for (invitation of pendingWorkspaceInvitations(); track invitation.id) {
+        <button
+          type="button"
+          class="workspace__needs-project-btn workspace__needs-project-btn--primary"
+          [disabled]="workspaceMemberMutationPending()"
+          (click)="acceptWorkspaceInvitation(invitation.id)"
+        >
+          Join {{ invitation.workspaceName }} as {{ invitation.role }}
+        </button>
+      }
+    </div>
+  </section>
+}
+
 @if (createEndpointFlowOpen()) {
   <main class="workspace__main workspace__main--create-wizard" aria-label="Create endpoint">
     <app-create-endpoint-page
@@ -143,7 +162,7 @@
   <main class="workspace__main" aria-label="Audit history">
     <app-audit-history
       [projectId]="selectedProjectId()"
-      [canRestoreSnapshots]="canMutateActiveWorkspace()"
+      [canRestoreSnapshots]="canRestoreActiveWorkspaceSnapshots()"
       (restoreSnapshotRequested)="restoreSnapshot($event)"
     />
   </main>
@@ -177,10 +196,13 @@
       [currentUserId]="authSnapshot().userId"
       [currentUserEmail]="authSnapshot().email"
       [members]="workspaceMembers()"
+      [invitations]="workspaceInvitations()"
       [loading]="workspaceMembersLoading()"
       [errorMessage]="workspaceMembersError()"
       [mutationPending]="workspaceMemberMutationPending()"
       (addMember)="addWorkspaceMember($event)"
+      (revokeInvitation)="revokeWorkspaceInvitation($event)"
+      (updateMemberRole)="updateWorkspaceMemberRole($event)"
       (removeMember)="removeWorkspaceMember($event)"
     />
   </main>
@@ -219,31 +241,83 @@
       aria-modal="true"
       (click)="$event.stopPropagation()"
     >
-      <h2 class="workspace__contract-review-title">Review OpenAPI import</h2>
-      <p class="workspace__contract-review-summary">
-        {{ review.file.name }} · {{ review.analysis.summary.create }} create ·
-        {{ review.analysis.summary.update }} update · {{ review.analysis.summary.delete }} delete
-      </p>
+      <header class="workspace__contract-review-header">
+        <div class="workspace__contract-review-title-wrap">
+          <h2 class="workspace__contract-review-title">Review OpenAPI import</h2>
+          <p class="workspace__contract-review-summary">{{ review.file.name }}</p>
+        </div>
+        <button
+          type="button"
+          class="workspace__contract-review-close"
+          [disabled]="endpointMutationPending()"
+          (click)="cancelContractImportReview()"
+          aria-label="Close import review"
+        >
+          ×
+        </button>
+      </header>
+      <div class="workspace__contract-review-stats" aria-label="Import summary">
+        <span class="workspace__contract-review-stat">
+          <strong>{{ review.analysis.summary.create }}</strong> create
+        </span>
+        <span class="workspace__contract-review-stat">
+          <strong>{{ review.analysis.summary.update }}</strong> update
+        </span>
+        <span class="workspace__contract-review-stat workspace__contract-review-stat--danger">
+          <strong>{{ review.analysis.summary.delete }}</strong> delete
+        </span>
+      </div>
       <div class="workspace__contract-review-body cp-scrollbar">
         @if (review.analysis.warnings.length > 0) {
-          <ul class="workspace__contract-review-list">
-            @for (warning of review.analysis.warnings; track warning.code + warning.message + (warning.path ?? '')) {
-              <li>
-                {{ warning.message }}
-                @if (warning.path) {
-                  — {{ warning.path }}
+          <section class="workspace__contract-review-section">
+            <h3 class="workspace__contract-review-section-title">Warnings</h3>
+            <ul class="workspace__contract-review-list">
+              @for (warning of review.analysis.warnings; track warning.code + warning.message + (warning.path ?? '')) {
+                <li>
+                  {{ warning.message }}
+                  @if (warning.path) {
+                    — {{ warning.path }}
+                  }
+                </li>
+              }
+            </ul>
+          </section>
+        }
+        <section class="workspace__contract-review-section">
+          <h3 class="workspace__contract-review-section-title">Operations to apply</h3>
+          @if (review.analysis.operations.length > 0) {
+            <div class="workspace__contract-review-op-groups">
+              @for (action of contractReviewActions; track action) {
+                @if (contractReviewOperationsForAction(review.analysis.operations, action).length > 0) {
+                  <section
+                    class="workspace__contract-review-op-group"
+                    [class.workspace__contract-review-op-group--danger]="action === 'delete'"
+                  >
+                    <h4 class="workspace__contract-review-op-group-title">
+                      {{ contractReviewActionLabel(action) }}
+                      <span class="workspace__contract-review-op-group-count">
+                        {{ contractReviewOperationsForAction(review.analysis.operations, action).length }}
+                      </span>
+                    </h4>
+                    <ul class="workspace__contract-review-list workspace__contract-review-list--ops">
+                      @for (
+                        operation of contractReviewOperationsForAction(review.analysis.operations, action);
+                        track operation.method + operation.path
+                      ) {
+                        <li class="workspace__contract-review-op">
+                          <span class="workspace__contract-review-op-method">{{ operation.method }}</span>
+                          <span class="workspace__contract-review-op-path">{{ operation.path }}</span>
+                        </li>
+                      }
+                    </ul>
+                  </section>
                 }
-              </li>
-            }
-          </ul>
-        }
-        @if (review.analysis.operations.length > 0) {
-          <ul class="workspace__contract-review-list">
-            @for (operation of review.analysis.operations; track operation.method + operation.path) {
-              <li>{{ operation.action | titlecase }} · {{ operation.method }} {{ operation.path }}</li>
-            }
-          </ul>
-        }
+              }
+            </div>
+          } @else {
+            <p class="workspace__contract-review-empty">No operations detected for this import.</p>
+          }
+        </section>
       </div>
       <div class="workspace__needs-project-actions workspace__contract-review-actions">
         <button
@@ -263,6 +337,153 @@
           Cancel
         </button>
       </div>
+    </section>
+  </div>
+}
+
+@if (restorePreviewState(); as restorePreview) {
+  <div class="workspace__contract-review-backdrop" (click)="closeRestorePreview()">
+    <section
+      class="workspace__contract-review workspace__restore-preview"
+      aria-label="Restore snapshot preview"
+      role="dialog"
+      aria-modal="true"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="workspace__contract-review-header">
+        <div class="workspace__contract-review-title-wrap">
+          <h2 class="workspace__contract-review-title">Restore revision preview</h2>
+          <p class="workspace__contract-review-summary">{{ restorePreview.snapshotName }}</p>
+        </div>
+        <button
+          type="button"
+          class="workspace__contract-review-close"
+          [disabled]="endpointMutationPending()"
+          (click)="closeRestorePreview()"
+          aria-label="Close restore preview"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="workspace__contract-review-stats" aria-label="Restore summary">
+        <span class="workspace__contract-review-stat"
+          ><strong>{{ restorePreview.preview.counts.create }}</strong> create</span
+        >
+        <span class="workspace__contract-review-stat"
+          ><strong>{{ restorePreview.preview.counts.update }}</strong> update</span
+        >
+        <span class="workspace__contract-review-stat workspace__contract-review-stat--danger">
+          <strong>{{ restorePreview.preview.counts.delete }}</strong> delete
+        </span>
+        <span class="workspace__contract-review-stat"
+          ><strong>{{ restorePreview.preview.counts.keep }}</strong> keep</span
+        >
+      </div>
+
+      <div class="workspace__contract-review-stats" aria-label="Revision metadata">
+        <span class="workspace__contract-review-stat">
+          <strong>{{ restorePreview.preview.revision.endpointCount }}</strong> endpoints
+        </span>
+        <span class="workspace__contract-review-stat">
+          <strong>{{ restorePreview.preview.revision.scenarioCount }}</strong> scenarios
+        </span>
+        <span class="workspace__contract-review-stat">
+          <strong>{{ restorePreview.preview.revision.globalScope ?? 'unknown' }}</strong> scope
+        </span>
+      </div>
+
+      <div class="workspace__contract-review-body cp-scrollbar">
+        <section class="workspace__contract-review-section">
+          <h3 class="workspace__contract-review-section-title">Project metadata</h3>
+          <ul class="workspace__contract-review-list">
+            <li>
+              Name:
+              @if (restorePreview.preview.project.name.changed) {
+                {{ restorePreview.preview.project.name.current }} → {{ restorePreview.preview.project.name.snapshot }}
+              } @else {
+                No change
+              }
+            </li>
+            <li>
+              Description:
+              @if (restorePreview.preview.project.description.changed) {
+                {{ restorePreview.preview.project.description.current || '—' }} →
+                {{ restorePreview.preview.project.description.snapshot || '—' }}
+              } @else {
+                No change
+              }
+            </li>
+          </ul>
+        </section>
+
+        <section class="workspace__contract-review-section">
+          <h3 class="workspace__contract-review-section-title">Global config</h3>
+          @if (restorePreview.preview.globalConfig.changed) {
+            <ul class="workspace__contract-review-list">
+              @for (change of restorePreview.preview.globalConfig.changes; track change.field) {
+                <li>{{ change.field }}: {{ change.current }} → {{ change.snapshot }}</li>
+              }
+            </ul>
+          } @else {
+            <p class="workspace__contract-review-empty">No global config changes.</p>
+          }
+        </section>
+
+        <section class="workspace__contract-review-section">
+          <h3 class="workspace__contract-review-section-title">Endpoints</h3>
+          <div class="workspace__contract-review-op-groups">
+            @for (action of restorePreviewActions; track action) {
+              <section
+                class="workspace__contract-review-op-group"
+                [class.workspace__contract-review-op-group--danger]="action === 'delete'"
+              >
+                <h4 class="workspace__contract-review-op-group-title">
+                  {{ action }}
+                  <span class="workspace__contract-review-op-group-count">{{
+                    restorePreviewEntries(action).length
+                  }}</span>
+                </h4>
+                @if (restorePreviewEntries(action).length > 0) {
+                  <ul class="workspace__contract-review-list workspace__contract-review-list--ops">
+                    @for (endpoint of restorePreviewEntries(action); track endpoint.key) {
+                      <li class="workspace__contract-review-op">
+                        <span class="workspace__contract-review-op-method">{{ endpoint.method }}</span>
+                        <span class="workspace__contract-review-op-path">{{ endpoint.path }}</span>
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="workspace__contract-review-empty">No endpoints in this group.</p>
+                }
+              </section>
+            }
+          </div>
+        </section>
+      </div>
+
+      @if (endpointMutationError()) {
+        <div class="workspace__inline-error workspace__inline-error--dialog">{{ endpointMutationError() }}</div>
+      }
+
+      <footer class="workspace__needs-project-actions workspace__contract-review-actions">
+        <button
+          type="button"
+          class="workspace__needs-project-btn"
+          [disabled]="endpointMutationPending()"
+          (click)="closeRestorePreview()"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="workspace__needs-project-btn workspace__needs-project-btn--primary"
+          [disabled]="endpointMutationPending()"
+          (click)="confirmRestoreSnapshot()"
+        >
+          {{ endpointMutationPending() ? 'Restoring…' : 'Restore revision' }}
+        </button>
+      </footer>
     </section>
   </div>
 }
@@ -301,6 +522,7 @@
   [loading]="projectModalLoading()"
   [errorMessage]="projectModalError()"
   [partialSuccessState]="createProjectPartialState()"
+  [availableWorkspaces]="availableWorkspaces()"
   (cancelled)="onProjectModalDismiss()"
   (createProjectOnly)="onCreateProjectModalProjectOnly($event)"
   (createProjectAndEndpoint)="onCreateProjectModalWithEndpoint($event)"

@@ -27,6 +27,7 @@ export class SelectMenuComponent {
 
   @Input({ required: true }) options: readonly SelectMenuOption[] = [];
   @Input({ required: true }) value = '';
+  @Input() disabled = false;
   @Output() readonly valueChange = new EventEmitter<string>();
   @Input({ required: true }) triggerId = '';
   @Input({ required: true }) listboxId = '';
@@ -38,10 +39,20 @@ export class SelectMenuComponent {
   }
 
   protected toggle(): void {
+    if (this.disabled) {
+      this.open.set(false);
+      return;
+    }
+
     this.open.update((o) => !o);
   }
 
   protected pick(optionValue: string): void {
+    if (this.disabled) {
+      this.open.set(false);
+      return;
+    }
+
     this.valueChange.emit(optionValue);
     this.open.set(false);
   }

@@ -1,11 +1,19 @@
+import type { WorkspaceSummaryDto } from '../../http/api.types';
+
 export type ProjectModalMode = 'create' | 'edit';
+
+export type ProjectModalWorkspaceOption = WorkspaceSummaryDto;
 
 export interface ProjectModalInitialValues {
   name: string;
   description: string;
+  slug?: string;
+  workspaceId?: string;
 }
 
-export type CreateProjectModalPayload = ProjectModalInitialValues;
+export interface CreateProjectModalPayload extends ProjectModalInitialValues {
+  workspaceId?: string;
+}
 
 export interface CreateProjectWithEndpointPayload extends CreateProjectModalPayload {
   endpointPrompt: string;
@@ -19,4 +27,9 @@ export interface CreateProjectPartialSuccessState {
   retryable: boolean;
 }
 
-export type EditProjectModalPayload = ProjectModalInitialValues;
+export interface EditProjectModalPayload {
+  name: string;
+  description: string;
+  slug: string;
+  workspaceId?: string;
+}

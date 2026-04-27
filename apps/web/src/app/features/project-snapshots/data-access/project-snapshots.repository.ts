@@ -4,9 +4,14 @@ import type {
   CreateProjectSnapshotDto,
   ProjectSnapshotDetailDto,
   ProjectSnapshotListDto,
+  ProjectSnapshotRestorePreviewDto,
   RestoreProjectSnapshotResponseDto,
 } from '../../../shared/http/api.types';
-import { mapProjectSnapshotDetailFromApi, mapProjectSnapshotFromApi } from '../adapters/project-snapshot-api.mapper';
+import {
+  mapProjectSnapshotDetailFromApi,
+  mapProjectSnapshotFromApi,
+  mapProjectSnapshotRestorePreviewFromApi,
+} from '../adapters/project-snapshot-api.mapper';
 
 @Injectable({ providedIn: 'root' })
 export class ProjectSnapshotsRepository {
@@ -28,6 +33,13 @@ export class ProjectSnapshotsRepository {
       CreateProjectSnapshotDto
     >(`/projects/${projectId}/snapshots`, input);
     return mapProjectSnapshotFromApi(response as ProjectSnapshotListDto['items'][number]);
+  }
+
+  async previewRestore(projectId: string, snapshotId: string) {
+    const response = await this.api.get<ProjectSnapshotRestorePreviewDto>(
+      `/projects/${projectId}/snapshots/${snapshotId}/restore-preview`,
+    );
+    return mapProjectSnapshotRestorePreviewFromApi(response);
   }
 
   restore(projectId: string, snapshotId: string) {

@@ -1,5 +1,5 @@
+import type { WorkspaceCapabilitiesDto, WorkspaceKindDto, WorkspaceRoleDto } from '../../../shared/http/api.types';
 import type { EndpointPreview } from '../../../shared/models/endpoint-preview.model';
-import type { WorkspaceCapabilitiesDto, WorkspaceRoleDto } from '../../../shared/http/api.types';
 
 export type DashboardProjectStatus = 'empty' | 'attention' | 'running';
 export type DashboardEndpointStatus = 'ready' | 'needs-attention';
@@ -72,6 +72,8 @@ export interface DashboardEndpointRowsMeta {
 
 export interface DashboardWorkspaceSummary {
   id: string;
+  name: string;
+  kind: WorkspaceKindDto;
   role: WorkspaceRoleDto;
   isPersonal?: boolean;
   capabilities: WorkspaceCapabilitiesDto;

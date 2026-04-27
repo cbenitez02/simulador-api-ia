@@ -47,7 +47,46 @@
             ></textarea>
           </div>
 
+          @if (availableWorkspaces().length > 0) {
+            <div class="cnp-modal__field">
+              <label class="cnp-modal__label" [attr.for]="workspaceSelectId">
+                Workspace<span class="cnp-modal__required" aria-hidden="true">*</span>
+              </label>
+              <select
+                [id]="workspaceSelectId"
+                class="cnp-modal__input"
+                [disabled]="actionsDisabled()"
+                [value]="selectedWorkspaceId()"
+                (change)="onWorkspaceChange($event)"
+              >
+                <option value="" disabled>Select a workspace</option>
+                @for (workspace of availableWorkspaces(); track workspace.id) {
+                  <option [value]="workspace.id">
+                    {{ workspace.name }} {{ workspace.kind === 'personal' ? '(Personal)' : '(Team)' }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
+
           @if (isEditMode()) {
+            <div class="cnp-modal__field">
+              <label class="cnp-modal__label" [attr.for]="slugInputId">
+                Mock route slug<span class="cnp-modal__required" aria-hidden="true">*</span>
+              </label>
+              <input
+                [id]="slugInputId"
+                type="text"
+                class="cnp-modal__input"
+                placeholder="users-api"
+                autocomplete="off"
+                [value]="slug()"
+                [disabled]="actionsDisabled()"
+                [readOnly]="isPartialSuccess()"
+                (input)="onSlugInput($event)"
+              />
+              <p class="cnp-modal__helper">Resulting route: `/mock/{{ slug().trim() || 'your-slug' }}`</p>
+            </div>
             <p class="cnp-modal__info-note">{{ stableUrlMessage() }}</p>
           }
         </section>

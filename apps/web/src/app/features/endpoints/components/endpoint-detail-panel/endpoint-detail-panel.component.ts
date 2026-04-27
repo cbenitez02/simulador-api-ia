@@ -135,12 +135,13 @@ export class EndpointDetailPanelComponent {
   }
 
   protected scenarioChips(config: EndpointConfig): { key: MockScenarioId; label: string }[] {
-    const order: MockScenarioId[] = ['success', 'empty', 'error', 'timeout'];
+    const order: MockScenarioId[] = ['success', 'empty', 'error', 'timeout', 'unauthorized'];
     const labels: Record<MockScenarioId, string> = {
       success: 'Success',
       empty: 'Empty',
       error: 'Error',
       timeout: 'Timeout',
+      unauthorized: 'Unauthorized',
     };
     return order.filter((k) => config.scenarios[k]).map((k) => ({ key: k, label: labels[k] }));
   }

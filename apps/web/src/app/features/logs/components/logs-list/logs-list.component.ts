@@ -1,7 +1,7 @@
 import { animate, style, transition, trigger } from '@angular/animations';
 import { NgClass } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { LucideAlertCircle, LucideCircleCheck, LucideMinus } from '@lucide/angular';
+import { LucideAlertCircle, LucideAlertTriangle, LucideCircleCheck, LucideMinus } from '@lucide/angular';
 import { HttpMethodBadgeComponent } from '../../../../shared/ui/http-method-badge/http-method-badge.component';
 import type { ApiLogEntry } from '../../models/api-log.model';
 
@@ -10,7 +10,7 @@ import type { ApiLogEntry } from '../../models/api-log.model';
   templateUrl: './logs-list.component.html',
   styleUrls: ['./logs-list.component.css'],
   standalone: true,
-  imports: [HttpMethodBadgeComponent, LucideAlertCircle, LucideCircleCheck, LucideMinus, NgClass],
+  imports: [HttpMethodBadgeComponent, LucideAlertCircle, LucideAlertTriangle, LucideCircleCheck, LucideMinus, NgClass],
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [
     trigger('logRowEnter', [
@@ -40,6 +40,8 @@ export class LogsListComponent {
         return 'logs-table__scenario--success';
       case 'error':
         return 'logs-table__scenario--error';
+      case 'unauthorized':
+        return 'logs-table__scenario--unauthorized';
       default:
         return 'logs-table__scenario--empty';
     }

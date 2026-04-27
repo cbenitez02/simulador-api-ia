@@ -1,6 +1,7 @@
 import { Injector, runInInjectionContext } from '@angular/core';
 import { describe, expect, it } from 'vitest';
 import { provideAngularReactiveSchedulers, setupAngularVitest } from '../../../../testing/angular-vitest';
+import { ToastService } from '../../../../shared/ui/toast/toast.service';
 import type { DashboardProject } from '../../models/dashboard-project.model';
 import { MainDashboardDataComponent } from './main-dashboard-data.component';
 
@@ -85,7 +86,9 @@ const projectFixture: DashboardProject = {
 
 describe('MainDashboardDataComponent', () => {
   it('exposes real metrics, project status, and endpoint health rows from the summary payload', () => {
-    const injector = Injector.create({ providers: [...provideAngularReactiveSchedulers()] });
+    const injector = Injector.create({
+      providers: [...provideAngularReactiveSchedulers(), ToastService],
+    });
     const component = runInInjectionContext(
       injector,
       () => new MainDashboardDataComponent(),

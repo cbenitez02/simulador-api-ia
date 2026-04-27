@@ -10,6 +10,7 @@ function normalizeScenario(value: string): LogScenarioKind {
     value === 'error' ||
     value === 'timeout' ||
     value === 'empty' ||
+    value === 'unauthorized' ||
     value === 'forced-error' ||
     value === 'rate-limit-block'
     ? value

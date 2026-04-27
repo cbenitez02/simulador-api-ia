@@ -34,6 +34,7 @@ function scenarioBooleans(scenarios: readonly EndpointScenario[]): Record<MockSc
     empty: has('empty'),
     error: has('error'),
     timeout: has('timeout'),
+    unauthorized: has('unauthorized'),
   };
 }
 
@@ -43,6 +44,7 @@ function defaultScenarioBodies(mainBody: unknown, method: HttpMethod): Record<Mo
     empty: method === 'DELETE' ? null : {},
     error: { error: 'Internal server error', code: 'ERR_MOCK' },
     timeout: { error: 'Gateway timeout', code: 'TIMEOUT' },
+    unauthorized: { error: 'Unauthorized', message: 'Invalid or missing token' },
   };
 }
 
@@ -57,21 +59,24 @@ function rebuildScenariosFromBooleans(
     empty: 15,
     error: 10,
     timeout: 5,
+    unauthorized: 8,
   };
   const codes: Record<MockScenarioId, number> = {
     success: 200,
     empty: 200,
     error: 500,
     timeout: 408,
+    unauthorized: 401,
   };
   const names: Record<MockScenarioId, string> = {
     success: 'Success',
     empty: 'Empty',
     error: 'Error',
     timeout: 'Timeout',
+    unauthorized: 'Unauthorized',
   };
 
-  (['success', 'empty', 'error', 'timeout'] as const).forEach((id) => {
+  (['success', 'empty', 'error', 'timeout', 'unauthorized'] as const).forEach((id) => {
     if (!scenarios[id]) return;
     rows.push({
       id: newScenarioId(),

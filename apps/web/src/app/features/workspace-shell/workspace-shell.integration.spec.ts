@@ -15,6 +15,9 @@ import { GlobalConfigRepository } from '../global-config/data-access/global-conf
 import { ProjectSnapshotsRepository } from '../project-snapshots/data-access/project-snapshots.repository';
 import { ProjectContractsRepository } from './data-access/project-contracts.repository';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
+import { WorkspaceInvitationsRepository } from '../workspace-invitations/data-access/workspace-invitations.repository';
+import { WorkspacesRepository } from '../workspaces/data-access/workspaces.repository';
+import { ToastService } from '../../shared/ui/toast/toast.service';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 
 setupAngularVitest();
@@ -64,7 +67,7 @@ type WorkspaceShellHarness = WorkspaceShellComponent & {
   retryCreateProjectEndpointGeneration(): void;
 };
 
-async function flushAsyncWork(cycles = 6): Promise<void> {
+async function flushAsyncWork(cycles = 10): Promise<void> {
   for (let index = 0; index < cycles; index += 1) {
     await Promise.resolve();
   }
@@ -130,6 +133,18 @@ describe('WorkspaceShellComponent integration', () => {
     removeMember: vi.fn(),
   };
 
+  const workspaceInvitationsRepository = {
+    listWorkspaceInvitations: vi.fn(),
+    createInvitation: vi.fn(),
+    revokeInvitation: vi.fn(),
+    listPendingInvitations: vi.fn(),
+    acceptInvitation: vi.fn(),
+  };
+
+  const workspacesRepository = {
+    listWorkspaces: vi.fn(),
+  };
+
   const projectSnapshotsRepository = {
     list: vi.fn(),
     get: vi.fn(),
@@ -193,8 +208,14 @@ describe('WorkspaceShellComponent integration', () => {
     projectContractsRepository.analyzeContract.mockReset();
     projectContractsRepository.importContract.mockReset();
     workspaceMembersRepository.listMembers.mockReset();
+    workspacesRepository.listWorkspaces.mockReset();
     workspaceMembersRepository.addMember.mockReset();
     workspaceMembersRepository.removeMember.mockReset();
+    workspaceInvitationsRepository.listWorkspaceInvitations.mockReset();
+    workspaceInvitationsRepository.createInvitation.mockReset();
+    workspaceInvitationsRepository.revokeInvitation.mockReset();
+    workspaceInvitationsRepository.listPendingInvitations.mockReset();
+    workspaceInvitationsRepository.acceptInvitation.mockReset();
     authSession.bootstrap.mockReset();
     authSession.openSignIn.mockReset();
     authSession.signOut.mockReset();
@@ -246,6 +267,18 @@ describe('WorkspaceShellComponent integration', () => {
     });
     authSession.accessState.set('ready');
     workspaceMembersRepository.listMembers.mockResolvedValue([]);
+    workspaceInvitationsRepository.listWorkspaceInvitations.mockResolvedValue([]);
+    workspaceInvitationsRepository.listPendingInvitations.mockResolvedValue([]);
+    workspacesRepository.listWorkspaces.mockResolvedValue([
+      {
+        id: 'workspace-1',
+        name: 'Personal workspace',
+        kind: 'personal',
+        role: 'owner',
+        isPersonal: true,
+        capabilities: { canEdit: true, canManageMembers: true },
+      },
+    ]);
   });
 
   function createProjectListItem(endpointCount: number) {
@@ -342,9 +375,12 @@ describe('WorkspaceShellComponent integration', () => {
         { provide: ProjectSnapshotsRepository, useValue: projectSnapshotsRepository },
         { provide: ProjectContractsRepository, useValue: projectContractsRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
+        { provide: WorkspaceInvitationsRepository, useValue: workspaceInvitationsRepository },
+        { provide: WorkspacesRepository, useValue: workspacesRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
         { provide: ActivatedRoute, useValue: route },
         { provide: Router, useValue: router },
+        ToastService,
       ],
     });
 
@@ -623,6 +659,7 @@ describe('WorkspaceShellComponent integration', () => {
                   empty: false,
                   error: false,
                   timeout: false,
+                  unauthorized: false,
                 },
               },
             },
@@ -641,7 +678,7 @@ describe('WorkspaceShellComponent integration', () => {
       endpointPrompt: 'Create a users endpoint',
     });
 
-    await flushAsyncWork(14);
+    await flushAsyncWork(30);
 
     expect(api.post).toHaveBeenCalledWith('/projects', {
       name: 'Generated project',
@@ -735,6 +772,7 @@ describe('WorkspaceShellComponent integration', () => {
                   empty: false,
                   error: false,
                   timeout: false,
+                  unauthorized: false,
                 },
               },
             },
@@ -753,7 +791,7 @@ describe('WorkspaceShellComponent integration', () => {
       endpointPrompt: 'Create a users endpoint',
     });
 
-    await flushAsyncWork(14);
+    await flushAsyncWork(30);
 
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(component.selectedProjectId()).toBe('p1');
@@ -765,7 +803,7 @@ describe('WorkspaceShellComponent integration', () => {
     });
 
     component.retryCreateProjectEndpointGeneration();
-    await flushAsyncWork(14);
+    await flushAsyncWork(30);
 
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(endpointsRepository.generateAiEndpoint).toHaveBeenCalledTimes(2);
@@ -814,7 +852,7 @@ describe('WorkspaceShellComponent integration', () => {
       endpointPrompt: 'Create a users endpoint',
     });
 
-    await flushAsyncWork(14);
+    await flushAsyncWork(30);
 
     expect(component.selectedProjectId()).toBe('p1');
     expect(component.createProjectModalOpen()).toBe(true);

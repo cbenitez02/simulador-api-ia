@@ -12,6 +12,9 @@ import { ProjectsRepository } from '../main-dashboard/data-access/projects.repos
 import { EndpointsRepository } from '../endpoints/data-access/endpoints.repository';
 import { GlobalConfigRepository } from '../global-config/data-access/global-config.repository';
 import { WorkspaceMembersRepository } from '../workspace-members/data-access/workspace-members.repository';
+import { WorkspaceInvitationsRepository } from '../workspace-invitations/data-access/workspace-invitations.repository';
+import { WorkspacesRepository } from '../workspaces/data-access/workspaces.repository';
+import { ToastService } from '../../shared/ui/toast/toast.service';
 import { WorkspaceShellComponent } from './workspace-shell.component';
 
 setupAngularVitest();
@@ -69,6 +72,7 @@ describe('WorkspaceShellComponent audit history integration', () => {
   const projectSnapshotsRepository = {
     list: vi.fn(),
     get: vi.fn(),
+    previewRestore: vi.fn(),
     create: vi.fn(),
     restore: vi.fn(),
   };
@@ -94,6 +98,18 @@ describe('WorkspaceShellComponent audit history integration', () => {
     listMembers: vi.fn(),
     addMember: vi.fn(),
     removeMember: vi.fn(),
+  };
+
+  const workspaceInvitationsRepository = {
+    listWorkspaceInvitations: vi.fn(),
+    createInvitation: vi.fn(),
+    revokeInvitation: vi.fn(),
+    listPendingInvitations: vi.fn(),
+    acceptInvitation: vi.fn(),
+  };
+
+  const workspacesRepository = {
+    listWorkspaces: vi.fn(),
   };
 
   const authSession = {
@@ -128,6 +144,7 @@ describe('WorkspaceShellComponent audit history integration', () => {
     auditHistoryRepository.listEvents.mockReset();
     projectSnapshotsRepository.list.mockReset();
     projectSnapshotsRepository.get.mockReset();
+    projectSnapshotsRepository.previewRestore.mockReset();
     projectSnapshotsRepository.create.mockReset();
     projectSnapshotsRepository.restore.mockReset();
     projectContractsRepository.exportContract.mockReset();
@@ -135,7 +152,17 @@ describe('WorkspaceShellComponent audit history integration', () => {
     projectContractsRepository.importContract.mockReset();
     workspaceMembersRepository.listMembers.mockReset();
     workspaceMembersRepository.listMembers.mockResolvedValue([]);
+    workspaceInvitationsRepository.listWorkspaceInvitations.mockReset();
+    workspaceInvitationsRepository.createInvitation.mockReset();
+    workspaceInvitationsRepository.revokeInvitation.mockReset();
+    workspaceInvitationsRepository.listPendingInvitations.mockReset();
+    workspaceInvitationsRepository.acceptInvitation.mockReset();
+    workspaceInvitationsRepository.listWorkspaceInvitations.mockResolvedValue([]);
+    workspaceInvitationsRepository.listPendingInvitations.mockResolvedValue([]);
+    workspacesRepository.listWorkspaces.mockReset();
+    workspacesRepository.listWorkspaces.mockResolvedValue([]);
     projectSnapshotsRepository.list.mockResolvedValue({ items: [] });
+    projectSnapshotsRepository.previewRestore.mockResolvedValue(null);
     projectContractsRepository.exportContract.mockResolvedValue({
       text: '{"openapi":"3.0.3"}',
       filename: 'users-api-openapi.json',
@@ -186,9 +213,12 @@ describe('WorkspaceShellComponent audit history integration', () => {
         { provide: EndpointsRepository, useValue: endpointsRepository },
         { provide: GlobalConfigRepository, useValue: globalConfigRepository },
         { provide: WorkspaceMembersRepository, useValue: workspaceMembersRepository },
+        { provide: WorkspaceInvitationsRepository, useValue: workspaceInvitationsRepository },
+        { provide: WorkspacesRepository, useValue: workspacesRepository },
         { provide: FrontendAuthSessionService, useValue: authSession },
         { provide: ActivatedRoute, useValue: route },
         { provide: Router, useValue: router },
+        ToastService,
       ],
     });
 
@@ -211,7 +241,18 @@ describe('WorkspaceShellComponent audit history integration', () => {
           id: 'project-1',
           name: 'Workspace project',
           slug: 'workspace-project',
-          workspace: { id: 'workspace-1', role: 'owner', capabilities: { canEdit: true, canManageMembers: true } },
+          workspace: {
+            id: 'workspace-1',
+            name: 'Team workspace',
+            kind: 'team',
+            role: 'owner',
+            capabilities: {
+              canEdit: true,
+              canManageMembers: true,
+              canRestoreSnapshots: true,
+              canImportContracts: true,
+            },
+          },
           status: 'running',
           mockUrl: 'https://mock.example.com/workspace-project',
           description: 'Live backend project',
@@ -286,7 +327,18 @@ describe('WorkspaceShellComponent audit history integration', () => {
           id: 'project-1',
           name: 'Workspace project',
           slug: 'workspace-project',
-          workspace: { id: 'workspace-1', role: 'owner', capabilities: { canEdit: true, canManageMembers: true } },
+          workspace: {
+            id: 'workspace-1',
+            name: 'Team workspace',
+            kind: 'team',
+            role: 'owner',
+            capabilities: {
+              canEdit: true,
+              canManageMembers: true,
+              canRestoreSnapshots: true,
+              canImportContracts: true,
+            },
+          },
           status: 'running',
           mockUrl: 'https://mock.example.com/workspace-project',
           description: 'Live backend project',
@@ -329,9 +381,11 @@ describe('WorkspaceShellComponent audit history integration', () => {
           resourceId: 'snapshot-1',
           resourceLabel: 'Before imports',
           action: 'created',
-          actionLabel: 'saved snapshot',
-          summary: 'Created snapshot Before imports',
-          metadata: { snapshotName: 'Before imports' },
+          actionLabel: 'saved revision',
+          summary: 'Created revision Before imports',
+          resourceTypeLabel: 'revision',
+          detailsLabel: '2 endpoints · 3 scenarios · scope unset',
+          metadata: { snapshotName: 'Before imports', endpointCount: 2, scenarioCount: 3, scope: 'unset' },
           createdAt: '2026-04-14T12:00:00.000Z',
           timeLabel: '12:00:00',
         },
@@ -348,42 +402,37 @@ describe('WorkspaceShellComponent audit history integration', () => {
           description: '',
           createdAt: '2026-04-14T12:00:00.000Z',
           createdBy: { userId: 'user-1', email: 'owner@example.com', displayName: 'Owner User', label: 'Owner User' },
+          revision: {
+            endpointCount: 2,
+            scenarioCount: 3,
+            globalScope: 'unset',
+            projectSlug: 'workspace-project',
+            projectName: 'Workspace project',
+            isLegacySnapshot: false,
+          },
         },
       ],
     });
-    projectSnapshotsRepository.get.mockResolvedValue({
-      id: 'snapshot-1',
-      projectId: 'project-1',
-      name: 'Before imports',
-      description: '',
-      createdAt: '2026-04-14T12:00:00.000Z',
-      createdBy: { userId: 'user-1', email: 'owner@example.com', displayName: 'Owner User', label: 'Owner User' },
-      payload: {
-        project: {
-          id: 'project-1',
-          slug: 'workspace-project',
-          name: 'Workspace project',
-          description: 'Live backend project',
-        },
-        globalConfig: {
-          projectId: 'project-1',
-          latencyEnabled: false,
-          latencyMinMs: 0,
-          latencyMaxMs: 1000,
-          latencyMode: 'fixed',
-          errorSimulationEnabled: false,
-          errorSimulationRate: 0,
-          errorSimulationCodes: [500],
-          rateLimitingEnabled: false,
-          rateLimitingRpm: 60,
-          loggingLevel: 'basic',
-          scope: 'all',
-        },
-        endpoints: [],
+    projectSnapshotsRepository.previewRestore.mockResolvedValue({
+      snapshotId: 'snapshot-1',
+      snapshotName: 'Before imports',
+      revision: {
+        endpointCount: 2,
+        scenarioCount: 3,
+        globalScope: 'unset',
+        projectSlug: 'workspace-project',
+        projectName: 'Workspace project',
+        isLegacySnapshot: false,
       },
+      project: {
+        name: { current: 'Workspace project', snapshot: 'Workspace project', changed: false },
+        description: { current: 'Live backend project', snapshot: 'Live backend project', changed: false },
+      },
+      globalConfig: { changed: false, changes: [] },
+      endpoints: { create: [], update: [], delete: [], keep: [] },
+      counts: { create: 0, update: 0, delete: 0, keep: 0, totalAfterRestore: 0 },
     });
     projectSnapshotsRepository.restore.mockResolvedValue({ restoredSnapshotId: 'snapshot-1' });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     const { component } = createComponent();
     await flushAsyncWork();
@@ -395,6 +444,7 @@ describe('WorkspaceShellComponent audit history integration', () => {
     await (component as unknown as { restoreSnapshot(snapshotId: string): Promise<void> }).restoreSnapshot(
       'snapshot-1',
     );
+    await (component as unknown as { confirmRestoreSnapshot(): Promise<void> }).confirmRestoreSnapshot();
     await flushAsyncWork();
 
     expect(projectSnapshotsRepository.list).toHaveBeenCalledWith('project-1');
@@ -402,8 +452,7 @@ describe('WorkspaceShellComponent audit history integration', () => {
       'project-1',
       expect.objectContaining({ name: expect.any(String) }),
     );
-    expect(projectSnapshotsRepository.get).toHaveBeenCalledWith('project-1', 'snapshot-1');
+    expect(projectSnapshotsRepository.previewRestore).toHaveBeenCalledWith('project-1', 'snapshot-1');
     expect(projectSnapshotsRepository.restore).toHaveBeenCalledWith('project-1', 'snapshot-1');
-    expect(confirmSpy).toHaveBeenCalled();
   });
 });
