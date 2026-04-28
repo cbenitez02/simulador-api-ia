@@ -337,7 +337,7 @@ Formato:
 - Prioridad: Baja
 - Precondiciones: Usuario autenticado.
 - Pasos:
-  1. Navegar por `/account-profile-settings`, `/account-api-keys`, `/account-notifications`, `/account-security`, `/account-usage`, `/account-plan-billing`.
+  1. Navegar por `/account-profile-settings`, `/account-usage`, `/account-plan-billing`.
 - Resultado esperado:
   - Cada ruta carga correctamente.
   - Se mantiene la estructura del shell sin romper navegacion principal.

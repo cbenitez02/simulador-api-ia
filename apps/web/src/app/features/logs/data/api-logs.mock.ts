@@ -10,7 +10,6 @@ type LegacyApiLogEntry = Omit<
 const ECOMMERCE_BASE = 'https://mock.api.simulator/ecommerce';
 const AUTH_BASE = 'https://mock.api.simulator/auth';
 const PAYMENTS_BASE = 'https://mock.api.simulator/payments';
-const DEMO_USERS_BASE = 'https://mock.api.simulator/demo-users';
 
 const MOCK_API_LOGS_ECOMMERCE: LegacyApiLogEntry[] = [
   {
@@ -216,34 +215,10 @@ const MOCK_API_LOGS_PAYMENTS: LegacyApiLogEntry[] = [
   },
 ];
 
-const MOCK_API_LOGS_DEMO_USERS: LegacyApiLogEntry[] = [
-  {
-    id: 'demo-1',
-    method: 'GET',
-    path: '/users',
-    fullUrl: `${DEMO_USERS_BASE}/users`,
-    statusCode: 200,
-    latencyMs: 140,
-    scenario: 'success',
-    scenarioSelectionSource: 'default',
-    timeLabel: '10:00:01',
-    requestHeaders: { Accept: 'application/json' },
-    requestBody: null,
-    responseHeaders: { 'Content-Type': 'application/json' },
-    responseBody: {
-      data: [
-        { id: 'u1', name: 'Ada', email: 'ada@example.com', orders: [{ id: 'o1' }] },
-        { id: 'u2', name: 'Grace', email: 'grace@example.com', orders: [] },
-      ],
-    },
-  },
-];
-
 const BY_PROJECT: Record<string, LegacyApiLogEntry[]> = {
   ecommerce: MOCK_API_LOGS_ECOMMERCE,
   auth: MOCK_API_LOGS_AUTH,
   payments: MOCK_API_LOGS_PAYMENTS,
-  'demo-users': MOCK_API_LOGS_DEMO_USERS,
 };
 
 /** Mock request log lines aligned with `MOCK_DASHBOARD_PROJECTS` ids and base URLs. */
