@@ -245,7 +245,6 @@
   color: var(--cp-text-muted);
   word-break: break-all;
   flex: 0 1 auto;
-  min-width: 1px;
 }
 
 .dash__hero-copy-btn {
