@@ -119,10 +119,6 @@
   border-color: color-mix(in srgb, var(--cp-danger, #dc2626) 46%, var(--cp-border-input-hover));
 }
 
-.dash__btn-plus {
-  display: flex;
-}
-
 .dash__scroll {
   flex: 1;
   min-height: 0;
