@@ -171,10 +171,6 @@
   margin-bottom: 0.75rem;
 }
 
-.account-section-page__panel-head--actions-only {
-  justify-content: flex-end;
-}
-
 .account-section-page__icon-btn {
   display: inline-flex;
   align-items: center;
