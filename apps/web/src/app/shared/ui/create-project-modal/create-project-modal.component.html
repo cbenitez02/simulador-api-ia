@@ -87,7 +87,12 @@
               />
               <p class="cnp-modal__helper">Resulting route: `/mock/{{ slug().trim() || 'your-slug' }}`</p>
             </div>
-            <p class="cnp-modal__info-note">{{ stableUrlMessage() }}</p>
+            <div class="cnp-modal__warn-note" role="note">
+              <span class="cnp-modal__warn-note-icon" aria-hidden="true">
+                <svg lucideAlertTriangle [size]="18" strokeWidth="1.75"></svg>
+              </span>
+              <p class="cnp-modal__warn-note-text">{{ stableUrlMessage() }}</p>
+            </div>
           }
         </section>
 
