@@ -1,3 +1,4 @@
+/* eslint-env node */
 /**
  * Deletes a User by id and removes their personal workspace (and cascaded data)
  * so Clerk can re-register the same email with a new subject.
