@@ -87,15 +87,30 @@ export class GlobalConfigDrawerComponent {
   });
 
   private previousOpen = false;
+  private previousLoading = false;
 
   constructor() {
     effect(() => {
       const isOpen = this.open();
-      if (isOpen && !this.previousOpen) {
-        const init = this.initialConfig();
+      const loading = this.loading();
+      const init = this.initialConfig();
+
+      if (!isOpen) {
+        this.previousOpen = false;
+        this.previousLoading = loading;
+        return;
+      }
+
+      // On first open, `initialConfig` may still be defaults until the parent fetch finishes.
+      if (!this.previousOpen) {
+        this.state.set(structuredClone(init ?? createDefaultGlobalConfig()));
+      } else if (this.previousLoading && !loading) {
+        // Parent just finished loading — re-apply server config to the form.
         this.state.set(structuredClone(init ?? createDefaultGlobalConfig()));
       }
+
       this.previousOpen = isOpen;
+      this.previousLoading = loading;
     });
   }
 
