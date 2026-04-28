@@ -5,7 +5,6 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  font-family: Inter, system-ui, sans-serif;
 }
 
 .dash {
@@ -38,7 +37,6 @@
   margin: 0 0 0.25rem;
   font-size: 1.25rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
 }
 
 .dash__sub {
@@ -64,7 +62,6 @@
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -168,14 +165,12 @@
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
 }
 
 .dash__pill {
   font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
 }
@@ -373,7 +368,6 @@
   font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--cp-text-subtle);
 }
 
@@ -381,7 +375,6 @@
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
 }
 
 .dash__grid {
@@ -401,7 +394,6 @@
   margin: 0 0 1rem;
   font-size: 0.9375rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .dash__health {
@@ -515,7 +507,6 @@
   font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--cp-text-subtle);
   border-bottom: 1px solid var(--cp-border-default);
   white-space: nowrap;
