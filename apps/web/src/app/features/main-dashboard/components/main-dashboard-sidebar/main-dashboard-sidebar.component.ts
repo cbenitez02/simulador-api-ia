@@ -23,9 +23,6 @@ import type {
 
 const ACCOUNT_NAV_ROUTES = new Set<WorkspaceNavId>([
   'account-profile-settings',
-  'account-api-keys',
-  'account-notifications',
-  'account-security',
   'account-usage',
   'account-plan-billing',
 ]);

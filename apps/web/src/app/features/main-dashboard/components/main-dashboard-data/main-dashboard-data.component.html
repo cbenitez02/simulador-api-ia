@@ -49,63 +49,75 @@
           </div>
           <span class="dash__hero-updated">Last updated: {{ project().lastUpdatedRelative }}</span>
         </div>
-        <div class="dash__hero-actions">
-          <button
-            type="button"
-            class="dash__btn dash__btn--ghost"
-            [disabled]="!canMutate()"
-            (click)="editProjectRequested.emit()"
-          >
-            <svg lucidePencil [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
-            Edit project
-          </button>
-          <button
-            type="button"
-            class="dash__btn dash__btn--danger"
-            [disabled]="!canMutate()"
-            (click)="deleteProjectRequested.emit()"
-          >
-            <svg lucideTrash2 [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
-            Delete project
-          </button>
-        </div>
       </div>
-      <dl class="dash__hero-stats">
-        <div class="dash__stat">
-          <dt class="dash__stat-label">Endpoints</dt>
-          <dd class="dash__stat-value">{{ metrics().totalEndpoints }}</dd>
-        </div>
-        <div class="dash__stat">
-          <dt class="dash__stat-label">Scenarios</dt>
-          <dd class="dash__stat-value">{{ metrics().totalScenarios }}</dd>
-        </div>
-        <div class="dash__stat">
-          <dt class="dash__stat-label">Avg latency</dt>
-          <dd class="dash__stat-value">{{ metrics().avgLatencyMs }}ms</dd>
-        </div>
-        <div class="dash__stat">
-          <dt class="dash__stat-label">Error rate</dt>
-          <dd class="dash__stat-value">{{ metrics().errorRatePct }}%</dd>
-        </div>
-      </dl>
+      <div class="dash__hero-actions" role="toolbar" aria-label="Project actions">
+        <button
+          type="button"
+          class="dash__hero-icon-btn"
+          [disabled]="!canMutate()"
+          (click)="editProjectRequested.emit()"
+          aria-label="Edit project"
+          title="Edit project"
+        >
+          <svg lucidePencil [size]="18" strokeWidth="1.75" aria-hidden="true"></svg>
+        </button>
+        <button
+          type="button"
+          class="dash__hero-icon-btn dash__hero-icon-btn--danger"
+          [disabled]="!canMutate()"
+          (click)="deleteProjectRequested.emit()"
+          aria-label="Delete project"
+          title="Delete project"
+        >
+          <svg lucideTrash2 [size]="18" strokeWidth="1.75" aria-hidden="true"></svg>
+        </button>
+      </div>
     </section>
 
     <div class="dash__metrics">
       <article class="dash__metric card">
-        <h3 class="dash__metric-label">Total endpoints</h3>
-        <p class="dash__metric-value">{{ metrics().totalEndpoints }}</p>
+        <div class="dash__metric-inner">
+          <div class="dash__metric-copy">
+            <h3 class="dash__metric-label">Total endpoints</h3>
+            <p class="dash__metric-value">{{ metrics().totalEndpoints }}</p>
+          </div>
+          <span class="dash__metric-icon" aria-hidden="true">
+            <svg lucideRoute [size]="18" strokeWidth="1.75"></svg>
+          </span>
+        </div>
       </article>
       <article class="dash__metric card">
-        <h3 class="dash__metric-label">Total scenarios</h3>
-        <p class="dash__metric-value">{{ metrics().totalScenarios }}</p>
+        <div class="dash__metric-inner">
+          <div class="dash__metric-copy">
+            <h3 class="dash__metric-label">Total scenarios</h3>
+            <p class="dash__metric-value">{{ metrics().totalScenarios }}</p>
+          </div>
+          <span class="dash__metric-icon" aria-hidden="true">
+            <svg lucideLayers [size]="18" strokeWidth="1.75"></svg>
+          </span>
+        </div>
       </article>
       <article class="dash__metric card">
-        <h3 class="dash__metric-label">Average latency</h3>
-        <p class="dash__metric-value">{{ metrics().avgLatencyMs }}ms</p>
+        <div class="dash__metric-inner">
+          <div class="dash__metric-copy">
+            <h3 class="dash__metric-label">Average latency</h3>
+            <p class="dash__metric-value">{{ metrics().avgLatencyMs }}ms</p>
+          </div>
+          <span class="dash__metric-icon" aria-hidden="true">
+            <svg lucideClock [size]="18" strokeWidth="1.75"></svg>
+          </span>
+        </div>
       </article>
       <article class="dash__metric card">
-        <h3 class="dash__metric-label">Error rate</h3>
-        <p class="dash__metric-value">{{ metrics().errorRatePct }}%</p>
+        <div class="dash__metric-inner">
+          <div class="dash__metric-copy">
+            <h3 class="dash__metric-label">Error rate</h3>
+            <p class="dash__metric-value">{{ metrics().errorRatePct }}%</p>
+          </div>
+          <span class="dash__metric-icon dash__metric-icon--warn" aria-hidden="true">
+            <svg lucideAlertTriangle [size]="18" strokeWidth="1.75"></svg>
+          </span>
+        </div>
       </article>
     </div>
 
@@ -167,36 +179,55 @@
           </p>
         }
         <div class="dash__table-scroll cp-scrollbar">
-          <table class="dash__table">
-            <thead>
-              <tr>
-                <th scope="col">Endpoint</th>
-                <th scope="col">Scenarios</th>
-                <th scope="col">Latency</th>
-                <th scope="col">Error</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of endpointRows(); track row.endpointId) {
-                <tr>
-                  <td>
-                    <div class="dash__ep">
-                      <app-http-method-badge [method]="row.method" appearance="compact" />
-                      <div class="dash__ep-text">
-                        <span class="dash__ep-path">{{ row.path }}</span>
-                        <span class="dash__ep-desc">{{ row.description }}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{{ row.scenarioCount }}</td>
-                  <td>{{ row.latencyMs }}ms</td>
-                  <td>{{ row.errorRatePct }}%</td>
-                  <td>{{ row.status === 'ready' ? 'ready' : 'needs attention' }}</td>
-                </tr>
+          @if (endpointRows().length === 0) {
+            <div class="dash__endpoints-empty" role="status" aria-live="polite">
+              <p class="dash__endpoints-empty-title">No endpoints yet</p>
+              <p class="dash__endpoints-empty-desc">
+                Add an endpoint to see scenarios, latency, and status in this overview.
+              </p>
+              @if (canMutate()) {
+                <button
+                  type="button"
+                  class="dash__btn dash__btn--primary dash__endpoints-empty-btn"
+                  (click)="createEndpoint.emit()"
+                >
+                  <svg lucidePlus [size]="16" strokeWidth="2.25" aria-hidden="true"></svg>
+                  Create endpoint
+                </button>
               }
-            </tbody>
-          </table>
+            </div>
+          } @else {
+            <table class="dash__table">
+              <thead>
+                <tr>
+                  <th scope="col">Endpoint</th>
+                  <th scope="col">Scenarios</th>
+                  <th scope="col">Latency</th>
+                  <th scope="col">Error</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of endpointRows(); track row.endpointId) {
+                  <tr>
+                    <td>
+                      <div class="dash__ep">
+                        <app-http-method-badge [method]="row.method" appearance="compact" />
+                        <div class="dash__ep-text">
+                          <span class="dash__ep-path">{{ row.path }}</span>
+                          <span class="dash__ep-desc">{{ row.description }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{{ row.scenarioCount }}</td>
+                    <td>{{ row.latencyMs }}ms</td>
+                    <td>{{ row.errorRatePct }}%</td>
+                    <td>{{ row.status === 'ready' ? 'ready' : 'needs attention' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
         </div>
       </section>
     </div>

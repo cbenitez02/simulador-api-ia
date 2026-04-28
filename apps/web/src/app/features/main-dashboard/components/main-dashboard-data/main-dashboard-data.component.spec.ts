@@ -110,4 +110,36 @@ describe('MainDashboardDataComponent', () => {
     expect(component.endpointRowsMeta()).toEqual(projectFixture.endpointRowsMeta);
     expect(component.endpointRows()[1]?.status).toBe('needs-attention');
   });
+
+  it('treats an empty endpointRows list as no overview rows', () => {
+    const injector = Injector.create({
+      providers: [...provideAngularReactiveSchedulers(), ToastService],
+    });
+    const component = runInInjectionContext(
+      injector,
+      () => new MainDashboardDataComponent(),
+    ) as unknown as MainDashboardDataHarness & { project: () => DashboardProject };
+
+    bindProjectInput(component, {
+      ...projectFixture,
+      metrics: {
+        totalEndpoints: 0,
+        totalScenarios: 0,
+        avgLatencyMs: 0,
+        errorRatePct: 0,
+        totalRequests: 0,
+      },
+      health: {
+        readyEndpoints: 0,
+        needsAttentionEndpoints: 0,
+        errorScenarioEndpoints: 0,
+        emptyScenarioEndpoints: 0,
+        timeoutScenarioEndpoints: 0,
+      },
+      endpointRows: [],
+      endpointRowsMeta: { total: 0, limit: 10, hasMore: false },
+    });
+
+    expect(component.endpointRows().length).toBe(0);
+  });
 });
