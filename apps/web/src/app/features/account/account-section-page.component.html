@@ -1,8 +1,29 @@
 <main class="account-section-page cp-scrollbar" aria-label="Account section page">
-  <header class="account-section-page__head">
-    <h1 class="account-section-page__title">{{ title() }}</h1>
-    <p class="account-section-page__sub">Manage your account and preferences</p>
-  </header>
+  @if (section() === 'account-usage') {
+    <header class="account-section-page__head account-section-page__head--usage" aria-label="Usage overview">
+      <div class="account-section-page__usage-head-top">
+        <h1 class="account-section-page__title">{{ title() }}</h1>
+        <div class="account-section-page__usage-head-meta">
+          <span
+            class="account-section-page__usage-plan-pill"
+            [class.account-section-page__usage-plan-pill--pro]="accountPlanMock === 'Pro'"
+            [class.account-section-page__usage-plan-pill--free]="accountPlanMock === 'Free'"
+            >{{ accountPlanMock }} Plan</span
+          >
+          <span class="account-section-page__usage-reset">
+            <svg lucideCalendar [size]="14" strokeWidth="1.75" aria-hidden="true"></svg>
+            Resets in {{ usageBillingResetDays }} days
+          </span>
+        </div>
+      </div>
+      <p class="account-section-page__sub">{{ subtitle() }}</p>
+    </header>
+  } @else {
+    <header class="account-section-page__head">
+      <h1 class="account-section-page__title">{{ title() }}</h1>
+      <p class="account-section-page__sub">{{ subtitle() }}</p>
+    </header>
+  }
 
   @if (section() === 'account-profile-settings') {
     <section class="account-section-page__panel account-section-page__panel--profile" aria-label="Profile summary">
@@ -28,10 +49,6 @@
           }
         </div>
       </div>
-      <button type="button" class="account-section-page__edit-btn">
-        <svg lucidePencilLine [size]="14" strokeWidth="1.9" aria-hidden="true"></svg>
-        <span>Edit</span>
-      </button>
     </section>
 
     <section class="account-section-page__panel" aria-label="Profile account information">
@@ -60,63 +77,35 @@
     </section>
   }
 
-  @if (section() === 'account-api-keys') {
-    <section class="account-section-page__panel" aria-label="API keys section">
-      <article class="account-section-page__subcard">
-        <p class="account-section-page__subcard-title">Primary key</p>
-        <p class="account-section-page__subcard-value">mk_live_2f4c7f9a•••••••••••</p>
-        <button type="button" class="account-section-page__subcard-btn">Regenerate key</button>
-      </article>
-    </section>
-  }
-
-  @if (section() === 'account-notifications') {
-    <section class="account-section-page__panel" aria-label="Notifications section">
-      <article class="account-section-page__subcard">
-        <p class="account-section-page__subcard-title">Current preferences</p>
-        <ul class="account-section-page__subcard-list">
-          <li>Build alerts: enabled</li>
-          <li>Quota warnings: enabled</li>
-          <li>Marketing emails: disabled</li>
-        </ul>
-      </article>
-    </section>
-  }
-
-  @if (section() === 'account-security') {
-    <section class="account-section-page__panel" aria-label="Security section">
-      <article class="account-section-page__subcard">
-        <p class="account-section-page__subcard-title">Security status</p>
-        <ul class="account-section-page__subcard-list">
-          <li>2FA: enabled</li>
-          <li>Password last changed: 22 days ago</li>
-          <li>Active sessions: 2 devices</li>
-        </ul>
-      </article>
-    </section>
-  }
-
   @if (section() === 'account-usage') {
-    <section class="account-section-page__panel" aria-label="Usage section">
-      <div class="account-section-page__panel-head account-section-page__panel-head--actions-only">
-        <button
-          type="button"
-          class="account-section-page__icon-btn"
-          title="Copy usage summary"
-          aria-label="Copy usage summary"
-        >
-          <svg lucideCopy [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
-        </button>
+    <div class="account-section-page__usage-body" aria-label="Usage overview and quotas">
+      <div class="account-section-page__usage-grid" role="list">
+        @for (row of usageQuotaRows(); track row.id) {
+          <app-usage-quota-card
+            [label]="row.label"
+            [usedFormatted]="row.usedFormatted"
+            [limitFormatted]="row.limitFormatted"
+            [used]="row.used"
+            [limit]="row.limit"
+            [pct]="row.pct"
+            [barFill]="row.barFill"
+            [icon]="row.icon"
+            [trend]="row.trend"
+          />
+        }
       </div>
-      <article class="account-section-page__usage-card">
-        <p class="account-section-page__usage-title">Usage this month</p>
-        <ul class="account-section-page__usage-list">
-          @for (usage of usageHighlights; track usage) {
-            <li>{{ usage }}</li>
-          }
-        </ul>
-      </article>
-    </section>
+      <div class="account-section-page__usage-full-row">
+        <app-usage-endpoint-usage />
+      </div>
+      <div class="account-section-page__usage-chart-row">
+        <div class="account-section-page__usage-chart-col">
+          <app-usage-requests-over-time />
+        </div>
+        <div class="account-section-page__usage-chart-col">
+          <app-usage-ai-side-card />
+        </div>
+      </div>
+    </div>
   }
 
   @if (section() === 'account-plan-billing') {
@@ -124,7 +113,7 @@
       <article class="account-section-page__billing-card">
         <p class="account-section-page__billing-plan">
           Current Plan:
-          <span class="account-section-page__billing-plan-pill">Free</span>
+          <span class="account-section-page__billing-plan-pill">{{ accountPlanMock }}</span>
         </p>
         <ul class="account-section-page__billing-list">
           @for (highlight of billingHighlights; track highlight) {

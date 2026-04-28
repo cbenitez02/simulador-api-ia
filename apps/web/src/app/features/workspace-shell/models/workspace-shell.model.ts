@@ -6,9 +6,6 @@ export type WorkspaceNavId =
   | 'history'
   | 'workspace'
   | 'account-profile-settings'
-  | 'account-api-keys'
-  | 'account-notifications'
-  | 'account-security'
   | 'account-usage'
   | 'account-plan-billing';
 

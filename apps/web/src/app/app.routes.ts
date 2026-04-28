@@ -9,9 +9,6 @@ const WORKSPACE_NAV_ROUTES = new Set<WorkspaceNavId>([
   'history',
   'workspace',
   'account-profile-settings',
-  'account-api-keys',
-  'account-notifications',
-  'account-security',
   'account-usage',
   'account-plan-billing',
 ]);

@@ -5,13 +5,11 @@
 .account-section-page {
   flex: 1;
   min-width: 0;
-  min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem;
-  font-family: Inter, system-ui, sans-serif;
 }
 
 .account-section-page__head {
@@ -24,7 +22,6 @@
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
   color: var(--cp-text-primary);
 }
 
@@ -44,7 +41,7 @@
 .account-section-page__panel--profile {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
 }
 
@@ -61,13 +58,10 @@
   height: 60px;
   border-radius: 8px;
   overflow: hidden;
-  line-height: 0;
   border: 1px solid var(--cp-border-muted);
-  box-sizing: border-box;
 }
 
 .account-section-page__avatar {
-  box-sizing: border-box;
   width: 100%;
   height: 100%;
   border-radius: 7px;
@@ -76,7 +70,6 @@
   color: var(--cp-text-icon-muted);
   font-size: 0.82rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
 }
 
 .account-section-page__avatar:not(.account-section-page__avatar--image) {
@@ -104,7 +97,6 @@
 
 .account-section-page__email,
 .account-section-page__company {
-  margin: 0.2rem 0 0;
   font-size: 0.8rem;
   color: var(--cp-text-muted);
 }
@@ -114,7 +106,6 @@
   color: var(--cp-text-primary);
   font-size: 0.9375rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .account-section-page__section-sub {
@@ -161,13 +152,11 @@
 .account-section-page__info-label {
   font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--cp-text-subtle);
 }
 
 .account-section-page__info-value {
-  margin-top: 0.2rem;
   font-size: 0.86rem;
   color: var(--cp-text-body);
   font-weight: 600;
@@ -179,10 +168,6 @@
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
-}
-
-.account-section-page__panel-head--actions-only {
-  justify-content: flex-end;
 }
 
 .account-section-page__icon-btn {
@@ -257,7 +242,6 @@
   border-color: var(--cp-border-input-hover);
 }
 
-.account-section-page__usage-card,
 .account-section-page__billing-card {
   border: 1px solid var(--cp-border-default);
   border-radius: 10px;
@@ -265,15 +249,11 @@
   padding: 0.875rem 0.9rem;
 }
 
-.account-section-page__usage-title,
 .account-section-page__billing-plan {
   margin: 0;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--cp-text-body);
-}
-
-.account-section-page__billing-plan {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -288,11 +268,8 @@
   color: var(--cp-accent-primary);
   font-size: 0.625rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
-.account-section-page__usage-list,
 .account-section-page__billing-list {
   margin: 0.6rem 0 0;
   padding: 0 0 0 1rem;
@@ -301,6 +278,142 @@
   gap: 0.28rem;
   color: var(--cp-text-muted);
   font-size: 0.8125rem;
+}
+
+/* --- Usage page (quota cards) --- */
+
+.account-section-page__head--usage {
+  gap: 0.45rem;
+  margin-bottom: 0.15rem;
+}
+
+.account-section-page__head--usage .account-section-page__title {
+  flex: 1;
+  min-width: min(100%, 140px);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.account-section-page__head--usage .account-section-page__sub {
+  margin-top: 0.15rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  max-width: 36rem;
+}
+
+.account-section-page__usage-head-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.account-section-page__usage-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem 1rem;
+}
+
+.account-section-page__usage-plan-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--cp-border-default);
+  background: var(--cp-surface-raised);
+  color: var(--cp-text-body);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.account-section-page__usage-plan-pill--pro {
+  border-color: color-mix(in srgb, var(--cp-text-primary) 22%, var(--cp-border-default));
+  color: var(--cp-text-primary);
+}
+
+.account-section-page__usage-plan-pill--free {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--cp-text-primary) 28%, var(--cp-border-default));
+  color: var(--cp-text-primary);
+}
+
+.account-section-page__usage-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--cp-text-muted);
+  white-space: nowrap;
+}
+
+.account-section-page__usage-reset svg {
+  flex-shrink: 0;
+}
+
+.account-section-page__usage-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.account-section-page__usage-chart-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.account-section-page__usage-chart-col {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-section-page__usage-chart-col > app-usage-requests-over-time,
+.account-section-page__usage-chart-col > app-usage-ai-side-card {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.account-section-page__usage-full-row {
+  min-width: 0;
+}
+
+.account-section-page__usage-full-row > app-usage-endpoint-usage {
+  display: block;
+}
+
+@media (max-width: 1024px) {
+  .account-section-page__usage-chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account-section-page__usage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .account-section-page__usage-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .account-section-page__usage-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .account-section-page__upgrade-btn {
@@ -321,27 +434,6 @@
 
 .account-section-page__upgrade-btn:hover {
   background: var(--cp-accent-primary-hover);
-}
-
-.account-section-page__edit-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--cp-border-default);
-  border-radius: 8px;
-  background: var(--cp-surface-app);
-  color: var(--cp-text-primary);
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.5rem 0.875rem;
-  white-space: nowrap;
-}
-
-.account-section-page__edit-btn:hover {
-  background: var(--cp-surface-subtle);
-  border-color: var(--cp-border-input-hover);
 }
 
 @media (max-width: 720px) {
@@ -365,7 +457,16 @@
     align-items: flex-start;
   }
 
-  .account-section-page__edit-btn,
+  .account-section-page__usage-head-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-section-page__usage-head-meta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .account-section-page__upgrade-btn {
     width: 100%;
     justify-content: center;

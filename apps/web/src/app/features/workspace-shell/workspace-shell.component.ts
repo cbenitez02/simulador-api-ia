@@ -1,4 +1,3 @@
-import { TitleCasePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal, type OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -89,9 +88,6 @@ const WORKSPACE_NAV_ROUTES = new Set<WorkspaceNavId>([
   'history',
   'workspace',
   'account-profile-settings',
-  'account-api-keys',
-  'account-notifications',
-  'account-security',
   'account-usage',
   'account-plan-billing',
 ]);
@@ -113,7 +109,6 @@ const isWorkspaceNavId = (value: string | null): value is WorkspaceNavId =>
     MainDashboardDataComponent,
     MainDashboardSidebarComponent,
     MainDashboardUtilitySidebarComponent,
-    TitleCasePipe,
     GlobalConfigDrawerComponent,
     CreateProjectModalComponent,
     ConfirmDialogComponent,
@@ -144,9 +139,6 @@ export class WorkspaceShellComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly accountNavRoutes = new Set<WorkspaceNavId>([
     'account-profile-settings',
-    'account-api-keys',
-    'account-notifications',
-    'account-security',
     'account-usage',
     'account-plan-billing',
   ]);
@@ -479,13 +471,6 @@ export class WorkspaceShellComponent implements OnInit {
       name: this.projects().length === 0 ? 'My first project' : 'New project',
       description: 'Your mock API workspace.',
     });
-  }
-
-  protected loadDemoProject(): void {
-    void this.createProject(
-      { name: 'Demo: Users API', description: 'Sample users endpoint generated for the demo.' },
-      'GET /users',
-    );
   }
 
   protected selectProject(id: string): void {

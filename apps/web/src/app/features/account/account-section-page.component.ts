@@ -1,15 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { LucideCopy, LucideFileText, LucideHistory, LucidePencilLine, LucideUsers } from '@lucide/angular';
+import { LucideCalendar, LucideCopy, LucideFileText, LucideHistory, LucideUsers } from '@lucide/angular';
 
 import { FrontendAuthSessionService } from '../../shared/auth/frontend-auth-session.service';
+import { UsageAiSideCardComponent } from './components/usage-ai-side-card/usage-ai-side-card.component';
+import { UsageQuotaCardComponent } from './components/usage-quota-card/usage-quota-card.component';
+import type { UsageQuotaCardIcon } from './components/usage-quota-card/usage-quota-card.model';
+import { UsageEndpointUsageComponent } from './components/usage-endpoint-usage/usage-endpoint-usage.component';
+import { UsageRequestsOverTimeComponent } from './components/usage-requests-over-time/usage-requests-over-time.component';
 
-type AccountSectionNavId =
-  | 'account-profile-settings'
-  | 'account-api-keys'
-  | 'account-notifications'
-  | 'account-security'
-  | 'account-usage'
-  | 'account-plan-billing';
+type AccountSectionNavId = 'account-profile-settings' | 'account-usage' | 'account-plan-billing';
 
 interface AccountField {
   icon: 'copy' | 'history' | 'file' | 'users';
@@ -17,10 +16,73 @@ interface AccountField {
   value: string;
 }
 
+interface UsageQuotaCard {
+  id: string;
+  label: string;
+  used: number;
+  limit: number;
+  icon: UsageQuotaCardIcon;
+  trend?: { direction: 'up' | 'down'; pct: number };
+}
+
+interface UsageQuotaRow extends UsageQuotaCard {
+  pct: number;
+  /** Verde por defecto; naranja en requests con uso alto (como referencia visual). */
+  barFill: 'accent' | 'orange';
+  usedFormatted: string;
+  limitFormatted: string;
+}
+
+const USAGE_QUOTA_CARDS_MOCK: readonly UsageQuotaCard[] = [
+  {
+    id: 'requests',
+    label: 'Requests this month',
+    used: 8432,
+    limit: 10000,
+    icon: 'requests',
+    trend: { direction: 'up', pct: 12 },
+  },
+  {
+    id: 'endpoints',
+    label: 'Endpoints created',
+    used: 12,
+    limit: 20,
+    icon: 'endpoints',
+    trend: { direction: 'up', pct: 5 },
+  },
+  {
+    id: 'ai',
+    label: 'AI generations',
+    used: 24,
+    limit: 50,
+    icon: 'ai',
+    trend: { direction: 'down', pct: 8 },
+  },
+  {
+    id: 'projects',
+    label: 'Projects',
+    used: 2,
+    limit: 3,
+    icon: 'projects',
+  },
+] as const;
+
+const USAGE_NUMBER_FORMAT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
 @Component({
   selector: 'app-account-section-page',
   standalone: true,
-  imports: [LucideCopy, LucideFileText, LucideHistory, LucidePencilLine, LucideUsers],
+  imports: [
+    UsageAiSideCardComponent,
+    UsageEndpointUsageComponent,
+    UsageQuotaCardComponent,
+    UsageRequestsOverTimeComponent,
+    LucideCalendar,
+    LucideCopy,
+    LucideFileText,
+    LucideHistory,
+    LucideUsers,
+  ],
   templateUrl: './account-section-page.component.html',
   styleUrls: ['./account-section-page.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,6 +94,9 @@ export class AccountSectionPageComponent {
 
   /** Mock: sustituir por dato real cuando exista API de billing (`Free` | `Pro`). */
   protected readonly accountPlanMock: 'Free' | 'Pro' = 'Free';
+
+  /** Mock: días hasta el reset del período de facturación. */
+  protected readonly usageBillingResetDays = 12;
 
   /** Perfil desde la sesión Clerk (misma fuente que el sidebar y las llamadas API). */
   protected readonly profileDisplay = computed(() => {
@@ -69,26 +134,38 @@ export class AccountSectionPageComponent {
 
   protected readonly billingHighlights: readonly string[] = ['5 endpoints', '1000 requests/month', 'No AI generation'];
 
-  protected readonly usageHighlights: readonly string[] = [
-    '2,340 requests this month',
-    '8 endpoints created',
-    '12 AI generations',
-  ];
+  /** Mock enriquecido para la cuadrícula Usage; sustituir por API cuando exista. */
+  protected readonly usageQuotaRows = computed((): UsageQuotaRow[] => {
+    return USAGE_QUOTA_CARDS_MOCK.map((c) => {
+      const pct = c.limit <= 0 ? 0 : Math.min(100, Math.round((c.used / c.limit) * 1000) / 10);
+      const barFill: 'accent' | 'orange' = c.id === 'requests' && pct >= 72 ? 'orange' : 'accent';
+      return {
+        ...c,
+        pct,
+        barFill,
+        usedFormatted: USAGE_NUMBER_FORMAT.format(c.used),
+        limitFormatted: USAGE_NUMBER_FORMAT.format(c.limit),
+      };
+    });
+  });
 
   protected readonly title = computed(() => {
     switch (this.section()) {
       case 'account-profile-settings':
         return 'Profile Settings';
-      case 'account-api-keys':
-        return 'API Keys';
-      case 'account-notifications':
-        return 'Notifications';
-      case 'account-security':
-        return 'Security';
       case 'account-usage':
         return 'Usage';
       case 'account-plan-billing':
         return 'Plan / Billing';
+    }
+  });
+
+  protected readonly subtitle = computed(() => {
+    switch (this.section()) {
+      case 'account-usage':
+        return 'Monitor your API requests and resource consumption';
+      default:
+        return 'Manage your account and preferences';
     }
   });
 }
