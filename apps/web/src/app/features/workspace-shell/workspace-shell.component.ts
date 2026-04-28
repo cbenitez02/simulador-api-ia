@@ -1,4 +1,3 @@
-import { TitleCasePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal, type OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -110,7 +109,6 @@ const isWorkspaceNavId = (value: string | null): value is WorkspaceNavId =>
     MainDashboardDataComponent,
     MainDashboardSidebarComponent,
     MainDashboardUtilitySidebarComponent,
-    TitleCasePipe,
     GlobalConfigDrawerComponent,
     CreateProjectModalComponent,
     ConfirmDialogComponent,
