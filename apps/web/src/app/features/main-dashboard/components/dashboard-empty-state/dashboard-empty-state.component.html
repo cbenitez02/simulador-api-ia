@@ -9,11 +9,6 @@
       <svg lucidePlus [size]="18" strokeWidth="2.25" aria-hidden="true"></svg>
       Create your first project
     </button>
-    <button type="button" class="empty__link" (click)="tryDemoProject.emit()">
-      <svg lucidePlay [size]="14" strokeWidth="2" aria-hidden="true"></svg>
-      Try a demo project
-      <span class="empty__link-chevron" aria-hidden="true">&gt;</span>
-    </button>
   </div>
 
   <section class="empty__example" aria-labelledby="empty-example-heading">
@@ -31,11 +26,6 @@
     </div>
     <div class="empty__example-footer">
       <p class="empty__example-hint">AI will generate endpoints, scenarios &amp; mock data</p>
-      <button type="button" class="empty__btn empty__btn--outline" (click)="generateDemoFromCard.emit()">
-        <svg lucideSparkles [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
-        Generate demo project
-        <svg lucideArrowRight [size]="16" strokeWidth="1.75" aria-hidden="true"></svg>
-      </button>
     </div>
   </section>
 

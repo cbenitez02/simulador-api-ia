@@ -44,7 +44,7 @@
 .account-section-page__panel--profile {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
 }
 
@@ -257,7 +257,6 @@
   border-color: var(--cp-border-input-hover);
 }
 
-.account-section-page__usage-card,
 .account-section-page__billing-card {
   border: 1px solid var(--cp-border-default);
   border-radius: 10px;
@@ -265,7 +264,6 @@
   padding: 0.875rem 0.9rem;
 }
 
-.account-section-page__usage-title,
 .account-section-page__billing-plan {
   margin: 0;
   font-size: 0.8125rem;
@@ -292,7 +290,6 @@
   text-transform: uppercase;
 }
 
-.account-section-page__usage-list,
 .account-section-page__billing-list {
   margin: 0.6rem 0 0;
   padding: 0 0 0 1rem;
@@ -301,6 +298,152 @@
   gap: 0.28rem;
   color: var(--cp-text-muted);
   font-size: 0.8125rem;
+}
+
+/* --- Usage page (quota cards) --- */
+
+.account-section-page__head--usage {
+  gap: 0.45rem;
+  margin-bottom: 0.15rem;
+}
+
+.account-section-page__head--usage .account-section-page__title {
+  flex: 1;
+  min-width: min(100%, 140px);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.account-section-page__head--usage .account-section-page__sub {
+  margin-top: 0.15rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  max-width: 36rem;
+}
+
+.account-section-page__usage-head-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.account-section-page__usage-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem 1rem;
+}
+
+.account-section-page__usage-plan-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--cp-border-default);
+  background: var(--cp-surface-raised);
+  color: var(--cp-text-body);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.account-section-page__usage-plan-pill--pro {
+  border-color: color-mix(in srgb, var(--cp-text-primary) 22%, var(--cp-border-default));
+  color: var(--cp-text-primary);
+}
+
+.account-section-page__usage-plan-pill--free {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--cp-text-primary) 28%, var(--cp-border-default));
+  color: var(--cp-text-primary);
+}
+
+.account-section-page__usage-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--cp-text-muted);
+  white-space: nowrap;
+}
+
+.account-section-page__usage-reset svg {
+  flex-shrink: 0;
+  color: var(--cp-text-subtle);
+}
+
+.account-section-page__usage-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.account-section-page__usage-chart-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.account-section-page__usage-chart-col {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-self: stretch;
+}
+
+.account-section-page__usage-chart-col > app-usage-requests-over-time,
+.account-section-page__usage-chart-col > app-usage-ai-side-card {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.account-section-page__usage-full-row {
+  min-width: 0;
+  width: 100%;
+}
+
+.account-section-page__usage-full-row > app-usage-endpoint-usage {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .account-section-page__usage-chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account-section-page__usage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .account-section-page__usage-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .account-section-page__usage-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .account-section-page__upgrade-btn {
@@ -321,27 +464,6 @@
 
 .account-section-page__upgrade-btn:hover {
   background: var(--cp-accent-primary-hover);
-}
-
-.account-section-page__edit-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--cp-border-default);
-  border-radius: 8px;
-  background: var(--cp-surface-app);
-  color: var(--cp-text-primary);
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.5rem 0.875rem;
-  white-space: nowrap;
-}
-
-.account-section-page__edit-btn:hover {
-  background: var(--cp-surface-subtle);
-  border-color: var(--cp-border-input-hover);
 }
 
 @media (max-width: 720px) {
@@ -365,7 +487,16 @@
     align-items: flex-start;
   }
 
-  .account-section-page__edit-btn,
+  .account-section-page__usage-head-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-section-page__usage-head-meta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .account-section-page__upgrade-btn {
     width: 100%;
     justify-content: center;

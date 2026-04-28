@@ -1,0 +1,70 @@
+<section class="usage-endpoint-usage" aria-labelledby="usage-endpoint-usage-title">
+  <header class="usage-endpoint-usage__head">
+    <div class="usage-endpoint-usage__titles">
+      <h2 id="usage-endpoint-usage-title" class="usage-endpoint-usage__title">Endpoint Usage</h2>
+      <p class="usage-endpoint-usage__sub">Top performing endpoints this period</p>
+    </div>
+  </header>
+
+  <div class="usage-endpoint-usage__table-wrap" role="region" aria-label="Endpoint usage table">
+    <table class="usage-endpoint-usage__table">
+      <thead>
+        <tr>
+          <th scope="col" class="usage-endpoint-usage__th usage-endpoint-usage__th--endpoint">Endpoint</th>
+          <th scope="col" class="usage-endpoint-usage__th usage-endpoint-usage__th--num">Requests</th>
+          <th scope="col" class="usage-endpoint-usage__th usage-endpoint-usage__th--num">Avg Latency</th>
+          <th scope="col" class="usage-endpoint-usage__th usage-endpoint-usage__th--num">Error Rate</th>
+          <th scope="col" class="usage-endpoint-usage__th usage-endpoint-usage__th--num">Trend</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.id) {
+          <tr class="usage-endpoint-usage__row">
+            <td class="usage-endpoint-usage__td usage-endpoint-usage__td--endpoint">
+              <div class="usage-endpoint-usage__endpoint-inner">
+                <span class="usage-endpoint-usage__method">{{ row.method }}</span>
+                <span class="usage-endpoint-usage__path">{{ row.path }}</span>
+                @if (row.mostUsed) {
+                  <span class="usage-endpoint-usage__badge">Most used</span>
+                }
+              </div>
+            </td>
+            <td class="usage-endpoint-usage__td usage-endpoint-usage__td--num">{{ formatRequests(row.requests) }}</td>
+            <td class="usage-endpoint-usage__td usage-endpoint-usage__td--num">
+              {{ formatLatency(row.avgLatencyMs) }}
+            </td>
+            <td
+              class="usage-endpoint-usage__td usage-endpoint-usage__td--num"
+              [class.usage-endpoint-usage__error--low]="errorTier(row.errorRatePct) === 'low'"
+              [class.usage-endpoint-usage__error--medium]="errorTier(row.errorRatePct) === 'medium'"
+              [class.usage-endpoint-usage__error--high]="errorTier(row.errorRatePct) === 'high'"
+            >
+              {{ formatErrorPct(row.errorRatePct) }}
+            </td>
+            <td class="usage-endpoint-usage__td usage-endpoint-usage__td--num">
+              <span
+                class="usage-endpoint-usage__trend"
+                [class.usage-endpoint-usage__trend--up]="row.trend.direction === 'up'"
+                [class.usage-endpoint-usage__trend--down]="row.trend.direction === 'down'"
+                [attr.aria-label]="
+                  row.trend.direction === 'up'
+                    ? 'Trend up ' + row.trend.pct + ' percent'
+                    : 'Trend down ' + row.trend.pct + ' percent'
+                "
+              >
+                @if (row.trend.direction === 'up') {
+                  <svg lucideTrendingUp [size]="14" strokeWidth="2" aria-hidden="true"></svg>
+                } @else {
+                  <svg lucideTrendingDown [size]="14" strokeWidth="2" aria-hidden="true"></svg>
+                }
+                <span class="usage-endpoint-usage__trend-text">{{
+                  formatTrendSigned(row.trend.direction, row.trend.pct)
+                }}</span>
+              </span>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

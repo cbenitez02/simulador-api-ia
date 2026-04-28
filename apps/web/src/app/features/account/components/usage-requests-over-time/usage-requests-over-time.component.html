@@ -1,0 +1,88 @@
+<section class="usage-requests-over-time" aria-labelledby="usage-requests-chart-title">
+  <div class="usage-requests-over-time__head">
+    <div class="usage-requests-over-time__titles">
+      <h2 id="usage-requests-chart-title" class="usage-requests-over-time__title">Requests over time</h2>
+      <p class="usage-requests-over-time__sub">Daily API request volume</p>
+    </div>
+    <div class="usage-requests-over-time__range" role="group" aria-label="Time range">
+      <button
+        type="button"
+        class="usage-requests-over-time__pill"
+        [class.usage-requests-over-time__pill--active]="range() === '7d'"
+        (click)="selectRange('7d')"
+        [attr.aria-pressed]="range() === '7d' ? 'true' : 'false'"
+      >
+        7d
+      </button>
+      <button
+        type="button"
+        class="usage-requests-over-time__pill"
+        [class.usage-requests-over-time__pill--active]="range() === '30d'"
+        (click)="selectRange('30d')"
+        [attr.aria-pressed]="range() === '30d' ? 'true' : 'false'"
+      >
+        30d
+      </button>
+    </div>
+  </div>
+
+  <div class="usage-requests-over-time__plot-wrap">
+    @let L = chartLayout();
+    <svg
+      class="usage-requests-over-time__svg"
+      [attr.viewBox]="L.viewBox"
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      [attr.aria-label]="ariaLabel()"
+    >
+      @for (y of L.horizontalYs; track $index) {
+        <line
+          class="usage-requests-over-time__grid usage-requests-over-time__grid--h"
+          [attr.x1]="L.plotL"
+          [attr.x2]="L.plotR"
+          [attr.y1]="y"
+          [attr.y2]="y"
+        />
+      }
+
+      @for (x of L.verticalXs; track $index) {
+        <line
+          class="usage-requests-over-time__grid usage-requests-over-time__grid--v"
+          [attr.x1]="x"
+          [attr.x2]="x"
+          [attr.y1]="L.plotT"
+          [attr.y2]="L.plotB"
+        />
+      }
+
+      @for (t of L.yTickLabels; track t.v) {
+        <text
+          class="usage-requests-over-time__axis usage-requests-over-time__axis--y"
+          [attr.x]="L.yAxisTextX"
+          [attr.y]="t.y + 4"
+          text-anchor="end"
+        >
+          {{ t.v }}
+        </text>
+      }
+
+      @for (xl of L.xLabels; track xl.x) {
+        <text
+          class="usage-requests-over-time__axis usage-requests-over-time__axis--x"
+          [attr.x]="xl.x"
+          y="140"
+          text-anchor="middle"
+        >
+          {{ xl.label }}
+        </text>
+      }
+
+      <path
+        class="usage-requests-over-time__line"
+        [attr.d]="L.linePath"
+        fill="none"
+        vector-effect="non-scaling-stroke"
+      />
+    </svg>
+  </div>
+</section>

@@ -103,11 +103,7 @@
 } @else if (!hasProjects() && !isAccountNav()) {
   @if (activeNav() === 'dashboard') {
     <div class="workspace__main workspace__main--welcome">
-      <app-dashboard-empty-state
-        (createFirstProject)="openCreateProjectModal()"
-        (tryDemoProject)="loadDemoProject()"
-        (generateDemoFromCard)="loadDemoProject()"
-      />
+      <app-dashboard-empty-state (createFirstProject)="openCreateProjectModal()" />
     </div>
   } @else {
     <main class="workspace__main workspace__main--needs-project" aria-label="No project">
@@ -126,13 +122,6 @@
           </button>
           <button type="button" class="workspace__needs-project-btn" (click)="openCreateProjectModal()">
             Create project
-          </button>
-          <button
-            type="button"
-            class="workspace__needs-project-btn workspace__needs-project-btn--ghost"
-            (click)="loadDemoProject()"
-          >
-            Try demo project
           </button>
         </div>
       </div>
@@ -209,18 +198,6 @@
 } @else if (activeNav() === 'account-profile-settings') {
   <main class="workspace__main" aria-label="Profile settings">
     <app-account-section-page section="account-profile-settings"></app-account-section-page>
-  </main>
-} @else if (activeNav() === 'account-api-keys') {
-  <main class="workspace__main" aria-label="API keys">
-    <app-account-section-page section="account-api-keys"></app-account-section-page>
-  </main>
-} @else if (activeNav() === 'account-notifications') {
-  <main class="workspace__main" aria-label="Notifications">
-    <app-account-section-page section="account-notifications"></app-account-section-page>
-  </main>
-} @else if (activeNav() === 'account-security') {
-  <main class="workspace__main" aria-label="Security">
-    <app-account-section-page section="account-security"></app-account-section-page>
   </main>
 } @else if (activeNav() === 'account-usage') {
   <main class="workspace__main" aria-label="Usage">

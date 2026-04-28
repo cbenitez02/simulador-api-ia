@@ -1,0 +1,56 @@
+<article class="usage-quota-card" role="listitem">
+  <div class="usage-quota-card__top">
+    <h2 class="usage-quota-card__label">{{ label() }}</h2>
+    <span class="usage-quota-card__icon" [class.usage-quota-card__icon--accent]="icon() === 'ai'" aria-hidden="true">
+      @switch (icon()) {
+        @case ('requests') {
+          <svg lucideBarChart3 [size]="18" strokeWidth="1.75"></svg>
+        }
+        @case ('endpoints') {
+          <svg lucideArrowUpDown [size]="18" strokeWidth="1.75"></svg>
+        }
+        @case ('ai') {
+          <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
+        }
+        @case ('projects') {
+          <svg lucideFolder [size]="18" strokeWidth="1.75"></svg>
+        }
+      }
+    </span>
+  </div>
+  <p class="usage-quota-card__values">
+    <span class="usage-quota-card__used">{{ usedFormatted() }}</span>
+    <span class="usage-quota-card__sep"> / </span>
+    <span class="usage-quota-card__limit">{{ limitFormatted() }}</span>
+  </p>
+  <div
+    class="usage-quota-card__bar"
+    role="progressbar"
+    [attr.aria-valuenow]="used()"
+    [attr.aria-valuemin]="0"
+    [attr.aria-valuemax]="limit()"
+    [attr.aria-label]="label() + ': ' + pct() + ' percent'"
+  >
+    <div
+      class="usage-quota-card__bar-fill"
+      [class.usage-quota-card__bar-fill--orange]="barFill() === 'orange'"
+      [style.width.%]="pct()"
+    ></div>
+  </div>
+  <div class="usage-quota-card__trend-slot">
+    @if (trend(); as trendVal) {
+      <p
+        class="usage-quota-card__trend"
+        [class.usage-quota-card__trend--up]="trendVal.direction === 'up'"
+        [class.usage-quota-card__trend--down]="trendVal.direction === 'down'"
+      >
+        @if (trendVal.direction === 'up') {
+          <svg lucideTrendingUp [size]="14" strokeWidth="2" aria-hidden="true"></svg>
+        } @else {
+          <svg lucideTrendingDown [size]="14" strokeWidth="2" aria-hidden="true"></svg>
+        }
+        <span>{{ trendVal.pct }}% vs last period</span>
+      </p>
+    }
+  </div>
+</article>

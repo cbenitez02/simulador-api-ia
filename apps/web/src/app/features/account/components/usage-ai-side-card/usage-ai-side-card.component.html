@@ -1,0 +1,39 @@
+<article class="usage-ai-side" aria-labelledby="usage-ai-side-title">
+  <div class="usage-ai-side__head">
+    <div class="usage-ai-side__titles">
+      <h2 id="usage-ai-side-title" class="usage-ai-side__title">{{ copy.title }}</h2>
+      <p class="usage-ai-side__sub">{{ copy.subtitle }}</p>
+    </div>
+    <span class="usage-ai-side__icon" aria-hidden="true">
+      <svg lucideSparkles [size]="18" strokeWidth="1.75"></svg>
+    </span>
+  </div>
+
+  <div class="usage-ai-side__stat-row">
+    <span class="usage-ai-side__stat-main">{{ usedFormatted }}</span>
+    <span class="usage-ai-side__stat-of">of {{ limitFormatted }}</span>
+  </div>
+
+  <div
+    class="usage-ai-side__bar"
+    role="progressbar"
+    [attr.aria-valuenow]="copy.used"
+    [attr.aria-valuemin]="0"
+    [attr.aria-valuemax]="copy.limit"
+    [attr.aria-label]="copy.title + ': ' + pct + ' percent'"
+  >
+    <div class="usage-ai-side__bar-fill" [style.width.%]="pct"></div>
+  </div>
+
+  <div class="usage-ai-side__inset">
+    <p class="usage-ai-side__inset-label">Tokens consumed</p>
+    <p class="usage-ai-side__inset-value">{{ tokensFormatted }}</p>
+  </div>
+
+  <div class="usage-ai-side__activity">
+    <p class="usage-ai-side__activity-label">Last activity</p>
+    <p class="usage-ai-side__activity-value">{{ copy.lastActivityLabel }}</p>
+  </div>
+
+  <button type="button" class="usage-ai-side__btn" (click)="onViewHistory()">View AI history</button>
+</article>
