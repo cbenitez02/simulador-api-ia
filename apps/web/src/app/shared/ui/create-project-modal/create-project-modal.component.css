@@ -147,6 +147,22 @@
   padding: 0.4rem 0.65rem;
 }
 
+select.cnp-modal__input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.35rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem 1rem;
+}
+
+select.cnp-modal__input:disabled {
+  cursor: not-allowed;
+}
+
 .cnp-modal__textarea {
   padding: 0.45rem 0.65rem;
   resize: vertical;
@@ -155,6 +171,9 @@
 
 .cnp-modal__textarea--body {
   min-height: 2.85rem;
+  /* Cap resize to ~3 text lines: 3×(font-size × line-height) + vertical padding + border */
+  max-height: calc(3 * 1.45 * 0.8125rem + 0.45rem * 2 + 2px);
+  overflow-y: auto;
 }
 
 .cnp-modal__textarea--prompt {
@@ -199,15 +218,32 @@
   color: var(--cp-text-icon-muted, #a3a3a3);
 }
 
-.cnp-modal__info-note {
+.cnp-modal__warn-note {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   margin: 0;
   padding: 0.7rem 0.8rem;
   border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--cp-accent-primary) 28%, var(--cp-border-default));
-  background: color-mix(in srgb, var(--cp-surface-app) 82%, var(--cp-accent-primary) 18%);
-  color: var(--cp-text-body);
+  border: 1px solid color-mix(in srgb, hsl(38 92% 50%) 38%, var(--cp-border-default));
+  background: color-mix(in srgb, var(--cp-surface-app) 72%, hsl(38 92% 50%) 14%);
   font-size: 0.75rem;
   line-height: 1.45;
+  color: color-mix(in srgb, var(--cp-text-body) 90%, hsl(38 90% 78%) 10%);
+}
+
+.cnp-modal__warn-note-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(38 92% 50%);
+}
+
+.cnp-modal__warn-note-text {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 /* AI feature card */

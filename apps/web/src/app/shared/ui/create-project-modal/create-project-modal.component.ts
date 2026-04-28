@@ -8,11 +8,11 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { LucideLoader2, LucideSparkles } from '@lucide/angular';
+import { LucideAlertTriangle, LucideLoader2, LucideSparkles } from '@lucide/angular';
 
+import { projectRecoverySubtitle } from '../../utils/endpoint-flow-ui';
 import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
 import { ToggleSwitchComponent } from '../toggle-switch/toggle-switch.component';
-import { projectRecoverySubtitle } from '../../utils/endpoint-flow-ui';
 import type {
   CreateProjectModalPayload,
   CreateProjectPartialSuccessState,
@@ -28,7 +28,7 @@ let createProjectModalUid = 0;
 @Component({
   selector: 'app-create-project-modal',
   standalone: true,
-  imports: [InlineAlertComponent, LucideLoader2, LucideSparkles, ToggleSwitchComponent],
+  imports: [InlineAlertComponent, LucideAlertTriangle, LucideLoader2, LucideSparkles, ToggleSwitchComponent],
   templateUrl: './create-project-modal.component.html',
   styleUrls: ['./create-project-modal.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
