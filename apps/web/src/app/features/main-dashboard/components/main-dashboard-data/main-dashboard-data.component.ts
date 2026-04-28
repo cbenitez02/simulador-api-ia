@@ -7,8 +7,10 @@ import {
   LucideCheck,
   LucideClock,
   LucideCopy,
-  LucideFileText,
+  LucideLayers,
   LucidePencil,
+  LucidePlus,
+  LucideRoute,
   LucideTrash2,
 } from '@lucide/angular';
 import { HttpMethodBadgeComponent } from '../../../../shared/ui/http-method-badge/http-method-badge.component';
@@ -30,8 +32,10 @@ import type { DashboardProject } from '../../models/dashboard-project.model';
     LucideCheck,
     LucideClock,
     LucideCopy,
-    LucideFileText,
+    LucideLayers,
     LucidePencil,
+    LucidePlus,
+    LucideRoute,
     LucideTrash2,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
